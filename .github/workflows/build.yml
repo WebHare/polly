@@ -19,7 +19,7 @@ jobs:
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Test PollyKit
         run: swift test --package-path Packages/PollyKit
@@ -83,7 +83,7 @@ jobs:
           xcrun stapler staple "$DMG"
           rm "$RUNNER_TEMP/notary.p8"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.DMG }}
           path: ${{ env.DMG }}
