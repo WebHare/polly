@@ -32,7 +32,12 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
         content.sound = .default
         // One notification per server: a newer one replaces the previous instead of stacking up.
         let request = UNNotificationRequest(identifier: server.id.uuidString, content: content, trigger: nil)
-        UNUserNotificationCenter.current().add(request)
+        // The bell asks for permission, but `notifications: true` can also come from a hand-edited settings
+        // file. Without permission the system drops the notification silently, so ask here as well.
+        Task {
+            guard await requestAuthorization() else { return }
+            try? await UNUserNotificationCenter.current().add(request)
+        }
     }
 
     /// Without this a notification is dropped while the app is frontmost, which on iOS is the only time it polls.

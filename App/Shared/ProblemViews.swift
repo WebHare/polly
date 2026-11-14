@@ -112,7 +112,13 @@ private struct ProblemRow: View {
             return
         }
         // Creating a backend reads the password, so only do that for a row that is actually opened.
-        capabilities = (try? monitor.backend(for: server).capabilities) ?? []
+        do {
+            capabilities = try monitor.backend(for: server).capabilities
+        } catch {
+            // Without this a password that can't be read looks like a server without any actions.
+            capabilities = []
+            message = error.localizedDescription
+        }
     }
 
     private func prepare(_ kind: CommandKind) {

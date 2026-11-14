@@ -8,6 +8,8 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         var status = 200
         var body = ""
         var redirectTo: URL?
+        /// Seconds to wait before answering, to let a later request overtake this one.
+        var delay: TimeInterval = 0
     }
 
     nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> Response)?
@@ -52,9 +54,16 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
             return
         }
         let response = HTTPURLResponse(url: request.url!, statusCode: stub.status, httpVersion: nil, headerFields: nil)!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        client?.urlProtocol(self, didLoad: Data(stub.body.utf8))
-        client?.urlProtocolDidFinishLoading(self)
+        let deliver: @Sendable () -> Void = { [self] in
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: Data(stub.body.utf8))
+            client?.urlProtocolDidFinishLoading(self)
+        }
+        if stub.delay > 0 {
+            DispatchQueue.global().asyncAfter(deadline: .now() + stub.delay, execute: deliver)
+        } else {
+            deliver()
+        }
     }
 }
 
@@ -185,6 +194,41 @@ struct TransportTests {
         for _ in 0..<4 { log.record(request: request, status: 200, body: Data(repeating: 0x61, count: 200), error: nil) }
         #expect(FileManager.default.fileExists(atPath: rotated.path(percentEncoded: false)))
         #expect(try Data(contentsOf: file).count < 600)
+    }
+
+    /// A slow poll that started before a recovery must not bring the problem back when it finally answers.
+    @MainActor @Test func staleResponseDoesNotOverwriteANewerOne() async throws {
+        let critical = Box(true)
+        let delay = Box(0.0)
+        StubProtocol.handler = { request in
+            var response = statusJSON(for: request, problems: critical.value ? #"{"web1":{"HTTP":{"status":16}}}"# : "{}")
+            response.delay = delay.value
+            return response
+        }
+        defer { StubProtocol.handler = nil }
+
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "s3cret")
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        var received: [ProblemChanges] = []
+        model.onProblemChanges = { _, changes in received.append(changes) }
+        await model.refreshAll()
+
+        delay.value = 0.5
+        async let slow: Void = model.refresh(server)
+        try await Task.sleep(for: .milliseconds(150))
+        critical.value = false
+        delay.value = 0
+        await model.refresh(server)
+        await slow
+
+        #expect(received.map { $0.recovered.map(\.id) } == [["web1/HTTP"]])
+        #expect(received.allSatisfy { $0.raised.isEmpty })
+        guard case .ok(let status) = model.states[server.id] else {
+            Issue.record("expected a status")
+            return
+        }
+        #expect(status.problems.isEmpty)
     }
 
     @MainActor @Test func modelNotifiesAfterTheBaselineAndOnlyWhenEnabled() async throws {
