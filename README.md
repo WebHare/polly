@@ -55,7 +55,7 @@ that's a member of that team in Xcode → Settings → Accounts so Xcode can cre
 ## Continuous integration
 
 `.github/workflows/build.yml` runs the PollyKit tests and builds a universal (arm64 + x86_64) Release build of
-the macOS app on every push to `master` and every pull request. The result is attached to the run as a
+the macOS app on every push to `main` and every pull request. The result is attached to the run as a
 `Polly-<version>-<run>.dmg` artifact.
 
 Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
