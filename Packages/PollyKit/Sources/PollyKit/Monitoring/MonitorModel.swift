@@ -30,6 +30,9 @@ public final class MonitorModel {
     /// Problems of the last successful fetch per server. A failed fetch keeps it, so an outage of the
     /// monitoring server itself doesn't report every problem as new once it is back.
     @ObservationIgnored private var baselines: [UUID: [ServiceProblem]] = [:]
+    /// Number of the refresh started last per server. The poll and a manual refresh can overlap, and the
+    /// answer that arrives last is not necessarily the newest.
+    @ObservationIgnored private var lastRefresh: [UUID: Int] = [:]
 
     public init(store: ServerStore, session: URLSession = .shared) {
         self.store = store
@@ -146,14 +149,17 @@ public final class MonitorModel {
     public func refresh(_ server: NagiosServer) async {
         guard isEnabled(server.id) else { return }
         if states[server.id] == nil { states[server.id] = .loading }
+        let number = (lastRefresh[server.id] ?? 0) + 1
+        lastRefresh[server.id] = number
         let result: ServerState
         do {
             result = .ok(try await backend(for: server).fetchStatus())
         } catch {
             result = .failed(error.localizedDescription)
         }
-        // The server may have been disabled or deleted while the request was in flight.
-        guard let current = enabledServer(server.id) else { return }
+        // The server may have been disabled or deleted while the request was in flight, or a refresh
+        // that started later has taken over: its answer is the newer one, whichever arrives first.
+        guard let current = enabledServer(server.id), lastRefresh[server.id] == number else { return }
         states[server.id] = result
         guard case .ok(let status) = result else { return }
         let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems)
