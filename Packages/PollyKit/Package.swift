@@ -13,9 +13,7 @@ let package = Package(
     targets: [
         .target(
             name: "PollyKit",
-            dependencies: ["Yams"],
-            // Only used to import settings from the old SQLite database (LegacySQLiteImport).
-            linkerSettings: [.linkedLibrary("sqlite3")]
+            dependencies: ["Yams"]
         ),
         .testTarget(name: "PollyKitTests", dependencies: ["PollyKit"]),
     ]

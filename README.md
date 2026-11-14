@@ -181,8 +181,6 @@ Why things are the way they are, so they can be revisited deliberately rather th
   existing passwords and reads everything first, so a keychain failure doesn't leave a half-migrated state.
 - **Window state is not a setting.** The menu panel size stays in `UserDefaults`; the Dock icon preference
   moved into `polly.yaml`.
-- **One-time import** of the old `naggie.sqlite` (renamed to `*.imported` afterwards) in
-  `LegacySQLiteImport.swift`. Safe to delete once no old installs remain.
 
 ### macOS UI
 
@@ -208,8 +206,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Tooling
 
-- **No third-party runtime dependencies besides Yams**; SQLite (only for the legacy import) and the
-  keychain are system libraries.
+- **No third-party runtime dependencies besides Yams**; the keychain is a system library.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is

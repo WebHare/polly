@@ -25,14 +25,11 @@ public final class ServerStore: @unchecked Sendable {
         URL.applicationSupportDirectory.appending(path: "Polly", directoryHint: .isDirectory)
     }
 
-    /// Opens `Application Support/Polly/polly.yaml`. On first run this imports the servers from the
-    /// SQLite database used by earlier builds, if there is one.
+    /// Opens `Application Support/Polly/polly.yaml`, creating it on first run.
     public static func makeDefault() throws -> ServerStore {
         let fileURL = defaultDirectory.appending(path: "polly.yaml")
         let exists = FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false))
-        let imported = exists ? nil : LegacySQLiteImport.run(in: defaultDirectory)
-        let store = try ServerStore(fileURL: fileURL, credentials: KeychainCredentialStore(),
-                                    initial: imported ?? PollySettings())
+        let store = try ServerStore(fileURL: fileURL, credentials: KeychainCredentialStore())
         if !exists {
             try store.withSettings { _ in } // write the file so it's there to look at / edit
         }
