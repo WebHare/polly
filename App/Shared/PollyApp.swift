@@ -1,8 +1,8 @@
-import NaggieKit
+import PollyKit
 import SwiftUI
 
 @main
-struct NaggieApp: App {
+struct PollyApp: App {
     @State private var monitor: MonitorModel
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
@@ -13,8 +13,8 @@ struct NaggieApp: App {
         do {
             store = try ServerStore.makeDefault()
         } catch {
-            // Keep the app usable (but non-persistent) if naggie.yaml can't be read, and don't overwrite it.
-            print("Naggie: failed to load settings, falling back to an in-memory store: \(error)")
+            // Keep the app usable (but non-persistent) if polly.yaml can't be read, and don't overwrite it.
+            print("Polly: failed to load settings, falling back to an in-memory store: \(error)")
             store = try! ServerStore(fileURL: nil, credentials: KeychainCredentialStore())
         }
         let monitor = MonitorModel(store: store)
@@ -33,7 +33,7 @@ struct NaggieApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Naggie Servers", id: WindowID.servers) {
+        Window("Polly Servers", id: WindowID.servers) {
             ServerListView()
                 .environment(monitor)
                 .frame(minWidth: 480, minHeight: 320)

@@ -1,14 +1,14 @@
 /* node mock/nagios-mock.mjs --no-rotate &
-   NAGGIE_MOCK_URL=http://localhost:8080 swift test --package-path Packages/NaggieKit --filter MockIntegrationTests */
+   POLLY_MOCK_URL=http://localhost:8080 swift test --package-path Packages/PollyKit --filter MockIntegrationTests */
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 /// Runs the real client against `mock/nagios-mock.mjs`. The mock is developed together with the client:
 /// when a real Nagios turns out to behave differently, change the mock first and let these tests fail.
-@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["NAGGIE_MOCK_URL"] != nil))
+@Suite(.serialized, .enabled(if: ProcessInfo.processInfo.environment["POLLY_MOCK_URL"] != nil))
 struct MockIntegrationTests {
-    private let base = URL(string: ProcessInfo.processInfo.environment["NAGGIE_MOCK_URL"] ?? "http://localhost:8080")!
+    private let base = URL(string: ProcessInfo.processInfo.environment["POLLY_MOCK_URL"] ?? "http://localhost:8080")!
     private let host = "web1.example.com"
 
     private func client(path: String = "", password: String = "nagios", cookies: Bool = true) -> NagiosClient {

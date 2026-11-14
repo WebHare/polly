@@ -1,11 +1,11 @@
 import Foundation
 import SQLite3
 
-/// One-time import of `naggie.sqlite`, used by builds before settings moved to `naggie.yaml`.
+/// One-time import of `naggie.sqlite`, used by builds before settings moved to `polly.yaml`.
 /// After a successful import the database files are renamed to `*.imported`.
 /// This file (and the sqlite3 link in Package.swift) can be removed once no old installs remain.
 enum LegacySQLiteImport {
-    static func run(in directory: URL) -> NaggieSettings? {
+    static func run(in directory: URL) -> PollySettings? {
         let dbURL = directory.appending(path: "naggie.sqlite")
         let path = dbURL.path(percentEncoded: false)
         guard FileManager.default.fileExists(atPath: path) else { return nil }
@@ -19,7 +19,7 @@ enum LegacySQLiteImport {
             sqlite3_close(handle)
         }
 
-        var settings = NaggieSettings()
+        var settings = PollySettings()
         if rows(handle, "SELECT value FROM settings WHERE key = 'password_storage'").first?["value"] == "database" {
             settings.passwordStorage = .file
         }

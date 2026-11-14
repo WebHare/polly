@@ -4,4 +4,4 @@ xcuserdata/
 *.xcuserstate
 .DS_Store
 .swiftpm/
-Packages/NaggieKit/.build/
+Packages/PollyKit/.build/

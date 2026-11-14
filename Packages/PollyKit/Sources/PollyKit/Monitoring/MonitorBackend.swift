@@ -4,7 +4,7 @@ import Foundation
 // plain "check this URL" backend are planned, so nothing in here may mention CGI names, HTML or Nagios
 // status bits.
 
-/// The type of monitoring system a server runs. Stored as `type` in naggie.yaml.
+/// The type of monitoring system a server runs. Stored as `type` in polly.yaml.
 public enum BackendKind: String, Sendable, CaseIterable {
     case nagios
 }

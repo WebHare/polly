@@ -1,4 +1,4 @@
-import NaggieKit
+import PollyKit
 import SwiftUI
 
 /// Form for adding a server. Pasting `https://user:pass@host/` fills username and password.

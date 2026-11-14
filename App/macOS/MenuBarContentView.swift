@@ -1,5 +1,5 @@
 import AppKit
-import NaggieKit
+import PollyKit
 import SwiftUI
 
 /// Icon shown in the macOS menu bar. Menu bar icons are rendered as templates (monochrome),

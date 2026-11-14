@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 struct NagiosClientTests {
     private let client = NagiosClient(endpoint: URL(string: "https://mon.example.com/nagios/cgi-bin/statusjson.cgi")!,

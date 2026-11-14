@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 /// Answers every request of a `URLSession` from a closure, so the client is tested without a network.
 final class StubProtocol: URLProtocol, @unchecked Sendable {
@@ -154,7 +154,7 @@ struct TransportTests {
     }
 
     @Test func wireLogRecordsTrafficWithoutCredentials() async throws {
-        let file = FileManager.default.temporaryDirectory.appending(path: "naggie-wire-\(UUID().uuidString).log")
+        let file = FileManager.default.temporaryDirectory.appending(path: "polly-wire-\(UUID().uuidString).log")
         defer { try? FileManager.default.removeItem(at: file) }
         StubProtocol.handler = { statusJSON(for: $0, problems: #"{"web1":{"HTTP":{"status":16,"plugin_output":"down"}}}"#) }
         defer { StubProtocol.handler = nil }
@@ -177,7 +177,7 @@ struct TransportTests {
     }
 
     @Test func wireLogRotatesInsteadOfGrowingForever() throws {
-        let file = FileManager.default.temporaryDirectory.appending(path: "naggie-wire-\(UUID().uuidString).log")
+        let file = FileManager.default.temporaryDirectory.appending(path: "polly-wire-\(UUID().uuidString).log")
         let rotated = file.appendingPathExtension("1")
         defer { try? FileManager.default.removeItem(at: file); try? FileManager.default.removeItem(at: rotated) }
         let log = WireLog(fileURL: file, maxBytes: 300)

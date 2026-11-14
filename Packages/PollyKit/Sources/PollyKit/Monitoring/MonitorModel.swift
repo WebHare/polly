@@ -20,7 +20,7 @@ public final class MonitorModel {
     public var pollInterval: Duration = .seconds(60)
 
     @ObservationIgnored public let store: ServerStore
-    /// `naggie-debug.log` next to naggie.yaml; nil for an in-memory store. Only passed to backends while
+    /// `polly-debug.log` next to polly.yaml; nil for an in-memory store. Only passed to backends while
     /// `debugLog` is on.
     @ObservationIgnored public let wireLog: WireLog?
     /// Called after a successful refresh of a server with `notifications == true`, when something changed.
@@ -34,7 +34,7 @@ public final class MonitorModel {
     public init(store: ServerStore, session: URLSession = .shared) {
         self.store = store
         self.session = session
-        wireLog = store.fileURL.map { WireLog(fileURL: $0.deletingLastPathComponent().appending(path: "naggie-debug.log")) }
+        wireLog = store.fileURL.map { WireLog(fileURL: $0.deletingLastPathComponent().appending(path: "polly-debug.log")) }
         reload()
     }
 

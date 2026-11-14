@@ -1,10 +1,10 @@
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 struct ServerStoreTests {
     private func tempFile() -> URL {
-        FileManager.default.temporaryDirectory.appending(path: "naggie-test-\(UUID().uuidString).yaml")
+        FileManager.default.temporaryDirectory.appending(path: "polly-test-\(UUID().uuidString).yaml")
     }
 
     @Test func addListUpdateDeletePersists() throws {

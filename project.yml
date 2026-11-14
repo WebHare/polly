@@ -1,5 +1,5 @@
 # XcodeGen spec. Regenerate the Xcode project with:  xcodegen generate
-name: Naggie
+name: Polly
 options:
   bundleIdPrefix: nl.webhare
   deploymentTarget:
@@ -8,8 +8,8 @@ options:
   createIntermediateGroups: true
 
 packages:
-  NaggieKit:
-    path: Packages/NaggieKit
+  PollyKit:
+    path: Packages/PollyKit
 
 settings:
   base:
@@ -18,7 +18,7 @@ settings:
     CURRENT_PROJECT_VERSION: "1"
 
 targets:
-  Naggie:
+  Polly:
     type: application
     supportedDestinations: [iOS, macOS]
     sources:
@@ -26,7 +26,7 @@ targets:
       - path: App/macOS
         destinationFilters: [macOS]
     dependencies:
-      - package: NaggieKit
+      - package: PollyKit
     info:
       path: App/Info.plist
       properties:
@@ -35,27 +35,27 @@ targets:
           NSAllowsArbitraryLoads: true
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: nl.webhare.naggie
-        PRODUCT_NAME: Naggie
+        PRODUCT_BUNDLE_IDENTIFIER: nl.webhare.polly
+        PRODUCT_NAME: Polly
         GENERATE_INFOPLIST_FILE: YES
-        INFOPLIST_KEY_CFBundleDisplayName: Naggie
+        INFOPLIST_KEY_CFBundleDisplayName: Polly
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         TARGETED_DEVICE_FAMILY: "1,2"
         # macOS: menu bar only, no Dock icon.
         "INFOPLIST_KEY_LSUIElement[sdk=macosx*]": YES
-        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/macOS/Naggie.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/macOS/Polly.entitlements
         "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
         CODE_SIGN_STYLE: Automatic
         # WebHare bv. A stable team signature keeps keychain access working across rebuilds.
         DEVELOPMENT_TEAM: MF6WPNPK5H
 
 schemes:
-  Naggie:
+  Polly:
     build:
       targets:
-        Naggie: all
+        Polly: all
     test:
       targets:
-        - package: NaggieKit/NaggieKitTests
+        - package: PollyKit/PollyKitTests

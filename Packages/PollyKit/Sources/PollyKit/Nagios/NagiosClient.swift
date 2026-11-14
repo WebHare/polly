@@ -19,7 +19,7 @@ public enum NagiosClientError: LocalizedError, Equatable {
         case .notStatusJSON: "The response was not valid statusjson.cgi output."
         case .queryFailed(let message): "Nagios reported an error: \(message)"
         case .transport(let message): message
-        case .redirect: "The server redirected the request, which Naggie does not follow so your password stays with this server. Enter the final URL instead."
+        case .redirect: "The server redirected the request, which Polly does not follow so your password stays with this server. Enter the final URL instead."
         case .empty: "Nagios returned no hosts or services. This account may not be allowed to see any."
         }
     }

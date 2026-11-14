@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Mock Nagios server for testing Naggie. No dependencies; needs Node 18+.
+// Mock Nagios server for testing Polly. No dependencies; needs Node 18+.
 //
 //   node mock/nagios-mock.mjs [--port 8080] [--interval 15] [--user nagiosadmin] [--password nagios] [--no-auth] [--no-rotate]
 //
@@ -599,7 +599,7 @@ function quit() {
 server.listen(Number(opts.port), () => {
   const auth = state.auth ? `${encodeURIComponent(opts.user)}:${encodeURIComponent(opts.password)}@` : "";
   console.log(`Mock Nagios listening on http://localhost:${opts.port}/nagios/cgi-bin/statusjson.cgi`);
-  console.log(`Add it to Naggie with:  http://${auth}localhost:${opts.port}/`);
+  console.log(`Add it to Polly with:  http://${auth}localhost:${opts.port}/`);
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
     process.stdin.setEncoding("utf8");

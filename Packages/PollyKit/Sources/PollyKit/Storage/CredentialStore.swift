@@ -1,7 +1,7 @@
 import Foundation
 import Security
 
-/// Stores server passwords outside naggie.yaml, so they are not lying around in plain text.
+/// Stores server passwords outside polly.yaml, so they are not lying around in plain text.
 public protocol CredentialStore: Sendable {
     func password(for serverID: UUID) throws -> String?
     /// Passing `nil` (or an empty string) removes the stored password.
@@ -18,7 +18,7 @@ public struct KeychainError: Error, CustomStringConvertible {
 public struct KeychainCredentialStore: CredentialStore {
     public let service: String
 
-    public init(service: String = "nl.webhare.naggie.server") {
+    public init(service: String = "nl.webhare.polly.server") {
         self.service = service
     }
 

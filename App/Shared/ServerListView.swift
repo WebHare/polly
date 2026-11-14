@@ -1,8 +1,8 @@
-import NaggieKit
+import PollyKit
 import SwiftUI
 
 /// Lists the configured servers with their status; add and delete servers.
-/// On macOS this is the "Naggie Servers" window, on iOS/iPadOS the main screen.
+/// On macOS this is the "Polly Servers" window, on iOS/iPadOS the main screen.
 struct ServerListView: View {
     @Environment(MonitorModel.self) private var monitor
     @State private var showingAdd = false
@@ -52,7 +52,7 @@ struct ServerListView: View {
             } footer: {
                 Text(monitor.passwordStorage == .keychain
                      ? "Passwords are stored in the system keychain."
-                     : "Passwords are stored unencrypted in naggie.yaml; the keychain is not used.")
+                     : "Passwords are stored unencrypted in polly.yaml; the keychain is not used.")
             }
 
             Section {
@@ -63,10 +63,10 @@ struct ServerListView: View {
                 }
                 #endif
             } footer: {
-                Text("For debugging: writes every request and response, without credentials, to naggie-debug.log next to naggie.yaml.")
+                Text("For debugging: writes every request and response, without credentials, to polly-debug.log next to polly.yaml.")
             }
         }
-        .navigationTitle("Naggie")
+        .navigationTitle("Polly")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button("Add Server", systemImage: "plus") { showingAdd = true }
@@ -122,7 +122,7 @@ struct ServerListView: View {
     private func setNotifications(_ enabled: Bool, for server: NagiosServer) {
         Task {
             if enabled, await !Notifier.shared.requestAuthorization() {
-                errorMessage = "Notifications are not allowed for Naggie. Allow them in the system settings first."
+                errorMessage = "Notifications are not allowed for Polly. Allow them in the system settings first."
                 return
             }
             do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }

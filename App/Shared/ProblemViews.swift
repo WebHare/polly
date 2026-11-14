@@ -1,4 +1,4 @@
-import NaggieKit
+import PollyKit
 import SwiftUI
 
 /// The problems of one server. Click a problem for its check output and the actions its server supports.

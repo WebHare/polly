@@ -9,8 +9,8 @@ public enum PasswordStorage: String, Sendable, CaseIterable {
     case file
 }
 
-/// Everything Naggie persists, stored as one YAML file (`naggie.yaml`).
-public struct NaggieSettings: Equatable, Sendable {
+/// Everything Polly persists, stored as one YAML file (`polly.yaml`).
+public struct PollySettings: Equatable, Sendable {
     public struct Server: Equatable, Sendable {
         public var server: NagiosServer
         /// Only set when `passwordStorage == .file`.
@@ -24,7 +24,7 @@ public struct NaggieSettings: Equatable, Sendable {
 
     public var passwordStorage: PasswordStorage = .keychain
     public var showDockIcon = false
-    /// Write `naggie-debug.log` (see `WireLog`) next to the settings file.
+    /// Write `polly-debug.log` (see `WireLog`) next to the settings file.
     public var debugLog = false
     public var servers: [Server] = []
 
@@ -42,27 +42,27 @@ public struct SettingsFileError: LocalizedError {
     public var errorDescription: String? { message }
 }
 
-/// Reads and writes `NaggieSettings` as YAML. Writing is done by hand (rather than through an encoder)
+/// Reads and writes `PollySettings` as YAML. Writing is done by hand (rather than through an encoder)
 /// so the file gets comments, a stable key order and blank lines between servers.
 public enum SettingsFile {
     // MARK: Reading
 
-    public static func load(from url: URL) throws -> NaggieSettings {
+    public static func load(from url: URL) throws -> PollySettings {
         try parse(String(contentsOf: url, encoding: .utf8))
     }
 
-    public static func parse(_ yaml: String) throws -> NaggieSettings {
+    public static func parse(_ yaml: String) throws -> PollySettings {
         let raw: RawSettings
         do {
             raw = try YAMLDecoder().decode(RawSettings.self, from: yaml)
         } catch {
-            throw SettingsFileError(message: "naggie.yaml is not valid: \(error)")
+            throw SettingsFileError(message: "polly.yaml is not valid: \(error)")
         }
 
-        var settings = NaggieSettings()
+        var settings = PollySettings()
         if let storage = raw.passwordStorage {
             guard let value = PasswordStorage(rawValue: storage) else {
-                throw SettingsFileError(message: "naggie.yaml: passwordStorage must be 'keychain' or 'file', not '\(storage)'")
+                throw SettingsFileError(message: "polly.yaml: passwordStorage must be 'keychain' or 'file', not '\(storage)'")
             }
             settings.passwordStorage = value
         }
@@ -70,12 +70,12 @@ public enum SettingsFile {
         settings.debugLog = raw.debugLog ?? false
         settings.servers = try (raw.servers ?? []).enumerated().map { index, entry in
             guard let urlText = entry.url, let url = URL(string: urlText) else {
-                throw SettingsFileError(message: "naggie.yaml: server #\(index + 1) has no valid url")
+                throw SettingsFileError(message: "polly.yaml: server #\(index + 1) has no valid url")
             }
             var kind = BackendKind.nagios
             if let type = entry.type {
                 guard let value = BackendKind(rawValue: type) else {
-                    throw SettingsFileError(message: "naggie.yaml: server #\(index + 1) has unknown type '\(type)'")
+                    throw SettingsFileError(message: "polly.yaml: server #\(index + 1) has unknown type '\(type)'")
                 }
                 kind = value
             }
@@ -88,7 +88,7 @@ public enum SettingsFile {
                 kind: kind,
                 notifications: entry.notifications ?? false
             )
-            return NaggieSettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
+            return PollySettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
         }
         return settings
     }
@@ -114,19 +114,19 @@ public enum SettingsFile {
 
     // MARK: Writing
 
-    public static func save(_ settings: NaggieSettings, to url: URL) throws {
+    public static func save(_ settings: PollySettings, to url: URL) throws {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(render(settings).utf8).write(to: url, options: .atomic)
         // May contain passwords: owner-only.
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path(percentEncoded: false))
     }
 
-    public static func render(_ settings: NaggieSettings) -> String {
+    public static func render(_ settings: PollySettings) -> String {
         var out = """
-            # Naggie settings
+            # Polly settings
             #
-            # Written by Naggie whenever you change something in the app. You can edit it by hand
-            # while Naggie is not running; changes are read at startup.
+            # Written by Polly whenever you change something in the app. You can edit it by hand
+            # while Polly is not running; changes are read at startup.
 
             # Where server passwords are kept:
             #   keychain  in the system keychain (recommended)
@@ -136,7 +136,7 @@ public enum SettingsFile {
             # macOS only: show a Dock icon in addition to the menu bar icon.
             showDockIcon: \(settings.showDockIcon)
 
-            # Write naggie-debug.log next to this file: every request to and response from the servers,
+            # Write polly-debug.log next to this file: every request to and response from the servers,
             # without credentials. For troubleshooting only.
             debugLog: \(settings.debugLog)
 

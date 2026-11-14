@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 struct ServerURLParserTests {
     @Test func extractsCredentials() throws {

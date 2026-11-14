@@ -1,16 +1,16 @@
-# Naggie
+# Polly
 
 A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI.
 
 ## Layout
 
 ```
-project.yml                 XcodeGen spec – source of truth for Naggie.xcodeproj
+project.yml                 XcodeGen spec – source of truth for Polly.xcodeproj
 App/Shared/                 SwiftUI app code shared by all platforms
 App/macOS/                  Menu bar UI + sandbox entitlements (macOS only)
-Packages/NaggieKit/         Platform-independent logic + unit tests
+Packages/PollyKit/          Platform-independent logic + unit tests
   Models/                   NagiosServer, ServerURLParser (splits user:pass@ out of pasted URLs)
-  Storage/                  naggie.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
+  Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
   Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
   Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
                             NotificationPolicy, AddServerModel (add-server form logic)
@@ -18,10 +18,10 @@ Packages/NaggieKit/         Platform-independent logic + unit tests
 mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 ```
 
-- Servers and settings are stored in one YAML file, `Application Support/Naggie/naggie.yaml`. On macOS
-  that's `~/Library/Containers/nl.webhare.naggie/Data/Library/Application Support/Naggie/naggie.yaml`.
+- Servers and settings are stored in one YAML file, `Application Support/Polly/polly.yaml`. On macOS
+  that's `~/Library/Containers/nl.webhare.polly/Data/Library/Application Support/Polly/polly.yaml`.
   Passwords are kept in the keychain unless you turn that off, in which case they go into the YAML file.
-  You can edit the file by hand while Naggie isn't running.
+  You can edit the file by hand while Polly isn't running.
 - A server's status is read from `<base URL>/nagios/cgi-bin/statusjson.cgi`
   (`programstatus` for the connection test; `hostcount`, `servicecount` and `servicelist` for status).
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
@@ -41,12 +41,12 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 
 ```sh
 xcodegen generate                          # after adding/removing files or editing project.yml
-open Naggie.xcodeproj                      # or use SweetPad in VS Code
+open Polly.xcodeproj                      # or use SweetPad in VS Code
 
 # command line (if xcode-select points to the Command Line Tools, prefix with
 # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
-xcodebuild -project Naggie.xcodeproj -scheme Naggie -destination 'platform=macOS' build
-(cd Packages/NaggieKit && swift test)
+xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' build
+(cd Packages/PollyKit && swift test)
 ```
 
 Builds are signed with the WebHare bv team (`DEVELOPMENT_TEAM: MF6WPNPK5H` in `project.yml`). Add an Apple ID
@@ -62,7 +62,7 @@ node mock/nagios-mock.mjs                # http://localhost:8080, login nagiosad
 node mock/nagios-mock.mjs --port 9000 --interval 5 --no-auth
 ```
 
-Add it in Naggie as `http://nagiosadmin:nagios@localhost:8080/`. Press `h` in the terminal for keyboard
+Add it in Polly as `http://nagiosadmin:nagios@localhost:8080/`. Press `h` in the terminal for keyboard
 controls (force warning/critical/unknown, hosts down, all OK, pause rotation, simulate an outage, toggle auth).
 
 Besides `statusjson.cgi` it serves `extinfo.cgi` (the check page with its action and notes links) and
@@ -75,7 +75,7 @@ The mock is developed together with the client. `MockIntegrationTests` runs the 
 
 ```sh
 node mock/nagios-mock.mjs --no-rotate &
-NAGGIE_MOCK_URL=http://localhost:8080 swift test --package-path Packages/NaggieKit --filter MockIntegrationTests
+POLLY_MOCK_URL=http://localhost:8080 swift test --package-path Packages/PollyKit --filter MockIntegrationTests
 ```
 
 When a real Nagios turns out to behave differently, change the mock to match first, watch these tests
@@ -90,7 +90,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **One multiplatform SwiftUI target** (`supportedDestinations: [iOS, macOS]`) instead of separate iOS
   and macOS apps. Most UI (server list, add-server form, status rows) is shared; macOS-only code lives in
   `App/macOS/` and is filtered per destination in `project.yml`.
-- **All logic in a local Swift package (`NaggieKit`)**, the app targets contain only views. This keeps the
+- **All logic in a local Swift package (`PollyKit`)**, the app targets contain only views. This keeps the
   logic testable with plain `swift test`, without simulators or an app host.
 - **XcodeGen (`project.yml`) as the source of truth** for the Xcode project. Hand-maintaining
   `project.pbxproj` is error-prone and merge-hostile. The generated project is still committed so the repo
@@ -104,7 +104,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
   connection, fetch the status, and optionally links and commands (`capabilities`). Nagios is the first
   implementation. `MonitorModel` and the views never mention CGI names, HTML or Nagios status values, so
   another system (Icinga, or a plain "is this URL up" check) is a new type plus a case in `BackendKind`.
-- **Each server has a `type` in `naggie.yaml`** (`nagios`, also the default when the key is missing). An
+- **Each server has a `type` in `polly.yaml`** (`nagios`, also the default when the key is missing). An
   unknown type is an error rather than silently treated as Nagios.
 - **Commands are prepared, then submitted.** `prepareCommand` only reads what the server needs (for
   Nagios: its form); nothing changes on the server until `submit`, and a submit is never retried.
@@ -149,9 +149,9 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Debugging
 
 - **`debugLog: true`** (or the switch in the Servers window) writes every request and response to
-  `naggie-debug.log` next to `naggie.yaml`, one JSON object per line, so an exchange that went wrong on a
+  `polly-debug.log` next to `polly.yaml`, one JSON object per line, so an exchange that went wrong on a
   real server can be replayed and the mock corrected afterwards. The `Authorization` header is replaced
-  and passwords never reach the file. At 5 MB the file is moved to `naggie-debug.log.1` and started anew.
+  and passwords never reach the file. At 5 MB the file is moved to `polly-debug.log.1` and started anew.
 
 ### Adding servers
 
@@ -164,7 +164,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Storage
 
-- **One human-readable YAML file (`naggie.yaml`)** for servers and settings. It started as SQLite, but a
+- **One human-readable YAML file (`polly.yaml`)** for servers and settings. It started as SQLite, but a
   single commented file is easier to inspect, back up, diff and hand-edit, and the data is tiny.
 - **Yams for reading, hand-written output for writing.** An encoder can't emit comments, a fixed key order
   or blank lines between servers. Strings are only quoted when YAML needs it (`"yes"`, `"a: b"`, leading
@@ -173,14 +173,14 @@ Why things are the way they are, so they can be revisited deliberately rather th
   invalid value (e.g. an unknown `passwordStorage`) is an error. If the file can't be read the app runs with
   an in-memory store instead of overwriting the file.
 - **Read at startup, rewritten after every change** (atomically, mode `0600` because it may contain
-  passwords). Hand edits are therefore only picked up when Naggie isn't running.
+  passwords). Hand edits are therefore only picked up when Polly isn't running.
 - **File order is display order**; new servers are appended. Reorder by editing the file.
 - **Passwords in the keychain by default**, keyed by the server's UUID, so they aren't lying around in plain
   text. A setting moves them into the YAML file instead: debug builds used to trigger keychain prompts on
   every rebuild, and turning the keychain off guarantees it is never touched again. Switching moves all
   existing passwords and reads everything first, so a keychain failure doesn't leave a half-migrated state.
 - **Window state is not a setting.** The menu panel size stays in `UserDefaults`; the Dock icon preference
-  moved into `naggie.yaml`.
+  moved into `polly.yaml`.
 - **One-time import** of the old `naggie.sqlite` (renamed to `*.imported` afterwards) in
   `LegacySQLiteImport.swift`. Safe to delete once no old installs remain.
 

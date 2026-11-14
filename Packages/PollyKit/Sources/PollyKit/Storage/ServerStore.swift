@@ -8,10 +8,10 @@ public final class ServerStore: @unchecked Sendable {
     /// `nil` keeps everything in memory only (tests, or when the file can't be read).
     public let fileURL: URL?
     private let credentials: CredentialStore
-    private var settings: NaggieSettings
+    private var settings: PollySettings
     private let lock = NSRecursiveLock()
 
-    public init(fileURL: URL?, credentials: CredentialStore, initial: NaggieSettings = NaggieSettings()) throws {
+    public init(fileURL: URL?, credentials: CredentialStore, initial: PollySettings = PollySettings()) throws {
         self.fileURL = fileURL
         self.credentials = credentials
         if let fileURL, FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) {
@@ -22,17 +22,17 @@ public final class ServerStore: @unchecked Sendable {
     }
 
     public static var defaultDirectory: URL {
-        URL.applicationSupportDirectory.appending(path: "Naggie", directoryHint: .isDirectory)
+        URL.applicationSupportDirectory.appending(path: "Polly", directoryHint: .isDirectory)
     }
 
-    /// Opens `Application Support/Naggie/naggie.yaml`. On first run this imports the servers from the
+    /// Opens `Application Support/Polly/polly.yaml`. On first run this imports the servers from the
     /// SQLite database used by earlier builds, if there is one.
     public static func makeDefault() throws -> ServerStore {
-        let fileURL = defaultDirectory.appending(path: "naggie.yaml")
+        let fileURL = defaultDirectory.appending(path: "polly.yaml")
         let exists = FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false))
         let imported = exists ? nil : LegacySQLiteImport.run(in: defaultDirectory)
         let store = try ServerStore(fileURL: fileURL, credentials: KeychainCredentialStore(),
-                                    initial: imported ?? NaggieSettings())
+                                    initial: imported ?? PollySettings())
         if !exists {
             try store.withSettings { _ in } // write the file so it's there to look at / edit
         }
@@ -40,7 +40,7 @@ public final class ServerStore: @unchecked Sendable {
     }
 
     /// Applies `change` to a copy of the settings, writes the file, and only then commits the copy.
-    private func withSettings<T>(_ change: (inout NaggieSettings) throws -> T) throws -> T {
+    private func withSettings<T>(_ change: (inout PollySettings) throws -> T) throws -> T {
         lock.lock()
         defer { lock.unlock() }
         var copy = settings
@@ -52,7 +52,7 @@ public final class ServerStore: @unchecked Sendable {
         return result
     }
 
-    private func read<T>(_ body: (NaggieSettings) -> T) -> T {
+    private func read<T>(_ body: (PollySettings) -> T) -> T {
         lock.lock()
         defer { lock.unlock() }
         return body(settings)

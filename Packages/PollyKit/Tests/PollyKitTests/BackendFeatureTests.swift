@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import NaggieKit
+@testable import PollyKit
 
 private func problem(_ severity: Severity = .critical, service: String = "HTTP", acknowledged: Bool = false,
                      downtimeDepth: Int = 0) -> ServiceProblem {

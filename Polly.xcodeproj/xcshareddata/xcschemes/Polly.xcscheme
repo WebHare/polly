@@ -15,10 +15,10 @@
             buildForAnalyzing = "YES">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "4BB67DAC09522EEC9110CB92"
-               BuildableName = "Naggie.app"
-               BlueprintName = "Naggie"
-               ReferencedContainer = "container:Naggie.xcodeproj">
+               BlueprintIdentifier = "53462219DF463E5802CC2091"
+               BuildableName = "Polly.app"
+               BlueprintName = "Polly"
+               ReferencedContainer = "container:Polly.xcodeproj">
             </BuildableReference>
          </BuildActionEntry>
       </BuildActionEntries>
@@ -32,10 +32,10 @@
       <MacroExpansion>
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4BB67DAC09522EEC9110CB92"
-            BuildableName = "Naggie.app"
-            BlueprintName = "Naggie"
-            ReferencedContainer = "container:Naggie.xcodeproj">
+            BlueprintIdentifier = "53462219DF463E5802CC2091"
+            BuildableName = "Polly.app"
+            BlueprintName = "Polly"
+            ReferencedContainer = "container:Polly.xcodeproj">
          </BuildableReference>
       </MacroExpansion>
       <Testables>
@@ -44,10 +44,10 @@
             parallelizable = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
-               BlueprintIdentifier = "NaggieKitTests"
-               BuildableName = "NaggieKitTests"
-               BlueprintName = "NaggieKitTests"
-               ReferencedContainer = "container:Packages/NaggieKit">
+               BlueprintIdentifier = "PollyKitTests"
+               BuildableName = "PollyKitTests"
+               BlueprintName = "PollyKitTests"
+               ReferencedContainer = "container:Packages/PollyKit">
             </BuildableReference>
          </TestableReference>
       </Testables>
@@ -68,10 +68,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4BB67DAC09522EEC9110CB92"
-            BuildableName = "Naggie.app"
-            BlueprintName = "Naggie"
-            ReferencedContainer = "container:Naggie.xcodeproj">
+            BlueprintIdentifier = "53462219DF463E5802CC2091"
+            BuildableName = "Polly.app"
+            BlueprintName = "Polly"
+            ReferencedContainer = "container:Polly.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </LaunchAction>
@@ -85,10 +85,10 @@
          runnableDebuggingMode = "0">
          <BuildableReference
             BuildableIdentifier = "primary"
-            BlueprintIdentifier = "4BB67DAC09522EEC9110CB92"
-            BuildableName = "Naggie.app"
-            BlueprintName = "Naggie"
-            ReferencedContainer = "container:Naggie.xcodeproj">
+            BlueprintIdentifier = "53462219DF463E5802CC2091"
+            BuildableName = "Polly.app"
+            BlueprintName = "Polly"
+            ReferencedContainer = "container:Polly.xcodeproj">
          </BuildableReference>
       </BuildableProductRunnable>
    </ProfileAction>
