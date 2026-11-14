@@ -54,18 +54,35 @@ public struct NagiosClient: MonitorBackend {
     }
 
     public func fetchStatus() async throws -> ServerStatus {
-        async let hosts: StatusJSONEnvelope<CountPayload<HostCounts>> = get(query: "hostcount")
-        async let services: StatusJSONEnvelope<CountPayload<ServiceCounts>> = get(query: "servicecount")
-        async let problems: StatusJSONEnvelope<ServiceListPayload> =
-            get(query: "servicelist", extra: [URLQueryItem(name: "servicestatus", value: "warning critical unknown"),
-                                         URLQueryItem(name: "details", value: "true")])
+        // A task group, not `async let`: with async let the process crashed when a server refused the connection while
+        // other requests were in flight. It looks like the async let teardown bugs in Swift 6.1+ (see swiftlang/swift#81771).
+        enum Part: Sendable { case hosts(HostCounts), services(ServiceCounts), problems([ServiceProblem]) }
+        var hosts = HostCounts(), services = ServiceCounts(), problems: [ServiceProblem] = []
+        try await withThrowingTaskGroup(of: Part.self) { group in
+            group.addTask {
+                let envelope: StatusJSONEnvelope<CountPayload<HostCounts>> = try await get(query: "hostcount")
+                return .hosts(envelope.data?.count ?? HostCounts())
+            }
+            group.addTask {
+                let envelope: StatusJSONEnvelope<CountPayload<ServiceCounts>> = try await get(query: "servicecount")
+                return .services(envelope.data?.count ?? ServiceCounts())
+            }
+            group.addTask {
+                let envelope: StatusJSONEnvelope<ServiceListPayload> =
+                    try await get(query: "servicelist", extra: [URLQueryItem(name: "servicestatus", value: "warning critical unknown"),
+                                                                URLQueryItem(name: "details", value: "true")])
+                return .problems(envelope.data?.problems ?? [])
+            }
+            for try await part in group {
+                switch part {
+                case .hosts(let value): hosts = value
+                case .services(let value): services = value
+                case .problems(let value): problems = value
+                }
+            }
+        }
 
-        let status = try await ServerStatus(
-            hosts: hosts.data?.count ?? HostCounts(),
-            services: services.data?.count ?? ServiceCounts(),
-            problems: problems.data?.problems ?? [],
-            fetchedAt: Date()
-        )
+        let status = ServerStatus(hosts: hosts, services: services, problems: problems, fetchedAt: Date())
         // Nagios shows an account without permissions an empty installation, which must not look healthy.
         let h = status.hosts, s = status.services
         if h.up + h.down + h.unreachable + h.pending + s.ok + s.warning + s.critical + s.unknown + s.pending == 0 {

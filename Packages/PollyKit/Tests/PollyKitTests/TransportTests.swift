@@ -149,6 +149,29 @@ struct TransportTests {
         await #expect(throws: NagiosClientError.empty) { try await client.fetchStatus() }
     }
 
+    /// Regression test for a startup crash with `async let` in `fetchStatus()`: a refused server next to busy ones
+    /// crashed the process ("freed pointer was not the last allocation", or a jump into freed memory). It is timing
+    /// dependent, so it catches a regression most of the time, not always. Needs nothing listening on 127.0.0.1:9.
+    @Test func refusedServerNextToBusyOnesDoesNotCrash() async {
+        StubProtocol.handler = { request in
+            var response = statusJSON(for: request)
+            response.delay = 0.002
+            return response
+        }
+        let busy = client
+        let refused = NagiosClient(endpoint: URL(string: "http://127.0.0.1:9/nagios/cgi-bin/statusjson.cgi")!,
+                                   username: "alice", password: "s3cret")
+        for _ in 0..<20 {
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<64 {
+                    group.addTask { _ = try? await busy.fetchStatus() }
+                    group.addTask { _ = try? await refused.fetchStatus() }
+                }
+            }
+        }
+        await #expect(throws: NagiosClientError.self) { try await refused.fetchStatus() }
+    }
+
     /// Following a redirect would send the Basic credentials to wherever it points.
     @Test func redirectsAreRefused() async {
         let requests = Box<[URL]>([])
