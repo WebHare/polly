@@ -31,14 +31,16 @@ update it when a decision changes. This file only holds what an agent needs on t
 
 ## Design
 
-The macOS screens follow the Polly design. Colors, status icons, the mascot and the controls are in
-`App/Shared/PollyDesign.swift`; use those instead of system colors and SF Symbols for status.
+The macOS and iOS screens follow the Polly design. Colors, status icons, the mascot and the controls are in
+`App/Shared/PollyDesign.swift`, with the extra iPhone colors in `App/iOS/PhoneDesign.swift`; use those
+instead of system colors and SF Symbols for status.
 
 - A part of the design that is drawn but does not work carries `PlaceholderTag()` and `.placeholderControl()`.
   Remove both in the change that makes it real; never ship a control that silently does nothing.
 - The mascot drawings and the app icon in `App/Shared/Assets.xcassets` are generated from the design export.
   Regenerate them from the export rather than editing the files by hand.
-- iOS still uses the older `ServerListView`, `AddServerView` and `ProblemViews`.
+- iOS has its own screens in `App/iOS` (Problems, Servers and Settings tabs); the command form,
+  `ServerStateIcon` and the status pill colors are shared with macOS.
 
 ## Building and running locally
 

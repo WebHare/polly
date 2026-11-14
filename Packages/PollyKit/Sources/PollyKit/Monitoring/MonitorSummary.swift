@@ -29,6 +29,9 @@ public struct MonitorSummary: Sendable {
     public private(set) var hosts = 0
     public private(set) var hostsDown = 0
     public private(set) var services = 0
+    /// How many enabled servers answered their last refresh, and when the latest of those answers came.
+    public private(set) var answeredServers = 0
+    public private(set) var lastFetched: Date?
     /// The first server that could not be reached, with its error.
     public private(set) var unreachable: (server: NagiosServer, message: String)?
     private let hasServers: Bool
@@ -43,6 +46,8 @@ public struct MonitorSummary: Sendable {
                 hosts += status.hosts.total
                 hostsDown += status.hosts.down + status.hosts.unreachable
                 services += status.services.total
+                answeredServers += 1
+                lastFetched = max(lastFetched ?? status.fetchedAt, status.fetchedAt)
                 entries += status.problems.map { ProblemEntry(server: server, problem: $0) }
             case .failed(let message):
                 if unreachable == nil { unreachable = (server, message) }
@@ -84,6 +89,27 @@ public struct MonitorSummary: Sendable {
         if count(.unknown) > 0 { return "Polly is confused: \(count(.unknown)) unknown" }
         if let unreachable { return "Polly can't reach \(unreachable.server.name)" }
         return "Polly is quiet. Go back to sleep."
+    }
+
+    /// Polly's words before the colon of the headline ("Polly is squawking"); nil when the headline has none.
+    public var headlineKicker: String? {
+        headlineParts.count == 2 ? headlineParts[0] : nil
+    }
+
+    /// The headline after the colon ("1 host down"), or all of it when there is no colon.
+    public var headlineTitle: String { headlineParts.last ?? headline }
+
+    private var headlineParts: [String] {
+        headline.split(separator: ": ", maxSplits: 1).map(String.init)
+    }
+
+    /// "218 hosts and 930 services OK on 2 servers. Last checked 9 s ago." for the all-quiet screen.
+    public func quietDetail(now: Date) -> String {
+        var text = "\(hosts) hosts and \(services) services OK on \(answeredServers) \(answeredServers == 1 ? "server" : "servers")."
+        if let lastFetched {
+            text += " Last checked \(DurationFormatting.ago(now.timeIntervalSince(lastFetched)))."
+        }
+        return text
     }
 
     /// "2 critical · 3 warning · 1 unknown", leaving out what is zero.

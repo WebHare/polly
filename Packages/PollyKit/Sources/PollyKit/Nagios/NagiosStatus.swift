@@ -66,6 +66,12 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var nextCheck: Date?
     public var id: String { "\(host)/\(service)" }
 
+    /// " · acknowledged · in downtime": the states to show after the service name, each with its separator.
+    public var stateNote: String {
+        [acknowledged ? "acknowledged" : nil, downtimeDepth > 0 ? "in downtime" : nil]
+            .compactMap { $0 }.map { " · \($0)" }.joined()
+    }
+
     public init(host: String, service: String, severity: Severity, since: Date? = nil, output: String = "",
                 longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0,
                 checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil) {

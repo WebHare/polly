@@ -100,15 +100,14 @@ struct ProblemsScreen: View {
     }
 
     private func summaryCard(_ summary: MonitorSummary) -> some View {
-        // The headline is "Polly is squawking: 1 host down"; the design sets Polly's words above the count.
-        let parts = summary.headline.split(separator: ": ", maxSplits: 1).map(String.init)
-        return HStack(spacing: 14) {
+        // The design sets Polly's words ("Polly is squawking") above the count ("1 host down").
+        HStack(spacing: 14) {
             PollyMascot(mood: summary.mood, size: 64)
             VStack(alignment: .leading, spacing: 2) {
-                if parts.count == 2 {
-                    Text(parts[0]).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.moodText(summary.mood))
+                if let kicker = summary.headlineKicker {
+                    Text(kicker).font(.system(size: 13, weight: .semibold)).foregroundStyle(theme.moodText(summary.mood))
                 }
-                Text(parts.last ?? "").font(.system(size: 21, weight: .bold))
+                Text(summary.headlineTitle).font(.system(size: 21, weight: .bold))
                 Text(summary.countsLine).font(.system(size: 13)).foregroundStyle(theme.muted)
             }
             Spacer(minLength: 0)
@@ -195,7 +194,7 @@ struct ProblemsScreen: View {
                 Text("Polly is quiet.").font(.system(size: 26, weight: .bold)).padding(.top, 14)
                 Text("Go back to sleep.").font(.system(size: 20)).foregroundStyle(theme.muted)
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(okDetail(summary, now: context.date))
+                    Text(summary.quietDetail(now: context.date))
                 }
                 .font(.system(size: 14))
                 .foregroundStyle(theme.faint)
@@ -207,19 +206,6 @@ struct ProblemsScreen: View {
         .padding(EdgeInsets(top: 70, leading: 40, bottom: 24, trailing: 40))
         .frame(maxWidth: .infinity)
     }
-
-    /// "218 hosts and 930 services OK on 2 servers. Last checked 9 s ago."
-    private func okDetail(_ summary: MonitorSummary, now: Date) -> String {
-        let answered = monitor.states.values.compactMap { state -> Date? in
-            if case .ok(let status) = state { status.fetchedAt } else { nil }
-        }
-        let servers = answered.count == 1 ? "1 server" : "\(answered.count) servers"
-        var text = "\(summary.hosts) hosts and \(summary.services) services OK on \(servers)."
-        if let last = answered.max() {
-            text += " Last checked \(DurationFormatting.ago(now.timeIntervalSince(last)))."
-        }
-        return text
-    }
 }
 
 /// One problem in the list: host, age, service and the first line of the check output.
@@ -230,14 +216,9 @@ struct PhoneProblemRow: View {
         TimelineView(.everyMinute) { context in
             PhoneRow(severity: problem.severity, title: problem.host,
                      trailing: problem.since.map { "\(DurationFormatting.short(context.date.timeIntervalSince($0)))  ›" } ?? "›",
-                     subtitle: problem.service + state, output: problem.output)
+                     subtitle: problem.service + problem.stateNote, output: problem.output)
         }
         .opacity(problem.acknowledged ? 0.55 : 1)
-    }
-
-    private var state: String {
-        [problem.acknowledged ? "acknowledged" : nil, problem.downtimeDepth > 0 ? "in downtime" : nil]
-            .compactMap { $0 }.map { " · \($0)" }.joined()
     }
 }
 
