@@ -1,19 +1,28 @@
 import Foundation
 
-// Everything the app needs from a monitoring system. Nagios is the first implementation; Icinga and a
-// plain "check this URL" backend are planned, so nothing in here may mention CGI names, HTML or Nagios
-// status bits.
+// Everything the app needs from a monitoring system. Implemented by Nagios and by a plain "check this URL"
+// backend, so nothing in here may mention CGI names, HTML or Nagios status bits.
 
 /// The type of monitoring system a server runs. Stored as `type` in polly.yaml.
-public enum BackendKind: String, Sendable, CaseIterable {
+public enum BackendKind: String, Sendable, CaseIterable, Identifiable {
+    /// A Nagios server, read through statusjson.cgi.
     case nagios
+    /// A website checked by Polly itself: DNS, HTTP and certificate (`URLMonitor`).
+    case url
+
+    public var id: String { rawValue }
 
     /// The name of the monitoring system as shown to the user.
     public var displayName: String {
         switch self {
         case .nagios: "Nagios"
+        case .url: "URL"
         }
     }
+
+    /// Whether the URL entered for this kind points at a monitoring system (and is cut back to its base
+    /// URL) rather than being the address to check.
+    public var urlIsMonitoringSystem: Bool { self == .nagios }
 }
 
 public struct BackendCapabilities: OptionSet, Sendable {

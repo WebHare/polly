@@ -12,6 +12,13 @@ public final class AddServerModel {
         case failed(String)
     }
 
+    /// What is being added. Decides how the URL is read and which backend tests it.
+    public var kind: BackendKind {
+        didSet {
+            guard kind != oldValue else { return }
+            checkState = .idle
+        }
+    }
     public var name = ""
     public var username = ""
     public var password = ""
@@ -31,11 +38,12 @@ public final class AddServerModel {
     @ObservationIgnored public var wireLog: WireLog?
     @ObservationIgnored private let session: URLSession
 
-    public init(session: URLSession = .shared) {
+    public init(kind: BackendKind = .nagios, session: URLSession = .shared) {
+        self.kind = kind
         self.session = session
     }
 
-    public var parsedURL: URL? { ServerURLParser.parse(urlText)?.baseURL }
+    public var parsedURL: URL? { parse(urlText)?.baseURL }
     public var canSubmit: Bool { parsedURL != nil && checkState != .checking }
 
     public func makeServer() -> NagiosServer? {
@@ -43,7 +51,8 @@ public final class AddServerModel {
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         return NagiosServer(name: trimmedName.isEmpty ? (url.host() ?? url.absoluteString) : trimmedName,
                             baseURL: url,
-                            username: username)
+                            username: username,
+                            kind: kind)
     }
 
     /// Runs the connectivity check. Returns true when the server answered correctly.
@@ -66,12 +75,16 @@ public final class AddServerModel {
     }
 
     private func extractCredentials() {
-        guard urlText.contains("@"), let parsed = ServerURLParser.parse(urlText),
+        guard urlText.contains("@"), let parsed = parse(urlText),
               parsed.username != nil || parsed.password != nil
         else { return }
         if let user = parsed.username { username = user }
         if let pass = parsed.password { password = pass }
         // Rewrite the field without the credentials (this re-enters didSet, which is then a no-op).
         urlText = parsed.baseURL.absoluteString
+    }
+
+    private func parse(_ text: String) -> ParsedServerURL? {
+        ServerURLParser.parse(text, keepPath: !kind.urlIsMonitoringSystem)
     }
 }

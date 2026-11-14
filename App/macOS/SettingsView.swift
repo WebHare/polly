@@ -245,7 +245,7 @@ private struct ServersPane: View {
                 GridRow {
                     label("Type")
                     HStack(spacing: 8) {
-                        TypePicker()
+                        TypePicker(selection: $model.kind)
                         PlaceholderTag()
                     }
                 }
@@ -256,16 +256,19 @@ private struct ServersPane: View {
                 }
                 GridRow {
                     label("URL")
-                    TextField("URL", text: $model.urlText, prompt: Text("https://nagios.example.com"))
+                    TextField("URL", text: $model.urlText,
+                              prompt: Text(model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
                         .pollyField()
                 }
                 GridRow {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                    (Text("Polly reads ")
-                        + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
-                        + Text(" (Nagios 4.4 or newer)."))
+                    (model.kind == .url
+                        ? Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
+                        : Text("Polly reads ")
+                            + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
+                            + Text(" (Nagios 4.4 or newer)."))
                         .font(.system(size: 12))
                         .foregroundStyle(theme.faint)
                         .padding(.top, -4)
@@ -397,7 +400,7 @@ private struct ServersPane: View {
     }
 
     private func resetForm() {
-        model = AddServerModel()
+        model = AddServerModel(kind: model.kind)
         syncWireLog()
     }
 
@@ -480,21 +483,31 @@ private struct ServersPane: View {
     }
 }
 
-/// The type segmented control: only Nagios exists, the other systems are drawn from the design.
+/// The type segmented control: Nagios and URL work, the other systems are drawn from the design.
 private struct TypePicker: View {
+    @Binding var selection: BackendKind
     @Environment(\.pollyTheme) private var theme
 
     var body: some View {
         HStack(spacing: 0) {
-            Text("Nagios")
-                .fontWeight(.semibold)
-                .padding(.vertical, 3)
-                .padding(.horizontal, 14)
-                .background {
-                    RoundedRectangle(cornerRadius: 5).fill(theme.dark ? theme.card : Color.white)
-                        .shadow(color: Color.pollyNavy.opacity(0.18), radius: 1, y: 1)
+            ForEach(BackendKind.allCases) { kind in
+                Button { selection = kind } label: {
+                    Text(kind.displayName)
+                        .fontWeight(kind == selection ? .semibold : .regular)
+                        .padding(.vertical, 3)
+                        .padding(.horizontal, 14)
+                        .background {
+                            if kind == selection {
+                                RoundedRectangle(cornerRadius: 5).fill(theme.dark ? theme.card : Color.white)
+                                    .shadow(color: Color.pollyNavy.opacity(0.18), radius: 1, y: 1)
+                            }
+                        }
+                        .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Type: Nagios")
+                .buttonStyle(.plain)
+                .accessibilityLabel("Type: \(kind.displayName)")
+                .accessibilityAddTraits(kind == selection ? .isSelected : [])
+            }
             HStack(spacing: 0) {
                 ForEach(["Icinga 2", "Checkmk", "Zabbix"], id: \.self) { name in
                     Text(name).padding(.vertical, 3).padding(.horizontal, 14)

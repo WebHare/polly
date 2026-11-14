@@ -1,11 +1,12 @@
 import Foundation
 
-/// A Nagios server to monitor. The password is not part of this record; `ServerStore` keeps it
+/// A server to monitor: a Nagios server, or a URL that Polly checks itself (see `kind`). The password is not part of this record; `ServerStore` keeps it
 /// in the keychain or the settings file depending on its `passwordStorage` setting.
 public struct NagiosServer: Identifiable, Hashable, Sendable {
     public var id: UUID
     public var name: String
-    /// Base URL of the server, without credentials and without the `/nagios/...` path.
+    /// Nagios: base URL of the server, without credentials and without the `/nagios/...` path.
+    /// URL monitor: the URL to check, without credentials.
     public var baseURL: URL
     public var username: String
     /// When false the server is kept but not polled ("monitoring paused").
@@ -37,6 +38,10 @@ public struct NagiosServer: Identifiable, Hashable, Sendable {
             var client = NagiosClient(server: self, password: password, session: session)
             client.wireLog = wireLog
             return client
+        case .url:
+            var monitor = URLMonitor(server: self, password: password, session: session)
+            monitor.wireLog = wireLog
+            return monitor
         }
     }
 }
