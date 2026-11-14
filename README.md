@@ -1,6 +1,7 @@
 # Polly
 
-A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI.
+A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI. It can also check
+websites itself, without a monitoring system behind them.
 
 ## Layout
 
@@ -12,6 +13,7 @@ Packages/PollyKit/          Platform-independent logic + unit tests
   Models/                   NagiosServer, ServerURLParser (splits user:pass@ out of pasted URLs)
   Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
   Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
+  URLCheck/                 URLMonitor: checks a URL's DNS, HTTP answer and certificate from the device
   Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
                             NotificationPolicy, AddServerModel (add-server form logic)
 .mcp.json                   Enables XcodeBuildMCP for Claude Code in this project
@@ -107,6 +109,13 @@ POLLY_MOCK_URL=http://localhost:8080 swift test --package-path Packages/PollyKit
 When a real Nagios turns out to behave differently, change the mock to match first, watch these tests
 fail, and then fix the client.
 
+`URLMonitorNetworkTests` checks real websites, including badssl.com's broken certificates. It is skipped
+unless `POLLY_NETWORK_TESTS` is set:
+
+```sh
+POLLY_NETWORK_TESTS=1 swift test --package-path Packages/PollyKit --filter URLMonitorNetworkTests
+```
+
 ## Design decisions
 
 Why things are the way they are, so they can be revisited deliberately rather than by accident.
@@ -132,6 +141,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
   another system (Icinga, or a plain "is this URL up" check) is a new type plus a case in `BackendKind`.
 - **Each server has a `type` in `polly.yaml`** (`nagios`, also the default when the key is missing). An
   unknown type is an error rather than silently treated as Nagios.
+- **Two types: `nagios` and `url`.** On iOS **Add** is a menu that picks the type; on macOS the Type control
+  in the add-server card does. The form adapts its placeholder and explanation to it.
 - **Commands are prepared, then submitted.** `prepareCommand` only reads what the server needs (for
   Nagios: its form); nothing changes on the server until `submit`, and a submit is never retried.
 
@@ -162,6 +173,24 @@ Why things are the way they are, so they can be revisited deliberately rather th
   command forms were read from a real server. That server sends no CSRF token, uses ISO dates and locks the
   author name, and the mock was changed to offer those variants. Actually submitting an acknowledgement or
   a downtime has only been done against the mock so far.
+
+### Checking URLs
+
+- **One host with three services**, so a URL fits the same status rows, problem list and notifications as a
+  Nagios server: `DNS` (the host name resolves), `HTTP` (a GET of the URL answers below 400) and, for
+  `https`, `Certificate`. The host counts as down when DNS or HTTP fails.
+- **Checked from the device, on every poll.** There is no history, so URL problems show no age.
+- **A failed DNS lookup skips the other checks** (counted as pending), so one outage isn't three problems.
+- **The URL is kept as entered** (path and query included); only credentials and the fragment are removed.
+- **Redirects are not followed**; a redirect is an answer, so the site is up.
+- **The certificate is checked on a new connection every time** (a fresh `URLSession` per check), because a
+  reused connection skips the TLS handshake. It must be trusted by the system for the host name, and the
+  leaf and intermediates must stay valid for 14 more days, otherwise it is a warning. Expiry dates are read
+  from the DER data, as Apple only offers them through an API on macOS.
+- **An untrusted certificate doesn't hide whether the server answers**: the HTTP check continues anyway,
+  unless a username or password is configured, which is never sent to a server with an untrusted
+  certificate.
+- **Optional Basic auth** for pages behind a login.
 
 ### Notifications
 

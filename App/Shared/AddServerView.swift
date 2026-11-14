@@ -1,19 +1,26 @@
 import PollyKit
 import SwiftUI
 
-/// Form for adding a server. Pasting `https://user:pass@host/` fills username and password.
-/// The connection is tested before saving; if the test fails the user can still choose "Add Anyway".
+/// Form for adding a Nagios server or a URL to check. Pasting `https://user:pass@host/` fills username and
+/// password. The connection is tested before saving; if the test fails the user can still choose "Add Anyway".
 struct AddServerView: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.dismiss) private var dismiss
-    @State private var model = AddServerModel()
+    @State private var model: AddServerModel
     @State private var saveError: String?
+
+    init(kind: BackendKind) {
+        _model = State(initialValue: AddServerModel(kind: kind))
+    }
+
+    private var isURLMonitor: Bool { model.kind == .url }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("URL", text: $model.urlText, prompt: Text("https://nagios.example.com"))
+                    TextField("URL", text: $model.urlText,
+                              prompt: Text(isURLMonitor ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
                         #if os(iOS)
@@ -23,11 +30,16 @@ struct AddServerView: View {
                     TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
                 } footer: {
                     if let url = model.parsedURL {
-                        Text("Status is read from \(url.appending(path: "nagios/cgi-bin/statusjson.cgi").absoluteString)")
+                        if isURLMonitor {
+                            Text("Polly checks that \(url.host() ?? "the host") resolves, that \(url.absoluteString) answers"
+                                 + (url.scheme == "https" ? ", and that its certificate is valid for at least two more weeks." : "."))
+                        } else {
+                            Text("Status is read from \(url.appending(path: "nagios/cgi-bin/statusjson.cgi").absoluteString)")
+                        }
                     }
                 }
 
-                Section("Credentials") {
+                Section {
                     TextField("Username", text: $model.username)
                         .textContentType(.username)
                         .autocorrectionDisabled()
@@ -36,6 +48,12 @@ struct AddServerView: View {
                         #endif
                     SecureField("Password", text: $model.password)
                         .textContentType(.password)
+                } header: {
+                    Text(isURLMonitor ? "Credentials (optional)" : "Credentials")
+                } footer: {
+                    if isURLMonitor {
+                        Text("Only needed for a page behind HTTP Basic authentication.")
+                    }
                 }
 
                 Section {
@@ -43,7 +61,7 @@ struct AddServerView: View {
                 }
             }
             .formStyle(.grouped)
-            .navigationTitle("Add Server")
+            .navigationTitle(isURLMonitor ? "Add URL" : "Add Nagios Server")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

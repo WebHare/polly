@@ -5,14 +5,16 @@ import Foundation
 /// `https://alice:s3cret@monitor.example.com/nagios/` becomes
 /// base URL `https://monitor.example.com`, username `alice`, password `s3cret`.
 public struct ParsedServerURL: Equatable, Sendable {
-    /// URL with credentials, query, fragment and any `/nagios...` suffix removed.
+    /// URL with credentials and fragment removed. For a monitoring system also its query and any
+    /// `/nagios...` suffix.
     public var baseURL: URL
     public var username: String?
     public var password: String?
 }
 
 public enum ServerURLParser {
-    public static func parse(_ input: String) -> ParsedServerURL? {
+    /// `keepPath` keeps the path and query, for a URL that is itself the thing to check.
+    public static func parse(_ input: String, keepPath: Bool = false) -> ParsedServerURL? {
         var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
         if !text.contains("://") {
@@ -30,9 +32,11 @@ public enum ServerURLParser {
         components.scheme = scheme
         components.user = nil
         components.password = nil
-        components.query = nil
         components.fragment = nil
-        components.path = stripNagiosSuffix(components.path)
+        if !keepPath {
+            components.query = nil
+            components.path = stripNagiosSuffix(components.path)
+        }
 
         guard let baseURL = components.url else { return nil }
         return ParsedServerURL(baseURL: baseURL, username: username, password: password)
