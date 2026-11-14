@@ -15,13 +15,25 @@ struct ServerListView: View {
                                        description: Text("Add a Nagios server to start monitoring."))
             }
             ForEach(monitor.servers) { server in
-                HStack {
-                    ServerStatusRow(server: server, state: monitor.states[server.id])
-                    Spacer()
-                    Toggle("Monitor \(server.name)", isOn: enabledBinding(for: server))
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .help(server.enabled ? "Pause monitoring this server" : "Resume monitoring this server")
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        ServerStatusRow(server: server, state: monitor.states[server.id])
+                        Spacer()
+                        Button(server.notifications ? "Turn off notifications" : "Turn on notifications",
+                               systemImage: server.notifications ? "bell.fill" : "bell.slash") {
+                            setNotifications(!server.notifications, for: server)
+                        }
+                        .labelStyle(.iconOnly)
+                        .buttonStyle(.borderless)
+                        .help(server.notifications ? "Notifications are on for this server" : "Notifications are off for this server")
+                        Toggle("Monitor \(server.name)", isOn: enabledBinding(for: server))
+                            .labelsHidden()
+                            .toggleStyle(.switch)
+                            .help(server.enabled ? "Pause monitoring this server" : "Resume monitoring this server")
+                    }
+                    if case .ok(let status)? = monitor.states[server.id], !status.problems.isEmpty {
+                        ProblemList(server: server, problems: status.problems)
+                    }
                 }
                 .contextMenu {
                     Button("Refresh") { Task { await monitor.refresh(server) } }
@@ -41,6 +53,17 @@ struct ServerListView: View {
                 Text(monitor.passwordStorage == .keychain
                      ? "Passwords are stored in the system keychain."
                      : "Passwords are stored unencrypted in naggie.yaml; the keychain is not used.")
+            }
+
+            Section {
+                Toggle("Log server traffic", isOn: debugLogBinding)
+                #if os(macOS)
+                if let wireLog = monitor.wireLog, monitor.debugLog {
+                    Button("Show Log in Finder") { NSWorkspace.shared.activateFileViewerSelecting([wireLog.fileURL]) }
+                }
+                #endif
+            } footer: {
+                Text("For debugging: writes every request and response, without credentials, to naggie-debug.log next to naggie.yaml.")
             }
         }
         .navigationTitle("Naggie")
@@ -87,6 +110,24 @@ struct ServerListView: View {
         }
     }
     #endif
+
+    private var debugLogBinding: Binding<Bool> {
+        Binding {
+            monitor.debugLog
+        } set: { enabled in
+            do { try monitor.setDebugLog(enabled) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
+        }
+    }
+
+    private func setNotifications(_ enabled: Bool, for server: NagiosServer) {
+        Task {
+            if enabled, await !Notifier.shared.requestAuthorization() {
+                errorMessage = "Notifications are not allowed for Naggie. Allow them in the system settings first."
+                return
+            }
+            do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }
+        }
+    }
 
     private func enabledBinding(for server: NagiosServer) -> Binding<Bool> {
         Binding {

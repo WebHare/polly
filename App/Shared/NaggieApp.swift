@@ -18,6 +18,7 @@ struct NaggieApp: App {
             store = try! ServerStore(fileURL: nil, credentials: KeychainCredentialStore())
         }
         let monitor = MonitorModel(store: store)
+        Notifier.shared.install(on: monitor)
         monitor.startPolling()
         _monitor = State(initialValue: monitor)
     }

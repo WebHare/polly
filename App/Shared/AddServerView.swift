@@ -57,6 +57,7 @@ struct AddServerView: View {
         #if os(macOS)
         .frame(minWidth: 420, minHeight: 360)
         #endif
+        .onAppear { model.wireLog = monitor.debugLog ? monitor.wireLog : nil }
     }
 
     @ViewBuilder private var checkStatus: some View {

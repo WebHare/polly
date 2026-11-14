@@ -10,9 +10,10 @@ App/Shared/                 SwiftUI app code shared by all platforms
 App/macOS/                  Menu bar UI + sandbox entitlements (macOS only)
 Packages/NaggieKit/         Platform-independent logic + unit tests
   Models/                   NagiosServer, ServerURLParser (splits user:pass@ out of pasted URLs)
-  Storage/                  naggie.yaml reader/writer (Yams), ServerStore, keychain CredentialStore
-  Nagios/                   NagiosClient for /nagios/cgi-bin/statusjson.cgi
-  Monitoring/               MonitorModel (polling), AddServerModel (add-server form logic)
+  Storage/                  naggie.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
+  Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
+  Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
+                            NotificationPolicy, AddServerModel (add-server form logic)
 .mcp.json                   Enables XcodeBuildMCP for Claude Code in this project
 mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 ```
@@ -24,6 +25,9 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 - A server's status is read from `<base URL>/nagios/cgi-bin/statusjson.cgi`
   (`programstatus` for the connection test; `hostcount`, `servicecount` and `servicelist` for status).
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
+- Click a problem to see the check output and to open the check on the server, open its action or notes
+  link, acknowledge it or schedule downtime.
+- The bell next to a server turns local notifications for that server on or off (off by default).
 
 ## Requirements
 
@@ -61,6 +65,21 @@ node mock/nagios-mock.mjs --port 9000 --interval 5 --no-auth
 Add it in Naggie as `http://nagiosadmin:nagios@localhost:8080/`. Press `h` in the terminal for keyboard
 controls (force warning/critical/unknown, hosts down, all OK, pause rotation, simulate an outage, toggle auth).
 
+Besides `statusjson.cgi` it serves `extinfo.cgi` (the check page with its action and notes links) and
+`cmd.cgi` (the acknowledge and downtime forms, including the CSRF token and cookie), so commands really
+change the mock's state. `/mock/reset` and `/mock/set?host=..&service=..&status=critical` put it in a known
+state, and anything under `/redirect/` answers with a redirect.
+
+The mock is developed together with the client. `MockIntegrationTests` runs the real `NagiosClient` against it:
+
+```sh
+node mock/nagios-mock.mjs --no-rotate &
+NAGGIE_MOCK_URL=http://localhost:8080 swift test --package-path Packages/NaggieKit --filter MockIntegrationTests
+```
+
+When a real Nagios turns out to behave differently, change the mock to match first, watch these tests
+fail, and then fix the client.
+
 ## Design decisions
 
 Why things are the way they are, so they can be revisited deliberately rather than by accident.
@@ -78,6 +97,17 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Deployment targets macOS 14 / iOS 17**, the minimum for the `@Observable` macro used by the models.
 - **Swift 6 language mode** with strict concurrency; UI-facing models are `@MainActor`.
 
+### Backends
+
+- **`MonitorBackend` is the only thing the rest of the app knows about a monitoring system**: test the
+  connection, fetch the status, and optionally links and commands (`capabilities`). Nagios is the first
+  implementation. `MonitorModel` and the views never mention CGI names, HTML or Nagios status values, so
+  another system (Icinga, or a plain "is this URL up" check) is a new type plus a case in `BackendKind`.
+- **Each server has a `type` in `naggie.yaml`** (`nagios`, also the default when the key is missing). An
+  unknown type is an error rather than silently treated as Nagios.
+- **Commands are prepared, then submitted.** `prepareCommand` only reads what the server needs (for
+  Nagios: its form); nothing changes on the server until `submit`, and a submit is never retried.
+
 ### Talking to Nagios
 
 - **Only `statusjson.cgi`** (`<url>/nagios/cgi-bin/statusjson.cgi`), as that is Nagios Core's JSON API and
@@ -92,6 +122,33 @@ Why things are the way they are, so they can be revisited deliberately rather th
   arrives after a server was disabled or deleted is discarded.
 - **Plain `http://` is allowed** (`NSAllowsArbitraryLoads`) because internal Nagios servers often have no
   TLS. Self-signed certificates are not supported yet.
+- **Redirects are refused**, because following one would send the Basic credentials to wherever it points.
+- **An answer without data is an error, not "no problems".** The same goes for an installation with no
+  hosts and no services at all: that is what Nagios shows an account that isn't allowed to see anything.
+- **Links come from `extinfo.cgi`**, not from the JSON API: the check page has the action and notes URLs
+  with their Nagios macros already expanded. Only `http(s)` links without embedded credentials are opened.
+- **Acknowledge and downtime go through `cmd.cgi`**, the same form the web UI uses, including its CSRF
+  token and cookie. HTTP 200 is not treated as success: only Nagios' own confirmation text is. "Accepted"
+  means Nagios queued the command, not that the status has changed yet. Downtime start and end are typed in
+  the server's own notation and time zone (prefilled by the server), as the app can't know that time zone.
+- **Not yet verified against a real Nagios.** Links and commands are tested against the mock server, whose
+  pages are modelled on the Nagios Core sources (`cgi/extinfo.c`, `cgi/cmd.c`).
+
+### Notifications
+
+- **Per server and off by default.** They are local notifications decided by the app; nothing changes in
+  the Nagios notification configuration.
+- **The first successful poll is the baseline.** After that, new problems, severity changes and recoveries
+  are bundled into one notification per server; a newer one replaces the older one.
+- **Acknowledged problems and problems in scheduled downtime stay quiet**, as someone already knows.
+- **Only while the app is polling.** On iOS that means while it is in the foreground; there is no push.
+
+### Debugging
+
+- **`debugLog: true`** (or the switch in the Servers window) writes every request and response to
+  `naggie-debug.log` next to `naggie.yaml`, one JSON object per line, so an exchange that went wrong on a
+  real server can be replayed and the mock corrected afterwards. The `Authorization` header is replaced
+  and passwords never reach the file. At 5 MB the file is moved to `naggie-debug.log.1` and started anew.
 
 ### Adding servers
 
@@ -137,6 +194,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
   a warning escalating to critical restarts it.
 - **Per-server on/off switch** to pause monitoring without deleting the server; paused servers don't count
   towards the menu bar status.
+- **Problem details and actions open inline** in the problem's row instead of in a sheet or a separate
+  window: the menu bar panel closes as soon as it loses focus, and the same row works on iOS.
 
 ### Signing and sandbox
 

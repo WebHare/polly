@@ -62,7 +62,7 @@ struct MenuBarContentView: View {
                         ForEach(monitor.servers) { server in
                             ServerStatusRow(server: server, state: monitor.states[server.id])
                             if case .ok(let status)? = monitor.states[server.id] {
-                                ProblemList(problems: status.problems)
+                                ProblemList(server: server, problems: status.problems)
                             }
                         }
                     }
@@ -100,41 +100,6 @@ struct MenuBarContentView: View {
         openWindow(id: WindowID.servers)
         // We're an LSUIElement (agent) app, so explicitly bring the window to the front.
         NSApplication.shared.activate()
-    }
-}
-
-private struct ProblemList: View {
-    let problems: [ServiceProblem]
-
-    var body: some View {
-        ForEach(problems) { problem in
-            HStack(spacing: 6) {
-                Image(systemName: problem.severity.symbolName).foregroundStyle(problem.severity.color)
-                Text(problem.host).bold()
-                Text(problem.service)
-                Spacer(minLength: 4)
-                if let since = problem.since {
-                    ProblemAge(since: since)
-                }
-            }
-            .font(.caption)
-            .padding(.leading, 24)
-        }
-    }
-}
-
-/// "3m" / "2h" / "3d" since the issue started; hover for the exact duration and local start time.
-private struct ProblemAge: View {
-    let since: Date
-
-    var body: some View {
-        TimelineView(.everyMinute) { context in
-            let age = context.date.timeIntervalSince(since)
-            Text(DurationFormatting.short(age))
-                .monospacedDigit()
-                .foregroundStyle(.secondary)
-                .help("\(DurationFormatting.long(age))\nSince \(since.formatted(date: .abbreviated, time: .standard))")
-        }
     }
 }
 

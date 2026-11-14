@@ -13,12 +13,15 @@
 		85C9EBD36567A06E5FD6A214 /* AddServerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0FAD4A06F1F700A89CE7A94B /* AddServerView.swift */; };
 		A0D0E11E3AA9D4A872493F3C /* ServerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BF260CF55599120499170A11 /* ServerListView.swift */; };
 		B61CD4332C179289AC3275E6 /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C3D78A67796D5599A831F40 /* MenuBarContentView.swift */; platformFilters = (macos, ); };
+		CDAF1891FA7864F7B0D861F3 /* ProblemViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9AC149AE1DAE80ACFD097D8 /* ProblemViews.swift */; };
 		D3335C00C122C6F35625DE6A /* NaggieApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEC7E2D7EDE3C32BCBA88DD9 /* NaggieApp.swift */; };
+		FE476DFBDD0B241FF589DD30 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31014940FF53980DBA3CB763 /* Notifier.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0FAD4A06F1F700A89CE7A94B /* AddServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddServerView.swift; sourceTree = "<group>"; };
 		1C3D78A67796D5599A831F40 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
+		31014940FF53980DBA3CB763 /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
 		45A323A9BDFCA9A63466F3DE /* Naggie.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Naggie.entitlements; sourceTree = "<group>"; };
 		4DEC37E438DB62D6C306DB40 /* SeverityStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeverityStyle.swift; sourceTree = "<group>"; };
 		59AB1DD206789C7B431468D5 /* Naggie.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Naggie.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -26,6 +29,7 @@
 		BF260CF55599120499170A11 /* ServerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerListView.swift; sourceTree = "<group>"; };
 		CEC7E2D7EDE3C32BCBA88DD9 /* NaggieApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NaggieApp.swift; sourceTree = "<group>"; };
 		DC97CB1C8408654D591D456C /* NaggieKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = NaggieKit; path = Packages/NaggieKit; sourceTree = SOURCE_ROOT; };
+		F9AC149AE1DAE80ACFD097D8 /* ProblemViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemViews.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -45,6 +49,8 @@
 			children = (
 				0FAD4A06F1F700A89CE7A94B /* AddServerView.swift */,
 				CEC7E2D7EDE3C32BCBA88DD9 /* NaggieApp.swift */,
+				31014940FF53980DBA3CB763 /* Notifier.swift */,
+				F9AC149AE1DAE80ACFD097D8 /* ProblemViews.swift */,
 				BF260CF55599120499170A11 /* ServerListView.swift */,
 				4DEC37E438DB62D6C306DB40 /* SeverityStyle.swift */,
 			);
@@ -163,6 +169,8 @@
 				8001AE4C29E679DDD26DBF0F /* DockIcon.swift in Sources */,
 				B61CD4332C179289AC3275E6 /* MenuBarContentView.swift in Sources */,
 				D3335C00C122C6F35625DE6A /* NaggieApp.swift in Sources */,
+				FE476DFBDD0B241FF589DD30 /* Notifier.swift in Sources */,
+				CDAF1891FA7864F7B0D861F3 /* ProblemViews.swift in Sources */,
 				A0D0E11E3AA9D4A872493F3C /* ServerListView.swift in Sources */,
 				422749B6D6FE49B4A4CEE05E /* SeverityStyle.swift in Sources */,
 			);
