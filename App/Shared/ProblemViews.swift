@@ -100,7 +100,7 @@ private struct ProblemRow: View {
                 ProgressView().controlSize(.small)
             }
         }
-        .buttonStyle(.borderless)
+        .actionButtonStyle()
         .disabled(working)
     }
 
@@ -178,7 +178,7 @@ private struct CommandForm: View {
                     ProgressView().controlSize(.small)
                 }
             }
-            .buttonStyle(.borderless)
+            .actionButtonStyle()
             .disabled(sending)
         }
         .textFieldStyle(.roundedBorder)
@@ -207,6 +207,17 @@ private struct CommandForm: View {
                 message = "Not confirmed: \(error.localizedDescription) Check the server in your browser before trying again."
             }
         }
+    }
+}
+
+private extension View {
+    /// Borderless buttons are grey on macOS, which reads as disabled; links are tinted there.
+    @ViewBuilder func actionButtonStyle() -> some View {
+        #if os(macOS)
+        buttonStyle(.link)
+        #else
+        buttonStyle(.borderless)
+        #endif
     }
 }
 
