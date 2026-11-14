@@ -43,7 +43,15 @@ struct ProblemDetailView: View {
         }
         .frame(maxHeight: .infinity, alignment: .top)
         // Creating a backend reads the password, so only do that for a problem that is actually opened.
-        .onAppear { capabilities = (try? monitor.backend(for: server).capabilities) ?? [] }
+        .onAppear {
+            do {
+                capabilities = try monitor.backend(for: server).capabilities
+            } catch {
+                // Without this a password that can't be read looks like a server without any actions.
+                capabilities = []
+                message = error.localizedDescription
+            }
+        }
     }
 
     private func bar(@ViewBuilder content: () -> some View) -> some View {
