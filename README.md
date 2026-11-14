@@ -41,7 +41,7 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 
 ```sh
 xcodegen generate                          # after adding/removing files or editing project.yml
-open Polly.xcodeproj                      # or use SweetPad in VS Code
+open Polly.xcodeproj                       # or use SweetPad in VS Code
 
 # command line (if xcode-select points to the Command Line Tools, prefix with
 # DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
@@ -51,6 +51,30 @@ xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' 
 
 Builds are signed with the WebHare bv team (`DEVELOPMENT_TEAM: MF6WPNPK5H` in `project.yml`). Add an Apple ID
 that's a member of that team in Xcode → Settings → Accounts so Xcode can create the signing certificate and profiles.
+
+## Continuous integration
+
+`.github/workflows/build.yml` runs the PollyKit tests and builds a universal (arm64 + x86_64) Release build of
+the macOS app on every push to `master` and every pull request. The result is attached to the run as a
+`Polly-<version>-<run>.dmg` artifact.
+
+Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
+open it once via System Settings → Privacy & Security → **Open Anyway**, or run
+`xattr -dr com.apple.quarantine /Applications/Polly.app`. Each build also counts as a new app for the keychain,
+so expect keychain prompts after updating (or set `passwordStorage: file`).
+
+With these repository secrets the app and DMG are signed with a **Developer ID** and notarized, so they open
+without warnings:
+
+| Secret                       | Contents                                                                |
+| ---------------------------- | ----------------------------------------------------------------------- |
+| `MACOS_CERTIFICATE_P12`      | base64 of the exported "Developer ID Application" certificate + key (.p12) |
+| `MACOS_CERTIFICATE_PASSWORD` | password of that .p12                                                   |
+| `NOTARY_API_KEY`             | base64 of an App Store Connect API key (.p8) with the Developer role    |
+| `NOTARY_API_KEY_ID`          | that key's Key ID                                                       |
+| `NOTARY_API_ISSUER_ID`       | the Issuer ID shown above the App Store Connect API keys list           |
+
+Only the team's Account Holder can create a Developer ID Application certificate.
 
 ## Mock Nagios server
 

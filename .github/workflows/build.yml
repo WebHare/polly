@@ -1,0 +1,94 @@
+name: Build
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-26
+    env:
+      # Developer ID signing and notarization only happen when these secrets are configured
+      # (see README.md, "Continuous integration"). Without them the app is ad-hoc signed.
+      HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
+      TEAM_ID: MF6WPNPK5H
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Test PollyKit
+        run: swift test --package-path Packages/PollyKit
+
+      - name: Import the Developer ID certificate
+        if: env.HAS_SIGNING == 'true'
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KEYCHAIN_PASSWORD="$(uuidgen)"
+          echo "$CERTIFICATE_P12" | base64 --decode > "$RUNNER_TEMP/certificate.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/certificate.p12" -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm "$RUNNER_TEMP/certificate.p12"
+
+      - name: Build Polly.app
+        run: |
+          if [ "$HAS_SIGNING" = true ]; then
+            SIGNING=(CODE_SIGN_STYLE=Manual "CODE_SIGN_IDENTITY=Developer ID Application"
+                     DEVELOPMENT_TEAM="$TEAM_ID" OTHER_CODE_SIGN_FLAGS=--timestamp)
+          else
+            SIGNING=(CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=)
+          fi
+          xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release \
+            -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} ENABLE_HARDENED_RUNTIME=YES \
+            CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
+            "${SIGNING[@]}" build
+          mkdir -p dist
+          cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Polly.app" dist/
+          codesign --verify --strict --verbose=2 dist/Polly.app
+
+      - name: Create the DMG
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/Polly.app/Contents/Info.plist)
+          DMG="Polly-$VERSION-${{ github.run_number }}.dmg"
+          ln -s /Applications dist/Applications
+          hdiutil create -volname Polly -srcfolder dist -fs HFS+ -format UDZO -ov "$DMG"
+          if [ "$HAS_SIGNING" = true ]; then
+            codesign --sign "Developer ID Application" --timestamp "$DMG"
+          fi
+          echo "DMG=$DMG" >> "$GITHUB_ENV"
+
+      - name: Notarize the DMG
+        if: env.HAS_SIGNING == 'true'
+        env:
+          NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
+          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+        run: |
+          echo "$NOTARY_API_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
+          xcrun notarytool submit "$DMG" --wait \
+            --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER_ID"
+          xcrun stapler staple "$DMG"
+          rm "$RUNNER_TEMP/notary.p8"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.DMG }}
+          path: ${{ env.DMG }}
+          if-no-files-found: error
+
+      - name: Remove the signing keychain
+        if: always() && env.HAS_SIGNING == 'true'
+        run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
