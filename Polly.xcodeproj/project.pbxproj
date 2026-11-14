@@ -155,7 +155,6 @@
 				};
 			};
 			buildConfigurationList = 05C77ABEA459BC4743AD1EE1 /* Build configuration list for PBXProject "Polly" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -168,6 +167,7 @@
 				ED81DB1E03F8F750DD685406 /* XCLocalSwiftPackageReference "Packages/PollyKit" */,
 			);
 			preferredProjectObjectVersion = 77;
+			productRefGroup = E3462FD0D841AEECA52AF5F3 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
