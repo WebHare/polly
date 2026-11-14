@@ -96,6 +96,13 @@ struct NagiosCommandFormTests {
         #expect(body.contains("fixed=1"))
         #expect(body.contains("end_time=11-13-2026%2016%3A00%3A00"))
 
+        // date_format=iso8601, as on monitor.webhare.net. Without a token in the form, none is sent.
+        let iso = CommandInput(author: "me", comment: "Maintenance", start: "2026-11-14 23:11:46", end: "2026-11-15 01:11:46")
+        let isoBody = String(decoding: try NagiosCommandForm.body(kind: .downtime, problem: target, input: iso,
+                                                                  form: ["start_time": "2026-11-14 23:11:46"]), as: UTF8.self)
+        #expect(isoBody.contains("start_time=2026-11-14%2023%3A11%3A46"))
+        #expect(!isoBody.contains("nagFormId"))
+
         for (start, end) in [("11-13-2026 16:00:00", "11-13-2026 15:00:00"), ("02-30-2026 10:00:00", "03-01-2026 10:00:00"),
                              ("11-13-2026 10:00:00", "11-13-2026 25:00:00"), ("11-13-2026", "11-14-2026"), ("", "")] {
             #expect(throws: BackendError.self) {

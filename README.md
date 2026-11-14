@@ -68,7 +68,8 @@ controls (force warning/critical/unknown, hosts down, all OK, pause rotation, si
 Besides `statusjson.cgi` it serves `extinfo.cgi` (the check page with its action and notes links) and
 `cmd.cgi` (the acknowledge and downtime forms, including the CSRF token and cookie), so commands really
 change the mock's state. `/mock/reset` and `/mock/set?host=..&service=..&status=critical` put it in a known
-state, and anything under `/redirect/` answers with a redirect.
+state, `/mock/config?csrf=off&dateFormat=iso8601` switches to the variant without a CSRF token and with
+ISO dates, and anything under `/redirect/` answers with a redirect.
 
 The mock is developed together with the client. `MockIntegrationTests` runs the real `NagiosClient` against it:
 
@@ -131,8 +132,10 @@ Why things are the way they are, so they can be revisited deliberately rather th
   token and cookie. HTTP 200 is not treated as success: only Nagios' own confirmation text is. "Accepted"
   means Nagios queued the command, not that the status has changed yet. Downtime start and end are typed in
   the server's own notation and time zone (prefilled by the server), as the app can't know that time zone.
-- **Not yet verified against a real Nagios.** Links and commands are tested against the mock server, whose
-  pages are modelled on the Nagios Core sources (`cgi/extinfo.c`, `cgi/cmd.c`).
+- **Verified against a real Nagios as far as reading goes.** Status, check details, the check page and both
+  command forms were read from a real server. That server sends no CSRF token, uses ISO dates and locks the
+  author name, and the mock was changed to offer those variants. Actually submitting an acknowledgement or
+  a downtime has only been done against the mock so far.
 
 ### Notifications
 

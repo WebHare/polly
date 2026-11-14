@@ -72,6 +72,26 @@ struct MockIntegrationTests {
         #expect(try await problem("HTTP")?.downtimeDepth == 1)
     }
 
+    /// What monitor.webhare.net does: no CSRF token in the form at all, and ISO dates.
+    @Test func serverWithoutCSRFTokenAndWithISODates() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/config?csrf=off&dateFormat=iso8601")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        let target = try #require(try await problem("HTTP"))
+
+        let acknowledge = try await client().prepareCommand(.acknowledge, for: target)
+        try await acknowledge.submit(CommandInput(author: acknowledge.defaults.author, comment: "Investigating"))
+        #expect(try await problem("HTTP")?.acknowledged == true)
+
+        let downtime = try await client().prepareCommand(.downtime, for: target)
+        var input = downtime.defaults
+        #expect(input.start.hasPrefix("20"))
+        input.comment = "Maintenance"
+        try await downtime.submit(input)
+        #expect(try await problem("HTTP")?.downtimeDepth == 1)
+        try await control("/mock/reset")
+    }
+
     /// Proves the form's CSRF cookie really travels from the GET to the POST.
     @Test func commandWithoutTheFormCookieIsRejected() async throws {
         try await control("/mock/reset")

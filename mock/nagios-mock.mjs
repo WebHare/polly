@@ -12,6 +12,7 @@
 // Mock-only, without auth:
 //   GET /mock/reset                                       all hosts up, all services OK, no acks or downtimes
 //   GET /mock/set?host=H&service=S&status=ok|warning|critical|unknown
+//   GET /mock/config?csrf=on|off&dateFormat=us|iso8601    how cmd.cgi behaves (reset by /mock/reset)
 //   /redirect/<path>                                      302 to /<path>
 // Press "h" in the terminal for keyboard controls.
 
@@ -74,6 +75,9 @@ const state = {
   offline: false, // respond with 503
   auth: !opts["no-auth"],
   requests: 0,
+  // Both variants exist in the wild: monitor.webhare.net sends no nagFormId at all and uses ISO dates.
+  csrf: true,
+  dateFormat: "us",
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -223,12 +227,19 @@ function checkAuth(req) {
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/'/g, "&#39;").replace(/"/g, "&quot;");
 const pad = (n) => String(n).padStart(2, "0");
-// Nagios date_format=us, server-local time.
-const nagiosTime = (d) => `${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+// Server-local time in the configured Nagios date_format: us (MM-DD-YYYY) or iso8601 (YYYY-MM-DD).
+function nagiosTime(d) {
+  const [y, m, day] = [d.getFullYear(), pad(d.getMonth() + 1), pad(d.getDate())];
+  const date = state.dateFormat === "iso8601" ? `${y}-${m}-${day}` : `${m}-${day}-${y}`;
+  return `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
 function parseNagiosTime(value) {
-  const m = /^(\d\d)-(\d\d)-(\d{4}) (\d\d):(\d\d):(\d\d)$/.exec(value ?? "");
-  return m ? new Date(m[3], m[1] - 1, m[2], m[4], m[5], m[6]).getTime() : NaN;
+  const iso = state.dateFormat === "iso8601";
+  const m = (iso ? /^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)$/ : /^(\d\d)-(\d\d)-(\d{4}) (\d\d):(\d\d):(\d\d)$/).exec(value ?? "");
+  if (!m) return NaN;
+  const [year, month, day] = iso ? [m[1], m[2], m[3]] : [m[3], m[1], m[2]];
+  return new Date(year, month - 1, day, m[4], m[5], m[6]).getTime();
 }
 
 const issuedFormIds = new Set();
@@ -336,7 +347,7 @@ function commandForm(params, formId) {
     );
   }
   rows.push(
-    row("Author (Your Name)", "<INPUT TYPE='TEXT' NAME='com_author' VALUE='Nagios Admin' >"),
+    row("Author (Your Name)", "<INPUT TYPE='TEXT' NAME='com_author' VALUE='Nagios Admin' READONLY DISABLED>"),
     row("Comment", "<INPUT TYPE='TEXT' NAME='com_data' VALUE='' SIZE=40>"),
   );
   if (cmd === "56") {
@@ -365,8 +376,7 @@ function commandForm(params, formId) {
 </tr>
 </table>
 <div align='center'><form method='post' action='cmd.cgi'>
-<INPUT TYPE='hidden' NAME='nagFormId' VALUE='${formId}'
-<TABLE CELLSPACING=0 CELLPADDING=0 CLASS='optBox'>
+${formId ? `<INPUT TYPE='hidden' NAME='nagFormId' VALUE='${formId}'\n` : ""}<TABLE CELLSPACING=0 CELLPADDING=0 CLASS='optBox'>
 <tr><td CLASS='boxFrame BoxWidth'>
 <table cellspacing='2' cellpadding='0' class='contentTable'>
 <tr CLASS='sectionHeader'><td COLSPAN='2'>Command Options</td></tr>
@@ -388,14 +398,15 @@ ${rows.join("\n")}
 /// Applies a POSTed command; returns the error text or null on success.
 function runCommand(fields, cookies) {
   const formId = fields.get("nagFormId");
-  if (!formId || cookies.NagFormId !== formId || !issuedFormIds.has(formId)) return "Error: Invalid or missing CSRF cookie!";
+  if (state.csrf && (!formId || cookies.NagFormId !== formId || !issuedFormIds.has(formId))) return "Error: Invalid or missing CSRF cookie!";
   if (fields.get("cmd_mod") !== "2") return "Error: Invalid command mode!";
   const cmd = fields.get("cmd_typ");
   if (cmd !== "34" && cmd !== "56") return "Error: An invalid command was specified!";
   if (!hosts.has(fields.get("host"))) return "Error: You must enter a valid host name!";
   const svc = findService(fields.get("host"), fields.get("service"));
   if (!svc) return "Error: You must enter a valid service description!";
-  const author = fields.get("com_author")?.trim();
+  // lock_author_names: whatever is posted, the command is recorded under the logged-in contact.
+  const author = "Nagios Admin";
   const comment = fields.get("com_data")?.trim();
   if (!author) return "Error: You must enter a name for the author!";
   if (!comment) return "Error: You must enter a comment!";
@@ -441,7 +452,19 @@ function handleControl(url) {
       s.downtime = null;
     }
     for (const name of hosts.keys()) setHost(name, HOST.up);
+    state.csrf = true;
+    state.dateFormat = "us";
     return [200, { ok: true }];
+  }
+  if (url.pathname === "/mock/config") {
+    const csrf = url.searchParams.get("csrf");
+    const dateFormat = url.searchParams.get("dateFormat");
+    if ((csrf && !["on", "off"].includes(csrf)) || (dateFormat && !["us", "iso8601"].includes(dateFormat))) {
+      return [404, { error: "csrf must be on|off, dateFormat must be us|iso8601" }];
+    }
+    if (csrf) state.csrf = csrf === "on";
+    if (dateFormat) state.dateFormat = dateFormat;
+    return [200, { ok: true, csrf: state.csrf, dateFormat: state.dateFormat }];
   }
   if (url.pathname === "/mock/set") {
     const p = url.searchParams;
@@ -482,6 +505,7 @@ const server = http.createServer(async (req, res) => {
     if (error) log(`\x1b[31mcommand refused: ${error}\x1b[0m`);
     return sendHTML(commandResult(error));
   }
+  if (!state.csrf) return sendHTML(commandForm(url.searchParams, null));
   const formId = randomBytes(16).toString("hex");
   issuedFormIds.add(formId);
   sendHTML(commandForm(url.searchParams, formId), { "Set-Cookie": `NagFormId=${formId}; Path=/` });
@@ -513,7 +537,8 @@ Keys:
   h           this help
   q           quit
 
-Without auth: GET /mock/reset, GET /mock/set?host=H&service=S&status=ok|warning|critical|unknown, /redirect/<path> (302)
+Without auth: GET /mock/reset, GET /mock/set?host=H&service=S&status=ok|warning|critical|unknown,
+  GET /mock/config?csrf=on|off&dateFormat=us|iso8601, /redirect/<path> (302)
 `);
 }
 
