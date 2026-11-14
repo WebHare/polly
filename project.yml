@@ -1,0 +1,61 @@
+# XcodeGen spec. Regenerate the Xcode project with:  xcodegen generate
+name: Naggie
+options:
+  bundleIdPrefix: nl.webhare
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+  createIntermediateGroups: true
+
+packages:
+  NaggieKit:
+    path: Packages/NaggieKit
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Naggie:
+    type: application
+    supportedDestinations: [iOS, macOS]
+    sources:
+      - path: App/Shared
+      - path: App/macOS
+        destinationFilters: [macOS]
+    dependencies:
+      - package: NaggieKit
+    info:
+      path: App/Info.plist
+      properties:
+        # Nagios servers are often internal and plain http.
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nl.webhare.naggie
+        PRODUCT_NAME: Naggie
+        GENERATE_INFOPLIST_FILE: YES
+        INFOPLIST_KEY_CFBundleDisplayName: Naggie
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad: "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
+        TARGETED_DEVICE_FAMILY: "1,2"
+        # macOS: menu bar only, no Dock icon.
+        "INFOPLIST_KEY_LSUIElement[sdk=macosx*]": YES
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/macOS/Naggie.entitlements
+        "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
+        CODE_SIGN_STYLE: Automatic
+        # WebHare bv. A stable team signature keeps keychain access working across rebuilds.
+        DEVELOPMENT_TEAM: MF6WPNPK5H
+
+schemes:
+  Naggie:
+    build:
+      targets:
+        Naggie: all
+    test:
+      targets:
+        - package: NaggieKit/NaggieKitTests
