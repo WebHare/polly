@@ -38,8 +38,6 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: nl.webhare.polly
         PRODUCT_NAME: Polly
         GENERATE_INFOPLIST_FILE: YES
-        # The asset catalog only holds the mascot; there is no app icon yet.
-        ASSETCATALOG_COMPILER_APPICON_NAME: ""
         INFOPLIST_KEY_CFBundleDisplayName: Polly
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
