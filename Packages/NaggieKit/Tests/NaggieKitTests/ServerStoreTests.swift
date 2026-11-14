@@ -67,5 +67,14 @@ struct ServerStoreTests {
         defer { try? FileManager.default.removeItem(at: file) }
         try ServerStore(fileURL: file, credentials: InMemoryCredentialStore()).setShowDockIcon(true)
         #expect(try ServerStore(fileURL: file, credentials: InMemoryCredentialStore()).showDockIcon)
+
+        let store = try ServerStore(fileURL: file, credentials: InMemoryCredentialStore())
+        let server = NagiosServer(name: "Prod", baseURL: URL(string: "https://mon.example.com")!, username: "alice")
+        try store.add(server, password: nil)
+        try store.setNotifications(true, for: server.id)
+        try store.setDebugLog(true)
+        let reopened = try ServerStore(fileURL: file, credentials: InMemoryCredentialStore())
+        #expect(reopened.allServers().first?.notifications == true)
+        #expect(reopened.debugLog)
     }
 }

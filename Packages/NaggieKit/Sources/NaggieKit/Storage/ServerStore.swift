@@ -68,6 +68,12 @@ public final class ServerStore: @unchecked Sendable {
         try withSettings { $0.showDockIcon = show }
     }
 
+    public var debugLog: Bool { read(\.debugLog) }
+
+    public func setDebugLog(_ enabled: Bool) throws {
+        try withSettings { $0.debugLog = enabled }
+    }
+
     /// Switches password storage and moves all existing passwords to the new location.
     /// Switching away from the keychain reads and removes the existing keychain items (this may prompt
     /// once); after that the keychain is no longer accessed.
@@ -135,6 +141,13 @@ public final class ServerStore: @unchecked Sendable {
         try withSettings { settings in
             guard let index = settings.servers.firstIndex(where: { $0.server.id == id }) else { return }
             settings.servers[index].server.enabled = enabled
+        }
+    }
+
+    public func setNotifications(_ enabled: Bool, for id: UUID) throws {
+        try withSettings { settings in
+            guard let index = settings.servers.firstIndex(where: { $0.server.id == id }) else { return }
+            settings.servers[index].server.notifications = enabled
         }
     }
 

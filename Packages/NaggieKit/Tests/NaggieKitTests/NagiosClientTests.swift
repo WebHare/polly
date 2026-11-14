@@ -47,6 +47,29 @@ struct NagiosClientTests {
         #expect(problems[1].since == nil)
     }
 
+    @Test func decodesProblemDetails() throws {
+        let json = """
+            {"result":{"type_code":0},
+             "data":{"servicelist":{"web1":{"HTTP":{"status":16,"last_check":1731590060000,
+                 "plugin_output":" HTTP CRITICAL - timeout \\n","long_plugin_output":"line 1\\\\nline 2",
+                 "problem_has_been_acknowledged":true,"scheduled_downtime_depth":2}}}}}
+            """
+        let envelope: StatusJSONEnvelope<ServiceListPayload> = try NagiosClient.decode(data: Data(json.utf8), statusCode: 200)
+        let problem = try #require(envelope.data?.problems.first)
+        #expect(problem.output == "HTTP CRITICAL - timeout")
+        #expect(problem.longOutput == "line 1\nline 2")
+        #expect(problem.lastCheck == Date(timeIntervalSince1970: 1_731_590_060))
+        #expect(problem.acknowledged)
+        #expect(problem.downtimeDepth == 2)
+    }
+
+    /// A successful result without a payload must never be read as "no problems".
+    @Test func missingDataIsNotHealthy() {
+        #expect(throws: NagiosClientError.notStatusJSON) {
+            let _: StatusJSONEnvelope<ServiceListPayload> = try NagiosClient.decode(data: Data(#"{"result":{"type_code":0}}"#.utf8), statusCode: 200)
+        }
+    }
+
     @Test func mapsErrors() {
         #expect(throws: NagiosClientError.unauthorized) {
             let _: StatusJSONEnvelope<IgnoredPayload> = try NagiosClient.decode(data: Data(), statusCode: 401)

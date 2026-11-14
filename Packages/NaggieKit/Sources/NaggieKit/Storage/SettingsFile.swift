@@ -24,11 +24,15 @@ public struct NaggieSettings: Equatable, Sendable {
 
     public var passwordStorage: PasswordStorage = .keychain
     public var showDockIcon = false
+    /// Write `naggie-debug.log` (see `WireLog`) next to the settings file.
+    public var debugLog = false
     public var servers: [Server] = []
 
-    public init(passwordStorage: PasswordStorage = .keychain, showDockIcon: Bool = false, servers: [Server] = []) {
+    public init(passwordStorage: PasswordStorage = .keychain, showDockIcon: Bool = false, debugLog: Bool = false,
+                servers: [Server] = []) {
         self.passwordStorage = passwordStorage
         self.showDockIcon = showDockIcon
+        self.debugLog = debugLog
         self.servers = servers
     }
 }
@@ -63,16 +67,26 @@ public enum SettingsFile {
             settings.passwordStorage = value
         }
         settings.showDockIcon = raw.showDockIcon ?? false
+        settings.debugLog = raw.debugLog ?? false
         settings.servers = try (raw.servers ?? []).enumerated().map { index, entry in
             guard let urlText = entry.url, let url = URL(string: urlText) else {
                 throw SettingsFileError(message: "naggie.yaml: server #\(index + 1) has no valid url")
+            }
+            var kind = BackendKind.nagios
+            if let type = entry.type {
+                guard let value = BackendKind(rawValue: type) else {
+                    throw SettingsFileError(message: "naggie.yaml: server #\(index + 1) has unknown type '\(type)'")
+                }
+                kind = value
             }
             let server = NagiosServer(
                 id: entry.id.flatMap(UUID.init(uuidString:)) ?? UUID(),
                 name: entry.name ?? url.host() ?? urlText,
                 baseURL: url,
                 username: entry.username ?? "",
-                enabled: entry.enabled ?? true
+                enabled: entry.enabled ?? true,
+                kind: kind,
+                notifications: entry.notifications ?? false
             )
             return NaggieSettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
         }
@@ -83,15 +97,18 @@ public enum SettingsFile {
     private struct RawSettings: Decodable {
         struct RawServer: Decodable {
             var name: String?
+            var type: String?
             var url: String?
             var username: String?
             var password: String?
             var enabled: Bool?
+            var notifications: Bool?
             var id: String?
         }
 
         var passwordStorage: String?
         var showDockIcon: Bool?
+        var debugLog: Bool?
         var servers: [RawServer]?
     }
 
@@ -119,6 +136,10 @@ public enum SettingsFile {
             # macOS only: show a Dock icon in addition to the menu bar icon.
             showDockIcon: \(settings.showDockIcon)
 
+            # Write naggie-debug.log next to this file: every request to and response from the servers,
+            # without credentials. For troubleshooting only.
+            debugLog: \(settings.debugLog)
+
 
             """
 
@@ -132,12 +153,14 @@ public enum SettingsFile {
             if index > 0 { out += "\n" }
             let server = entry.server
             out += "  - name: \(scalar(server.name))\n"
+            out += "    type: \(server.kind.rawValue)\n"
             out += "    url: \(scalar(server.baseURL.absoluteString))\n"
             out += "    username: \(scalar(server.username))\n"
             if let password = entry.password {
                 out += "    password: \(scalar(password))\n"
             }
             out += "    enabled: \(server.enabled)\n"
+            out += "    notifications: \(server.notifications)\n"
             // UUIDs are hex and dashes: always safe as a plain scalar.
             out += "    id: \(server.id.uuidString.lowercased())\n"
         }

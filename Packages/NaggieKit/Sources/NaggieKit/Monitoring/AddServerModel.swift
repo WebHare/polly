@@ -27,6 +27,8 @@ public final class AddServerModel {
         }
     }
 
+    /// Receives the connection test's traffic when set.
+    @ObservationIgnored public var wireLog: WireLog?
     @ObservationIgnored private let session: URLSession
 
     public init(session: URLSession = .shared) {
@@ -53,7 +55,7 @@ public final class AddServerModel {
         }
         checkState = .checking
         do {
-            try await NagiosClient(server: server, password: password.isEmpty ? nil : password, session: session)
+            try await server.makeBackend(password: password.isEmpty ? nil : password, session: session, wireLog: wireLog)
                 .testConnection()
             checkState = .succeeded
             return true

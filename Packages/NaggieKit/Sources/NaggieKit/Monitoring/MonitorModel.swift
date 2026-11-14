@@ -16,13 +16,25 @@ public final class MonitorModel {
     public private(set) var lastError: String?
     public private(set) var passwordStorage: PasswordStorage = .keychain
     public private(set) var showDockIcon = false
+    public private(set) var debugLog = false
     public var pollInterval: Duration = .seconds(60)
 
     @ObservationIgnored public let store: ServerStore
+    /// `naggie-debug.log` next to naggie.yaml; nil for an in-memory store. Only passed to backends while
+    /// `debugLog` is on.
+    @ObservationIgnored public let wireLog: WireLog?
+    /// Called after a successful refresh of a server with `notifications == true`, when something changed.
+    @ObservationIgnored public var onProblemChanges: ((NagiosServer, ProblemChanges) -> Void)?
+    @ObservationIgnored private let session: URLSession
     @ObservationIgnored private var pollTask: Task<Void, Never>?
+    /// Problems of the last successful fetch per server. A failed fetch keeps it, so an outage of the
+    /// monitoring server itself doesn't report every problem as new once it is back.
+    @ObservationIgnored private var baselines: [UUID: [ServiceProblem]] = [:]
 
-    public init(store: ServerStore) {
+    public init(store: ServerStore, session: URLSession = .shared) {
         self.store = store
+        self.session = session
+        wireLog = store.fileURL.map { WireLog(fileURL: $0.deletingLastPathComponent().appending(path: "naggie-debug.log")) }
         reload()
     }
 
@@ -51,14 +63,32 @@ public final class MonitorModel {
         servers = store.allServers()
         passwordStorage = store.passwordStorage
         showDockIcon = store.showDockIcon
+        debugLog = store.debugLog
         // Drop status of removed and disabled servers so they don't count towards the overall state.
         let active = Set(servers.filter(\.enabled).map(\.id))
         states = states.filter { active.contains($0.key) }
+        baselines = baselines.filter { active.contains($0.key) }
     }
 
     public func setShowDockIcon(_ show: Bool) throws {
         defer { reload() }
         try store.setShowDockIcon(show)
+    }
+
+    public func setDebugLog(_ enabled: Bool) throws {
+        defer { reload() }
+        try store.setDebugLog(enabled)
+    }
+
+    public func setNotifications(_ enabled: Bool, for server: NagiosServer) throws {
+        defer { reload() }
+        try store.setNotifications(enabled, for: server.id)
+    }
+
+    /// The backend for a server, with its password. Used by the UI for links and commands.
+    public func backend(for server: NagiosServer) throws -> any MonitorBackend {
+        server.makeBackend(password: try store.password(for: server.id), session: session,
+                           wireLog: debugLog ? wireLog : nil)
     }
 
     public func add(_ server: NagiosServer, password: String?) throws {
@@ -118,16 +148,24 @@ public final class MonitorModel {
         if states[server.id] == nil { states[server.id] = .loading }
         let result: ServerState
         do {
-            let password = try store.password(for: server.id)
-            result = .ok(try await NagiosClient(server: server, password: password).fetchStatus())
+            result = .ok(try await backend(for: server).fetchStatus())
         } catch {
             result = .failed(error.localizedDescription)
         }
         // The server may have been disabled or deleted while the request was in flight.
-        if isEnabled(server.id) { states[server.id] = result }
+        guard let current = enabledServer(server.id) else { return }
+        states[server.id] = result
+        guard case .ok(let status) = result else { return }
+        let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems)
+        baselines[server.id] = status.problems
+        if current.notifications, !changes.isEmpty { onProblemChanges?(current, changes) }
     }
 
     private func isEnabled(_ id: UUID) -> Bool {
-        servers.contains { $0.id == id && $0.enabled }
+        enabledServer(id) != nil
+    }
+
+    private func enabledServer(_ id: UUID) -> NagiosServer? {
+        servers.first { $0.id == id && $0.enabled }
     }
 }

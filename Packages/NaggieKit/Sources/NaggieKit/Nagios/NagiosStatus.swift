@@ -39,13 +39,27 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var severity: Severity
     /// When the service entered its current state (Nagios `last_state_change`).
     public var since: Date?
+    /// First line of the check's output.
+    public var output: String
+    /// Further output lines, separated by newlines.
+    public var longOutput: String
+    public var lastCheck: Date?
+    public var acknowledged: Bool
+    /// Number of scheduled downtimes the check is currently in; 0 means none.
+    public var downtimeDepth: Int
     public var id: String { "\(host)/\(service)" }
 
-    public init(host: String, service: String, severity: Severity, since: Date? = nil) {
+    public init(host: String, service: String, severity: Severity, since: Date? = nil, output: String = "",
+                longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0) {
         self.host = host
         self.service = service
         self.severity = severity
         self.since = since
+        self.output = output
+        self.longOutput = longOutput
+        self.lastCheck = lastCheck
+        self.acknowledged = acknowledged
+        self.downtimeDepth = downtimeDepth
     }
 }
 

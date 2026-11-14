@@ -31,12 +31,15 @@ struct SettingsFileTests {
         #expect(yaml.contains("""
             servers:
               - name: Production
+                type: nagios
                 url: https://mon.example.com
                 username: alice
                 enabled: true
+                notifications: false
                 id: 3f2504e0-4f89-11d3-9a0c-0305e82c3301
 
               - name: Test
+                type: nagios
                 url: http://test.local
                 username: ""
                 enabled: false
@@ -57,5 +60,19 @@ struct SettingsFileTests {
     @Test func rejectsBadValues() {
         #expect(throws: SettingsFileError.self) { try SettingsFile.parse("passwordStorage: cloud") }
         #expect(throws: SettingsFileError.self) { try SettingsFile.parse("servers:\n  - name: x\n") }
+        #expect(throws: SettingsFileError.self) { try SettingsFile.parse("servers:\n  - url: https://x.example\n    type: zabbix\n") }
+    }
+
+    @Test func roundTripsBackendNotificationsAndDebugLog() throws {
+        var settings = NaggieSettings(debugLog: true)
+        settings.servers.append(.init(server: NagiosServer(name: "Prod", baseURL: URL(string: "https://mon.example.com")!,
+                                                           username: "alice", notifications: true)))
+        let parsed = try SettingsFile.parse(SettingsFile.render(settings))
+        #expect(parsed == settings)
+        #expect(parsed.servers[0].server.kind == .nagios)
+        // Files written before these keys existed keep loading with the defaults.
+        let old = try SettingsFile.parse("servers:\n  - url: https://mon.example.com\n")
+        #expect(!old.debugLog)
+        #expect(!old.servers[0].server.notifications)
     }
 }
