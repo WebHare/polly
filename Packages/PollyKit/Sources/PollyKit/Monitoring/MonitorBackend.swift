@@ -7,6 +7,13 @@ import Foundation
 /// The type of monitoring system a server runs. Stored as `type` in polly.yaml.
 public enum BackendKind: String, Sendable, CaseIterable {
     case nagios
+
+    /// The name of the monitoring system as shown to the user.
+    public var displayName: String {
+        switch self {
+        case .nagios: "Nagios"
+        }
+    }
 }
 
 public struct BackendCapabilities: OptionSet, Sendable {

@@ -234,6 +234,8 @@ struct ServiceListPayload: Decodable {
         var longOutput = ""
         var acknowledged = false
         var downtimeDepth = 0
+        var checkAttempt: CheckAttempt?
+        var nextCheck: Date?
 
         private enum CodingKeys: String, CodingKey {
             case status
@@ -243,6 +245,10 @@ struct ServiceListPayload: Decodable {
             case longOutput = "long_plugin_output"
             case acknowledged = "problem_has_been_acknowledged"
             case downtimeDepth = "scheduled_downtime_depth"
+            case stateType = "state_type"
+            case currentAttempt = "current_attempt"
+            case maxAttempts = "max_attempts"
+            case nextCheck = "next_check"
         }
 
         init(from decoder: Decoder) throws {
@@ -259,6 +265,14 @@ struct ServiceListPayload: Decodable {
             longOutput = try container.decodeIfPresent(String.self, forKey: .longOutput)?.replacingOccurrences(of: "\\n", with: "\n") ?? ""
             acknowledged = try container.decodeIfPresent(Bool.self, forKey: .acknowledged) ?? false
             downtimeDepth = try container.decodeIfPresent(Int.self, forKey: .downtimeDepth) ?? 0
+            nextCheck = try Self.date(container, .nextCheck)
+            // state_type is 0/1, or "soft"/"hard" when the server enumerates values as text.
+            let hard = (try? container.decode(Int.self, forKey: .stateType)).map { $0 == 1 }
+                ?? (try? container.decode(String.self, forKey: .stateType)).map { $0.lowercased() == "hard" }
+            if let hard, let current = try container.decodeIfPresent(Int.self, forKey: .currentAttempt),
+               let max = try container.decodeIfPresent(Int.self, forKey: .maxAttempts) {
+                checkAttempt = CheckAttempt(hard: hard, current: current, max: max)
+            }
         }
 
         /// statusjson.cgi times are milliseconds since the epoch; 0 means "never".
@@ -276,7 +290,8 @@ struct ServiceListPayload: Decodable {
                 NagiosServiceState(rawValue: entry.status)?.severity.map {
                     ServiceProblem(host: host, service: service, severity: $0, since: entry.lastStateChange,
                                    output: entry.output, longOutput: entry.longOutput, lastCheck: entry.lastCheck,
-                                   acknowledged: entry.acknowledged, downtimeDepth: entry.downtimeDepth)
+                                   acknowledged: entry.acknowledged, downtimeDepth: entry.downtimeDepth,
+                                   checkAttempt: entry.checkAttempt, nextCheck: entry.nextCheck)
                 }
             }
         }

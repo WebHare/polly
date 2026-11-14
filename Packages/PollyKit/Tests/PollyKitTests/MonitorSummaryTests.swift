@@ -1,0 +1,96 @@
+import Foundation
+import Testing
+@testable import PollyKit
+
+@MainActor
+@Suite struct MonitorSummaryTests {
+    let nagios = NagiosServer(name: "monitor", baseURL: URL(string: "https://monitor.example.com")!, username: "")
+    let other = NagiosServer(name: "ops", baseURL: URL(string: "https://ops.example.com")!, username: "")
+
+    private func status(down: Int = 0, _ problems: [ServiceProblem]) -> MonitorModel.ServerState {
+        .ok(ServerStatus(hosts: HostCounts(up: 10, down: down),
+                         services: ServiceCounts(ok: 20, warning: problems.filter { $0.severity == .warning }.count,
+                                                 critical: problems.filter { $0.severity == .critical }.count,
+                                                 unknown: problems.filter { $0.severity == .unknown }.count),
+                         problems: problems, fetchedAt: Date(timeIntervalSince1970: 1000)))
+    }
+
+    @Test func groupsRunCriticalWarningUnknownNewestFirst() {
+        let problems = [
+            ServiceProblem(host: "a", service: "old warn", severity: .warning, since: Date(timeIntervalSince1970: 10)),
+            ServiceProblem(host: "b", service: "unk", severity: .unknown, since: Date(timeIntervalSince1970: 50)),
+            ServiceProblem(host: "c", service: "crit", severity: .critical, since: Date(timeIntervalSince1970: 20)),
+            ServiceProblem(host: "d", service: "new warn", severity: .warning, since: Date(timeIntervalSince1970: 90)),
+            ServiceProblem(host: "e", service: "undated warn", severity: .warning),
+        ]
+        let summary = MonitorSummary(servers: [nagios], states: [nagios.id: status(down: 1, problems)])
+        #expect(summary.groups.map(\.severity) == [.critical, .warning, .unknown])
+        #expect(summary.groups[1].entries.map(\.problem.service) == ["new warn", "old warn", "undated warn"])
+        #expect(summary.entries.count == 5)
+        #expect(summary.screen == .problems)
+        #expect(summary.mood == .critical)
+        #expect(summary.headline == "Polly is squawking: 1 host down")
+        #expect(summary.countsLine == "1 critical · 3 warning · 1 unknown")
+        #expect(summary.badge == "1")
+    }
+
+    @Test func warningsOnlyFidget() {
+        let problems = [ServiceProblem(host: "a", service: "x", severity: .warning),
+                        ServiceProblem(host: "a", service: "y", severity: .warning)]
+        let summary = MonitorSummary(servers: [nagios], states: [nagios.id: status(problems)])
+        #expect(summary.mood == .warning)
+        #expect(summary.headline == "Polly is fidgeting: 2 warnings")
+        #expect(summary.badge == "2")
+    }
+
+    @Test func criticalWithoutHostDown() {
+        let summary = MonitorSummary(servers: [nagios],
+                                     states: [nagios.id: status([ServiceProblem(host: "a", service: "x", severity: .critical)])])
+        #expect(summary.headline == "Polly is squawking: 1 critical")
+    }
+
+    @Test func emptyOkAndUnreachableScreens() {
+        #expect(MonitorSummary(servers: [], states: [:]).screen == .empty)
+        #expect(MonitorSummary(servers: [], states: [:]).headline == "Polly has nothing to watch yet")
+        let ok = MonitorSummary(servers: [nagios, other], states: [nagios.id: status([]), other.id: status([])])
+        #expect(ok.screen == .ok)
+        #expect(ok.mood == .ok)
+        #expect(ok.badge == nil)
+        #expect(ok.hosts == 20)
+        #expect(ok.services == 40)
+        let failed = MonitorSummary(servers: [nagios, other], states: [nagios.id: .failed("Timed out."), other.id: status([])])
+        #expect(failed.screen == .unreachable)
+        #expect(failed.mood == .unreachable)
+        #expect(failed.badge == "?")
+        #expect(failed.unreachable?.server.name == "monitor")
+        #expect(failed.unreachable?.message == "Timed out.")
+    }
+
+    /// A paused server has no state and must not count, whatever is left in `states`.
+    @Test func disabledServersAreIgnored() {
+        var paused = nagios
+        paused.enabled = false
+        let summary = MonitorSummary(servers: [paused], states: [paused.id: .failed("x")])
+        #expect(summary.screen == .ok)
+    }
+
+    @Test func serverLines() {
+        guard case .ok(let bad) = status(down: 1, [ServiceProblem(host: "a", service: "x", severity: .critical),
+                                                  ServiceProblem(host: "a", service: "y", severity: .warning)]),
+              case .ok(let good) = status([]) else { return }
+        #expect(bad.summaryLine == "11 hosts, 1 down · 22 services, 1 crit, 1 warn")
+        #expect(good.summaryLine == "10 hosts up · 20 services OK")
+    }
+}
+
+struct RelativeTimeTests {
+    @Test func agoAndUntil() {
+        #expect(DurationFormatting.ago(14) == "14 s ago")
+        #expect(DurationFormatting.ago(-3) == "0 s ago")
+        #expect(DurationFormatting.ago(240) == "4 min ago")
+        #expect(DurationFormatting.ago(7300) == "2 h ago")
+        #expect(DurationFormatting.until(46) == "in 46 s")
+        #expect(DurationFormatting.until(125) == "in 2 min")
+        #expect(DurationFormatting.until(-5) == "due now")
+    }
+}

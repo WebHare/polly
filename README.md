@@ -27,6 +27,8 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
 - Click a problem to see the check output and to open the check on the server, open its action or notes
   link, acknowledge it or schedule downtime.
+- The macOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an orange
+  PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
 ## Requirements
@@ -186,8 +188,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 - **Menu bar app** (`MenuBarExtra`, `LSUIElement`), no Dock icon by default. A Dock icon can be turned on in
   the Servers window; clicking it opens that window.
-- **Severity shown by symbol shape plus a problem count**, because menu bar icons are rendered as
-  monochrome templates, so colour can't be relied on.
+- **The menu bar icon is Polly's head plus a count.** Critical is a red pill with Polly on its back; the other
+  states are monochrome templates, so the warning triangle of the design is not yellow there.
 - **Panel sizes to its content** up to about a quarter of the screen height, then scrolls. It can also be
   resized by dragging; that size is remembered and a "Fit" button returns to automatic sizing.
 - **Each problem shows its age** ("3m", "2h", "3d", largest unit only, refreshed every minute), with the
@@ -195,8 +197,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
   a warning escalating to critical restarts it.
 - **Per-server on/off switch** to pause monitoring without deleting the server; paused servers don't count
   towards the menu bar status.
-- **Problem details and actions open inline** in the problem's row instead of in a sheet or a separate
-  window: the menu bar panel closes as soon as it loses focus, and the same row works on iOS.
+- **Problem details and actions open inside the panel** (it slides to the detail) instead of in a sheet or a
+  separate window: the menu bar panel closes as soon as it loses focus. iOS still opens them inline in the row.
 
 ### Signing and sandbox
 

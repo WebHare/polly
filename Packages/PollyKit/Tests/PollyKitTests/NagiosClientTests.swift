@@ -63,6 +63,27 @@ struct NagiosClientTests {
         #expect(problem.downtimeDepth == 2)
     }
 
+    @Test func decodesStateTypeAttemptsAndNextCheck() throws {
+        let json = """
+            {"result":{"type_code":0},
+             "data":{"servicelist":{"web1":{"HTTP":{"status":16,"state_type":1,"current_attempt":3,"max_attempts":3,
+                                                    "next_check":1731590120000},
+                                            "Disk":{"status":4,"state_type":"soft","current_attempt":1,"max_attempts":4},
+                                            "Load":{"status":8}}}}}
+            """
+        let envelope: StatusJSONEnvelope<ServiceListPayload> = try NagiosClient.decode(data: Data(json.utf8), statusCode: 200)
+        let problems = try #require(envelope.data?.problems)
+        let http = try #require(problems.first { $0.service == "HTTP" })
+        #expect(http.checkAttempt == CheckAttempt(hard: true, current: 3, max: 3))
+        #expect(http.checkAttempt?.label == "HARD 3/3")
+        #expect(http.nextCheck == Date(timeIntervalSince1970: 1_731_590_120))
+        let disk = try #require(problems.first { $0.service == "Disk" })
+        #expect(disk.checkAttempt?.label == "SOFT 1/4")
+        let load = try #require(problems.first { $0.service == "Load" })
+        #expect(load.checkAttempt == nil)
+        #expect(load.nextCheck == nil)
+    }
+
     /// A successful result without a payload must never be read as "no problems".
     @Test func missingDataIsNotHealthy() {
         #expect(throws: NagiosClientError.notStatusJSON) {

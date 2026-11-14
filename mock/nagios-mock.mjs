@@ -203,6 +203,10 @@ function handleQuery(params) {
               long_plugin_output: `Checked ${s.name} on ${s.host}\\nResponse time 0.042s`,
               problem_has_been_acknowledged: s.acknowledged,
               scheduled_downtime_depth: downtimeDepth(s),
+              state_type: 1,
+              current_attempt: 3,
+              max_attempts: 3,
+              next_check: Date.now() + 45_000,
             }
           : s.status;
       }

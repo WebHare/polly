@@ -33,11 +33,12 @@ struct PollyApp: App {
         }
         .menuBarExtraStyle(.window)
 
-        Window("Polly Servers", id: WindowID.servers) {
-            ServerListView()
+        Window("Polly Settings", id: WindowID.servers) {
+            SettingsView()
                 .environment(monitor)
-                .frame(minWidth: 480, minHeight: 320)
         }
+        // The design draws the sidebar up to the top edge, under the window buttons.
+        .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
         #else
         WindowGroup {

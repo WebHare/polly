@@ -33,6 +33,21 @@ public enum Severity: Int, Comparable, Sendable {
     public static func < (lhs: Severity, rhs: Severity) -> Bool { lhs.rawValue < rhs.rawValue }
 }
 
+/// Where a check is in its retries: a problem only counts as confirmed ("hard") after the last attempt.
+public struct CheckAttempt: Hashable, Sendable {
+    public var hard: Bool
+    public var current: Int
+    public var max: Int
+
+    public init(hard: Bool, current: Int, max: Int) {
+        self.hard = hard
+        self.current = current
+        self.max = max
+    }
+
+    public var label: String { "\(hard ? "HARD" : "SOFT") \(current)/\(max)" }
+}
+
 public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var host: String
     public var service: String
@@ -47,10 +62,13 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var acknowledged: Bool
     /// Number of scheduled downtimes the check is currently in; 0 means none.
     public var downtimeDepth: Int
+    public var checkAttempt: CheckAttempt?
+    public var nextCheck: Date?
     public var id: String { "\(host)/\(service)" }
 
     public init(host: String, service: String, severity: Severity, since: Date? = nil, output: String = "",
-                longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0) {
+                longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0,
+                checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil) {
         self.host = host
         self.service = service
         self.severity = severity
@@ -60,6 +78,8 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
         self.lastCheck = lastCheck
         self.acknowledged = acknowledged
         self.downtimeDepth = downtimeDepth
+        self.checkAttempt = checkAttempt
+        self.nextCheck = nextCheck
     }
 }
 

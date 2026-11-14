@@ -2,46 +2,54 @@ import AppKit
 import PollyKit
 import SwiftUI
 
-/// Icon shown in the macOS menu bar. Menu bar icons are rendered as templates (monochrome),
-/// so severity is conveyed by the symbol shape plus a problem count.
+/// Icon shown in the macOS menu bar; see `MenuBarIcon` for how each state looks.
 struct MenuBarLabel: View {
     let monitor: MonitorModel
     let appDelegate: AppDelegate
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        Group {
-            let severity = monitor.overallSeverity
-            if monitor.problemCount > 0 {
-                Label("\(monitor.problemCount)", systemImage: severity.symbolName)
-                    .labelStyle(.titleAndIcon)
-            } else {
-                Image(systemName: monitor.servers.isEmpty ? "binoculars" : "checkmark.circle")
+        let summary = MonitorSummary(servers: monitor.servers, states: monitor.states)
+        Image(nsImage: MenuBarIcon.image(mood: summary.mood, badge: summary.badge))
+            .accessibilityLabel(summary.headline)
+            .onAppear {
+                // Apply the saved Dock icon setting at launch (the label appears once, when the app starts).
+                DockIcon.apply(monitor.showDockIcon, activate: false)
+                // The label lives as long as the app, so it's a convenient place to hand `openWindow` to the delegate.
+                appDelegate.openServersWindow = { [openWindow] in
+                    openWindow(id: WindowID.servers)
+                    NSApplication.shared.activate()
+                }
             }
-        }
-        .onAppear {
-            // Apply the saved Dock icon setting at launch (the label appears once, when the app starts).
-            DockIcon.apply(monitor.showDockIcon, activate: false)
-            // The label lives as long as the app, so it's a convenient place to hand `openWindow` to the delegate.
-            appDelegate.openServersWindow = { [openWindow] in
-                openWindow(id: WindowID.servers)
-                NSApplication.shared.activate()
-            }
-        }
     }
 }
 
-/// The popover that opens from the menu bar icon.
+/// The popover that opens from the menu bar icon: the problem overview, sliding to one problem's detail.
 struct MenuBarContentView: View {
-    @Environment(MonitorModel.self) private var monitor
-    @Environment(\.openWindow) private var openWindow
-
     /// Panel size chosen by the user by dragging the panel edges. A height of 0 means "fit the content".
     @AppStorage("menuPanelWidth") private var panelWidth: Double = 360
     @AppStorage("menuPanelHeight") private var panelHeight: Double = 0
-    @State private var listContentHeight: CGFloat = 0
 
-    private var userSized: Bool { panelHeight > 0 }
+    var body: some View {
+        PopoverContent(userSized: panelHeight > 0) { panelHeight = 0 }
+            .frame(width: panelWidth, height: panelHeight > 0 ? panelHeight : nil)
+            .pollyThemed()
+            .background(PanelResizeSupport { size in
+                panelWidth = size.width
+                panelHeight = size.height
+            })
+    }
+}
+
+private struct PopoverContent: View {
+    let userSized: Bool
+    let fit: () -> Void
+
+    @Environment(MonitorModel.self) private var monitor
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.pollyTheme) private var theme
+    @State private var listContentHeight: CGFloat = 0
+    @State private var selectedID: String?
 
     /// Auto-sized list grows with its content up to about a quarter of the screen.
     private var autoListHeight: CGFloat {
@@ -50,56 +58,298 @@ struct MenuBarContentView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if monitor.servers.isEmpty {
-                Text("No servers configured.")
-                    .foregroundStyle(.secondary)
-                    .padding()
-                    .frame(maxHeight: userSized ? .infinity : nil, alignment: .top)
+        let summary = MonitorSummary(servers: monitor.servers, states: monitor.states)
+        let entries = summary.entries
+        ZStack {
+            if let index = entries.firstIndex(where: { $0.id == selectedID }) {
+                ProblemDetailView(entry: entries[index], position: index + 1, total: entries.count) {
+                    selectedID = nil
+                } step: { offset in
+                    selectedID = entries[(index + offset + entries.count) % entries.count].id
+                }
+                // A new identity per problem, so stepping resets the form and the fetched capabilities.
+                .id(entries[index].id)
+                .transition(.move(edge: .trailing))
             } else {
+                overview(summary)
+                    .transition(.move(edge: .leading))
+            }
+        }
+        .animation(.easeInOut(duration: 0.22), value: selectedID == nil)
+        .background(theme.panel)
+        .clipped()
+    }
+
+    private func overview(_ summary: MonitorSummary) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if summary.screen == .problems {
+                header(summary)
+                theme.divider.frame(height: 1)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 10) {
-                        ForEach(monitor.servers) { server in
-                            ServerStatusRow(server: server, state: monitor.states[server.id])
-                            if case .ok(let status)? = monitor.states[server.id] {
-                                ProblemList(server: server, problems: status.problems)
-                            }
-                        }
-                    }
-                    .padding()
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
+                    problemGroups(summary)
+                        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
                 }
                 .frame(height: userSized ? nil : autoListHeight)
                 .frame(maxHeight: userSized ? .infinity : nil)
+            } else {
+                hero(summary)
+                    .frame(maxWidth: .infinity)
+                    .frame(maxHeight: userSized ? .infinity : nil, alignment: .top)
             }
-
-            Divider()
-
-            HStack {
-                Button("Servers…") { showServersWindow() }
-                Button("Refresh") { Task { await monitor.refreshAll() } }
-                if userSized {
-                    Button("Fit", systemImage: "arrow.up.and.down.text.horizontal") { panelHeight = 0 }
-                        .labelStyle(.iconOnly)
-                        .help("Size the panel to fit its content again")
-                }
-                Spacer()
-                Button("Quit") { NSApplication.shared.terminate(nil) }
+            if !monitor.servers.isEmpty {
+                theme.divider.frame(height: 1)
+                servers
             }
-            .padding(10)
+            footer(summary)
         }
-        .frame(width: panelWidth, height: userSized ? panelHeight : nil)
-        .background(PanelResizeSupport { size in
-            panelWidth = size.width
-            panelHeight = size.height
-        })
     }
 
-    private func showServersWindow() {
+    private func header(_ summary: MonitorSummary) -> some View {
+        HStack(spacing: 10) {
+            PollyMascot(mood: summary.mood, size: 44)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(summary.headline).font(.system(size: 14, weight: .bold))
+                Text(summary.countsLine).font(.system(size: 12)).foregroundStyle(theme.muted)
+            }
+        }
+        .padding(EdgeInsets(top: 12, leading: 14, bottom: 10, trailing: 14))
+    }
+
+    private func problemGroups(_ summary: MonitorSummary) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(summary.groups) { group in
+                HStack(spacing: 6) {
+                    Text(group.severity.label).foregroundStyle(theme.severityText(group.severity))
+                    Text("\(group.entries.count)").fontWeight(.semibold).foregroundStyle(theme.faint)
+                }
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.66)
+                .textCase(.uppercase)
+                .padding(EdgeInsets(top: 8, leading: 8, bottom: 4, trailing: 8))
+                ForEach(group.entries) { entry in
+                    ProblemRow(entry: entry) { selectedID = entry.id }
+                }
+            }
+        }
+        .padding(EdgeInsets(top: 4, leading: 6, bottom: 6, trailing: 6))
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func hero(_ summary: MonitorSummary) -> some View {
+        VStack(spacing: 8) {
+            PollyMascot(mood: summary.mood, size: 96)
+            Text(summary.headline)
+                .font(.system(size: 15, weight: .bold))
+                .padding(.top, 6)
+            heroDetail(summary)
+                .font(.system(size: 12.5))
+                .lineSpacing(3)
+                .foregroundStyle(theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            if summary.screen != .ok {
+                HStack(spacing: 8) {
+                    if summary.screen == .empty {
+                        Button("Add server…") { showSettings() }
+                            .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
+                    } else {
+                        Button("Retry now") { Task { await monitor.refreshAll() } }
+                            .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
+                        Button("Edit server…") { showSettings() }
+                            .buttonStyle(PollyButtonStyle(radius: 6))
+                    }
+                }
+                .padding(.top, 6)
+            }
+        }
+        .multilineTextAlignment(.center)
+        .padding(EdgeInsets(top: 22, leading: 28, bottom: 18, trailing: 28))
+    }
+
+    @ViewBuilder private func heroDetail(_ summary: MonitorSummary) -> some View {
+        switch summary.screen {
+        case .empty:
+            Text("Add a Nagios server and Polly starts polling right away.")
+        case .unreachable:
+            Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
+        case .ok, .problems:
+            TimelineView(.periodic(from: .now, by: 1)) { context in
+                let wait = max(0, Int(monitor.nextPollAt?.timeIntervalSince(context.date) ?? 0))
+                Text("\(summary.hosts) hosts and \(summary.services) services are fine. Polly checks again in \(wait) seconds.")
+            }
+        }
+    }
+
+    private var servers: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Servers")
+                .font(.system(size: 11, weight: .bold))
+                .tracking(0.66)
+                .textCase(.uppercase)
+                .foregroundStyle(theme.faint)
+                .padding(EdgeInsets(top: 6, leading: 8, bottom: 4, trailing: 8))
+            ForEach(monitor.servers) { server in
+                HStack(alignment: .top, spacing: 8) {
+                    ServerStateIcon(server: server, state: monitor.states[server.id], size: 15)
+                        .padding(.top, 1)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(server.name).fontWeight(.semibold) + Text("  \(server.kind.displayName)").foregroundStyle(theme.faint)
+                        Text(ServerStateIcon.line(for: server, state: monitor.states[server.id]))
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.muted)
+                            .lineLimit(2)
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+            }
+        }
+        .padding(6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func footer(_ summary: MonitorSummary) -> some View {
+        VStack(spacing: 0) {
+            theme.divider.frame(height: 1)
+            HStack(spacing: 6) {
+                Group {
+                    Button("Refresh") { Task { await monitor.refreshAll() } }
+                    Button("Settings…") { showSettings() }
+                    if userSized {
+                        Button("Fit", systemImage: "arrow.up.and.down.text.horizontal", action: fit)
+                            .labelStyle(.iconOnly)
+                            .help("Size the panel to fit its content again")
+                    }
+                    Button("Quit") { NSApplication.shared.terminate(nil) }
+                }
+                .buttonStyle(PollyButtonStyle(horizontal: 10, vertical: 3, radius: 6))
+                Spacer()
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    Text(footNote(summary, now: context.date))
+                        .font(.system(size: 11.5))
+                        .monospacedDigit()
+                        .foregroundStyle(theme.faint)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(theme.footer)
+        }
+    }
+
+    private func footNote(_ summary: MonitorSummary, now: Date) -> String {
+        switch summary.screen {
+        case .empty:
+            return "No servers"
+        case .unreachable:
+            guard let next = monitor.nextPollAt else { return "" }
+            return "Retrying \(DurationFormatting.until(next.timeIntervalSince(now)))"
+        case .ok, .problems:
+            let fetched = monitor.states.values.compactMap { state -> Date? in
+                if case .ok(let status) = state { status.fetchedAt } else { nil }
+            }.max()
+            return fetched.map { "Checked \(DurationFormatting.ago(now.timeIntervalSince($0)))" } ?? ""
+        }
+    }
+
+    private func showSettings() {
         openWindow(id: WindowID.servers)
         // We're an LSUIElement (agent) app, so explicitly bring the window to the front.
         NSApplication.shared.activate()
+    }
+}
+
+private struct ProblemRow: View {
+    let entry: ProblemEntry
+    let open: () -> Void
+    @Environment(\.pollyTheme) private var theme
+    @State private var hovered = false
+
+    var body: some View {
+        let problem = entry.problem
+        Button(action: open) {
+            HStack(spacing: 8) {
+                StatusIcon(severity: problem.severity, size: 15)
+                (Text(problem.host).fontWeight(.semibold) + Text("  \(problem.service)").foregroundStyle(theme.muted))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                if problem.acknowledged {
+                    tag("ACK")
+                }
+                if problem.downtimeDepth > 0 {
+                    Image(systemName: "moon.zzz").font(.system(size: 11)).foregroundStyle(theme.muted)
+                        .help("In scheduled downtime").accessibilityLabel("In scheduled downtime")
+                }
+                if let since = problem.since {
+                    ProblemAge(since: since)
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(hovered ? theme.selection : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .opacity(problem.acknowledged ? 0.55 : 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovered = $0 }
+    }
+
+    private func tag(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 10, weight: .bold))
+            .tracking(0.4)
+            .foregroundStyle(theme.muted)
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(theme.border, lineWidth: 1))
+    }
+}
+
+/// "3m" / "2h" / "3d" since the issue started; hover for the exact duration and local start time.
+private struct ProblemAge: View {
+    let since: Date
+    @Environment(\.pollyTheme) private var theme
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            let age = context.date.timeIntervalSince(since)
+            Text(DurationFormatting.short(age))
+                .font(.system(size: 12))
+                .monospacedDigit()
+                .foregroundStyle(theme.muted)
+                .frame(minWidth: 26, alignment: .trailing)
+                .help("\(DurationFormatting.long(age))\nSince \(since.formatted(date: .abbreviated, time: .standard))")
+        }
+    }
+}
+
+/// The status icon of a server, and the one line that says how it is doing.
+struct ServerStateIcon: View {
+    let server: NagiosServer
+    let state: MonitorModel.ServerState?
+    var size: CGFloat = 16
+    @Environment(\.pollyTheme) private var theme
+
+    var body: some View {
+        if !server.enabled {
+            Image(systemName: "pause.circle").font(.system(size: size - 2)).foregroundStyle(theme.faint)
+                .frame(width: size, height: size)
+        } else {
+            switch state {
+            case .ok(let status): StatusIcon(severity: status.severity, size: size)
+            case .failed: StatusIcon(severity: .unknown, size: size)
+            case .loading, nil: ProgressView().controlSize(.small).frame(width: size, height: size)
+            }
+        }
+    }
+
+    static func line(for server: NagiosServer, state: MonitorModel.ServerState?) -> String {
+        guard server.enabled else { return "Monitoring paused" }
+        switch state {
+        case .ok(let status): return status.summaryLine
+        case .failed(let message): return "Unreachable · \(message)"
+        case .loading, nil: return server.baseURL.absoluteString
+        }
     }
 }
 

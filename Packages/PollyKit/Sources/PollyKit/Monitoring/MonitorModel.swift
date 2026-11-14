@@ -18,6 +18,8 @@ public final class MonitorModel {
     public private(set) var showDockIcon = false
     public private(set) var debugLog = false
     public var pollInterval: Duration = .seconds(60)
+    /// When the poll loop refreshes all servers again; nil while it isn't running.
+    public private(set) var nextPollAt: Date?
 
     @ObservationIgnored public let store: ServerStore
     /// `polly-debug.log` next to polly.yaml; nil for an in-memory store. Only passed to backends while
@@ -125,6 +127,7 @@ public final class MonitorModel {
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refreshAll()
+                self.nextPollAt = Date.now + TimeInterval(self.pollInterval.components.seconds)
                 try? await Task.sleep(for: self.pollInterval)
             }
         }
@@ -133,6 +136,7 @@ public final class MonitorModel {
     public func stopPolling() {
         pollTask?.cancel()
         pollTask = nil
+        nextPollAt = nil
     }
 
     public func refreshAll() async {
