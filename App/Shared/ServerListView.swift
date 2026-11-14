@@ -5,14 +5,15 @@ import SwiftUI
 /// On macOS this is the "Polly Servers" window, on iOS/iPadOS the main screen.
 struct ServerListView: View {
     @Environment(MonitorModel.self) private var monitor
-    @State private var showingAdd = false
+    /// What the add form is open for; nil while it is closed.
+    @State private var adding: BackendKind?
     @State private var errorMessage: String?
 
     var body: some View {
         List {
             if monitor.servers.isEmpty {
                 ContentUnavailableView("No servers", systemImage: "server.rack",
-                                       description: Text("Add a Nagios server to start monitoring."))
+                                       description: Text("Add a Nagios server or a URL to start monitoring."))
             }
             ForEach(monitor.servers) { server in
                 VStack(alignment: .leading, spacing: 10) {
@@ -69,15 +70,19 @@ struct ServerListView: View {
         .navigationTitle("Polly")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                Button("Add Server", systemImage: "plus") { showingAdd = true }
+                Menu("Add", systemImage: "plus") {
+                    Button("Nagios Server…", systemImage: "server.rack") { adding = .nagios }
+                    Button("URL…", systemImage: "globe") { adding = .url }
+                }
+                .help("Add a Nagios server or a URL to check")
             }
             ToolbarItem {
                 Button("Refresh", systemImage: "arrow.clockwise") { Task { await monitor.refreshAll() } }
             }
         }
         .refreshable { await monitor.refreshAll() }
-        .sheet(isPresented: $showingAdd) {
-            AddServerView()
+        .sheet(item: $adding) { kind in
+            AddServerView(kind: kind)
         }
         .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
