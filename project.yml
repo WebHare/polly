@@ -25,6 +25,8 @@ targets:
       - path: App/Shared
       - path: App/macOS
         destinationFilters: [macOS]
+      - path: App/iOS
+        destinationFilters: [iOS]
     dependencies:
       - package: PollyKit
     info:

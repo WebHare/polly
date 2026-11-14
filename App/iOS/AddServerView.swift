@@ -6,6 +6,7 @@ import SwiftUI
 struct AddServerView: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.pollyTheme) private var theme
     @State private var model: AddServerModel
     @State private var saveError: String?
 
@@ -23,10 +24,8 @@ struct AddServerView: View {
                               prompt: Text(isURLMonitor ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
-                        #if os(iOS)
                         .keyboardType(.URL)
                         .textInputAutocapitalization(.never)
-                        #endif
                     TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
                 } footer: {
                     if let url = model.parsedURL {
@@ -38,14 +37,13 @@ struct AddServerView: View {
                         }
                     }
                 }
+                .listRowBackground(theme.surface)
 
                 Section {
                     TextField("Username", text: $model.username)
                         .textContentType(.username)
                         .autocorrectionDisabled()
-                        #if os(iOS)
                         .textInputAutocapitalization(.never)
-                        #endif
                     SecureField("Password", text: $model.password)
                         .textContentType(.password)
                 } header: {
@@ -55,12 +53,15 @@ struct AddServerView: View {
                         Text("Only needed for a page behind HTTP Basic authentication.")
                     }
                 }
+                .listRowBackground(theme.surface)
 
                 Section {
                     checkStatus
                 }
+                .listRowBackground(theme.surface)
             }
             .formStyle(.grouped)
+            .phoneListBackground(theme)
             .navigationTitle(isURLMonitor ? "Add URL" : "Add Nagios Server")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -72,9 +73,6 @@ struct AddServerView: View {
                 }
             }
         }
-        #if os(macOS)
-        .frame(minWidth: 420, minHeight: 360)
-        #endif
         .onAppear { model.wireLog = monitor.debugLog ? monitor.wireLog : nil }
     }
 
@@ -86,10 +84,12 @@ struct AddServerView: View {
         case .checking:
             HStack { ProgressView().controlSize(.small); Text("Testing connection…") }
         case .succeeded:
-            Label("Connection OK", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            Label { Text("Connection OK") } icon: { StatusIcon(severity: .ok, size: 18) }
+                .foregroundStyle(theme.severityText(.ok))
         case .failed(let message):
             VStack(alignment: .leading, spacing: 8) {
-                Label(message, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                Label { Text(message) } icon: { StatusIcon(severity: .critical, size: 18) }
+                    .foregroundStyle(theme.severityText(.critical))
                 HStack {
                     Button("Retry") { Task { await model.testConnection() } }
                     Button("Add Anyway") { save() }
@@ -97,7 +97,7 @@ struct AddServerView: View {
             }
         }
         if let saveError {
-            Text(saveError).foregroundStyle(.red)
+            Text(saveError).foregroundStyle(theme.severityText(.critical))
         }
     }
 
