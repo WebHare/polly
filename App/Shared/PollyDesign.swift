@@ -177,6 +177,48 @@ struct StatusIcon: View {
     }
 }
 
+/// The status icon of a server, and the one line that says how it is doing.
+struct ServerStateIcon: View {
+    let server: NagiosServer
+    let state: MonitorModel.ServerState?
+    var size: CGFloat = 16
+    @Environment(\.pollyTheme) private var theme
+
+    var body: some View {
+        if !server.enabled {
+            Image(systemName: "pause.circle").font(.system(size: size - 2)).foregroundStyle(theme.faint)
+                .frame(width: size, height: size)
+        } else {
+            switch state {
+            case .ok(let status): StatusIcon(severity: status.severity, size: size)
+            case .failed: StatusIcon(severity: .unknown, size: size)
+            case .loading, nil: ProgressView().controlSize(.small).frame(width: size, height: size)
+            }
+        }
+    }
+
+    static func line(for server: NagiosServer, state: MonitorModel.ServerState?) -> String {
+        guard server.enabled else { return "Monitoring paused" }
+        switch state {
+        case .ok(let status): return status.summaryLine
+        case .failed(let message): return "Unreachable · \(message)"
+        case .loading, nil: return server.baseURL.absoluteString
+        }
+    }
+}
+
+extension Severity {
+    /// Background of the status pill; these are the light-scheme fills in both schemes.
+    var pillColor: Color {
+        switch self {
+        case .critical: Color(hex: 0xDC3B42)
+        case .warning: Color(hex: 0xF2B21B)
+        case .unknown: Color(hex: 0x7C6CF0)
+        case .ok: Color(hex: 0x1E9E63)
+        }
+    }
+}
+
 /// Polly on its tile. The drawings are the SVGs of the design, in the asset catalog.
 struct PollyMascot: View {
     let mood: MonitorSummary.Mood

@@ -9,6 +9,7 @@ websites itself, without a monitoring system behind them.
 project.yml                 XcodeGen spec – source of truth for Polly.xcodeproj
 App/Shared/                 SwiftUI app code shared by all platforms
 App/macOS/                  Menu bar UI + sandbox entitlements (macOS only)
+App/iOS/                    iPhone/iPad UI: Problems, Servers and Settings tabs (iOS only)
 Packages/PollyKit/          Platform-independent logic + unit tests
   Models/                   NagiosServer, ServerURLParser (splits user:pass@ out of pasted URLs)
   Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
@@ -29,8 +30,8 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
 - Click a problem to see the check output and to open the check on the server, open its action or notes
   link, acknowledge it or schedule downtime.
-- The macOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an orange
-  PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
+- The macOS and iOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an
+  orange PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
 ## Requirements
@@ -123,8 +124,9 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Project structure
 
 - **One multiplatform SwiftUI target** (`supportedDestinations: [iOS, macOS]`) instead of separate iOS
-  and macOS apps. Most UI (server list, add-server form, status rows) is shared; macOS-only code lives in
-  `App/macOS/` and is filtered per destination in `project.yml`.
+  and macOS apps. The design pieces (colors, status icons, mascot, buttons, command form) are shared; the
+  screens differ per platform and live in `App/macOS/` and `App/iOS/`, filtered per destination in
+  `project.yml`.
 - **All logic in a local Swift package (`PollyKit`)**, the app targets contain only views. This keeps the
   logic testable with plain `swift test`, without simulators or an app host.
 - **XcodeGen (`project.yml`) as the source of truth** for the Xcode project. Hand-maintaining
@@ -251,7 +253,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Per-server on/off switch** to pause monitoring without deleting the server; paused servers don't count
   towards the menu bar status.
 - **Problem details and actions open inside the panel** (it slides to the detail) instead of in a sheet or a
-  separate window: the menu bar panel closes as soon as it loses focus. iOS still opens them inline in the row.
+  separate window: the menu bar panel closes as soon as it loses focus. On iOS a problem opens on its own
+  screen, and acknowledge and downtime open in a sheet.
 
 ### Signing and sandbox
 

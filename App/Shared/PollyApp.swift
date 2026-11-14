@@ -42,10 +42,8 @@ struct PollyApp: App {
         .windowResizability(.contentMinSize)
         #else
         WindowGroup {
-            NavigationStack {
-                ServerListView()
-            }
-            .environment(monitor)
+            PhoneRootView()
+                .environment(monitor)
         }
         #endif
     }
