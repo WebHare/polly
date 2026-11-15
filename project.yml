@@ -8,20 +8,25 @@ options:
   createIntermediateGroups: true
 
 packages:
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: "2.10.1"
   PollyKit:
     path: Packages/PollyKit
 
 settings:
   base:
     SWIFT_VERSION: "6.0"
-    MARKETING_VERSION: "0.1.0"
-    CURRENT_PROJECT_VERSION: "1"
+    MARKETING_VERSION: "0.2.0"
+    CURRENT_PROJECT_VERSION: "2"
 
 targets:
   Polly:
     type: application
     supportedDestinations: [iOS, macOS]
     sources:
+      - path: CHANGELOG.md
+        buildPhase: resources
       - path: App/Shared
       - path: App/macOS
         destinationFilters: [macOS]
@@ -29,9 +34,18 @@ targets:
         destinationFilters: [iOS]
     dependencies:
       - package: PollyKit
+      - package: Sparkle
+        destinationFilters: [macOS]
     info:
       path: App/Info.plist
       properties:
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        SUFeedURL: https://github.com/unilynx/polly/releases/latest/download/appcast.xml
+        SUPublicEDKey: GrZ98ctK1NSaV5xWJknpg4/mvrvzK+CHbszkWAjg7us=
+        SUEnableInstallerLauncherService: true
+        SUEnableAutomaticChecks: true
+        SUScheduledCheckInterval: 21600
         # Nagios servers are often internal and plain http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
@@ -49,6 +63,8 @@ targets:
         "INFOPLIST_KEY_LSUIElement[sdk=macosx*]": YES
         "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/macOS/Polly.entitlements
         "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
+        # The multiplatform default points inside MacOS/Frameworks, not Contents/Frameworks.
+        "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"
         CODE_SIGN_STYLE: Automatic
         # WebHare bv. A stable team signature keeps keychain access working across rebuilds.
         DEVELOPMENT_TEAM: MF6WPNPK5H

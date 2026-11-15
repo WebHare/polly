@@ -8,3 +8,5 @@ Packages/PollyKit/.build/
 
 # Nagios Core source, for reference only (git clone --depth 1 https://github.com/NagiosEnterprises/nagioscore.git nagioscore)
 nagioscore/
+
+__pycache__/

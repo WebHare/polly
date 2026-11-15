@@ -39,6 +39,9 @@ Read the relevant section before changing behaviour, and update it in the same c
 - **Commands are prepared, then submitted once.** Never retry a submit, and never treat HTTP 200 as success.
 - **`project.yml` is the source of truth** for the Xcode project. After adding or removing files run
   `xcodegen generate` and commit `Polly.xcodeproj` too.
+- **Versions stay below 1.0** until the owner explicitly approves a 1.0 release.
+- **Releases:** add user-facing changes to `CHANGELOG.md`; before publishing, bump both version values in
+  `project.yml`, date the matching changelog section and regenerate the Xcode project. See DEVELOPERS.md.
 - **Commits:** `feat:` / `fix:` / `chore:` / `ci:` plus a sentence, as in `git log`.
 
 ## Workflow: don't break main

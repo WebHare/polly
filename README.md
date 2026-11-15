@@ -32,6 +32,7 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
   link, acknowledge it or schedule downtime.
 - The macOS and iOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an
   orange PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
+- **About Polly** (macOS) and **Settings** (iOS) show the version and bundled changelog. Release builds on macOS also check for signed updates using Sparkle.
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
 ## Development
@@ -209,7 +210,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Tooling
 
-- **No third-party runtime dependencies besides Yams**; the keychain is a system library.
+- **Yams for YAML and Sparkle for macOS updates**; the keychain is a system library.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is

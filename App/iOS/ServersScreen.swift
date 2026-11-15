@@ -140,6 +140,12 @@ struct PhoneSettingsScreen: View {
                 Text("For debugging: writes every request and response, without credentials, to polly-debug.log next to polly.yaml.")
                     .foregroundStyle(theme.muted)
             }
+            Section("About Polly") {
+                Text(AppRelease.versionLabel(info: Bundle.main.infoDictionary ?? [:]))
+                    .listRowBackground(theme.surface)
+                NavigationLink("What's New") { WhatsNewView() }
+                    .listRowBackground(theme.surface)
+            }
         }
         .listStyle(.insetGrouped)
         .tint(.pollyAccent)
