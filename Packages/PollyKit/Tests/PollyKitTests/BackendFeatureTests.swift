@@ -181,6 +181,12 @@ struct NagiosDateNotationTests {
         #expect(NagiosDateNotation.end(for: .untilTomorrowMorning, from: "11-11-2026 11:11:00", candidates: both) == nil)
         #expect(NagiosDateNotation.end(for: .oneHour, from: "11-11-2026 11:11:00", candidates: []) == nil)
     }
+
+    @Test func editedStartMustRemainValidInEveryServerNotation() {
+        let both = [NagiosDateNotation.us, .euro]
+        #expect(NagiosDateNotation.end(for: .untilTomorrowMorning, from: "11-15-2026 10:00:00", candidates: both) == nil)
+        #expect(NagiosDateNotation.end(for: .oneHour, from: "15-11-2026 10:00:00", candidates: both) == nil)
+    }
 }
 
 struct CommandSequenceErrorTests {
