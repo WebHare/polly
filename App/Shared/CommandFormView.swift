@@ -14,6 +14,7 @@ struct CommandFormView: View {
     /// One attempt per form: after an unconfirmed submission the user has to open a new form on purpose.
     @State private var attempted = false
     @State private var message: String?
+    @FocusState private var endFocused: Bool
 
     init(command: any PreparedCommand, onClose: @escaping () -> Void, onSent: @escaping () -> Void) {
         self.command = command
@@ -44,12 +45,7 @@ struct CommandFormView: View {
                             .pollyField(horizontal: 10, vertical: 8, radius: 7)
                     }
                     if isDowntime {
-                        HStack(spacing: 8) {
-                            Toggle("Also acknowledge the current problem", isOn: .constant(true))
-                                .toggleStyle(PollyCheckboxStyle())
-                                .placeholderControl()
-                            PlaceholderTag()
-                        }
+                        alsoAcknowledge
                     } else {
                         Toggle("Ask the server to notify its contacts", isOn: $input.notify)
                             .toggleStyle(PollyCheckboxStyle())
@@ -84,41 +80,74 @@ struct CommandFormView: View {
         }
     }
 
-    /// The design offers presets; Polly can't calculate in the server's time zone yet, so only "Custom" works.
+    /// Presets count from the start time. Polly can only calculate them when it can tell the server's date notation
+    /// from the prefilled times; otherwise only typing the times works.
     private var window: some View {
-        group("For", placeholder: "PRESETS ARE PLACEHOLDERS") {
+        let selected = DowntimePreset.allCases.first { command.end(for: $0, from: input.start) == input.end }
+        return group("For") {
             HStack(spacing: 6) {
-                ForEach(["30 min", "1 hour", "2 hours"], id: \.self) { chip($0).placeholderControl() }
+                ForEach([DowntimePreset.thirtyMinutes, .oneHour, .twoHours]) { presetChip($0, selected: selected) }
             }
             HStack(spacing: 6) {
-                chip("Until 09:00 tomorrow").placeholderControl()
-                chip("Custom…", selected: true)
+                presetChip(.untilTomorrowMorning, selected: selected)
+                Button { endFocused = true } label: { chip("Custom…", selected: selected == nil) }
+                    .buttonStyle(.plain)
+                    .help("Type the start and end below")
             }
             HStack(spacing: 6) {
                 TextField("Start", text: $input.start).pollyField(horizontal: 10, vertical: 6, radius: 7)
                 Text("→").foregroundStyle(theme.muted)
                 TextField("End", text: $input.end).pollyField(horizontal: 10, vertical: 6, radius: 7)
+                    .focused($endFocused)
             }
             Text("Server time, in the notation the server filled in.").font(.system(size: 12)).foregroundStyle(theme.muted)
         }
     }
 
+    private func presetChip(_ preset: DowntimePreset, selected: DowntimePreset?) -> some View {
+        let end = command.end(for: preset, from: input.start)
+        return Button { if let end { input.end = end } } label: { chip(preset.label, selected: preset == selected) }
+            .buttonStyle(.plain)
+            .disabled(end == nil)
+            .opacity(end == nil ? 0.5 : 1)
+            .help(end == nil ? "Polly can't tell this server's date notation from the start time. Type the end instead." : "")
+    }
+
     private var appliesTo: some View {
         group("Applies to") {
-            HStack(spacing: 8) {
-                Circle().strokeBorder(theme.chipSelected, lineWidth: 4).frame(width: 14, height: 14)
-                Text("This service only")
+            radio("This service only", selected: input.scope == .service) { input.scope = .service }
+            radio("Host \(command.problem.host) and its services", selected: input.scope == .hostAndServices) {
+                input.scope = .hostAndServices
             }
-            .padding(.top, 2)
+            .disabled(!command.options.contains(.hostScope))
+            .opacity(command.options.contains(.hostScope) ? 1 : 0.5)
+            .help(command.options.contains(.hostScope) ? "" : "The server does not allow you to schedule downtime for this host.")
+        }
+    }
+
+    private func radio(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             HStack(spacing: 8) {
-                HStack(spacing: 8) {
-                    Circle().strokeBorder(theme.faint, lineWidth: 1.5).frame(width: 14, height: 14)
-                    Text("Host \(command.problem.host) and its services")
-                }
-                .placeholderControl()
-                PlaceholderTag()
+                Circle().strokeBorder(selected ? theme.chipSelected : theme.faint, lineWidth: selected ? 4 : 1.5)
+                    .frame(width: 14, height: 14)
+                Text(label)
             }
-            .padding(.top, 2)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+        .padding(.top, 2)
+    }
+
+    @ViewBuilder private var alsoAcknowledge: some View {
+        if command.problem.acknowledged {
+            Text("The problem is already acknowledged.").foregroundStyle(theme.muted)
+        } else {
+            Toggle("Also acknowledge the current problem", isOn: $input.alsoAcknowledge)
+                .toggleStyle(PollyCheckboxStyle())
+                .disabled(!command.options.contains(.alsoAcknowledge))
+                .opacity(command.options.contains(.alsoAcknowledge) ? 1 : 0.5)
+                .help(command.options.contains(.alsoAcknowledge) ? "" : "The server does not allow you to acknowledge this problem.")
         }
     }
 
@@ -131,12 +160,9 @@ struct CommandFormView: View {
             .background(selected ? theme.chipSelected : theme.button, in: Capsule())
     }
 
-    private func group(_ label: String, placeholder: String? = nil, @ViewBuilder content: () -> some View) -> some View {
+    private func group(_ label: String, @ViewBuilder content: () -> some View) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Text(label).font(.system(size: 11.5)).foregroundStyle(theme.faint)
-                if let placeholder { PlaceholderTag(text: placeholder) }
-            }
+            Text(label).font(.system(size: 11.5)).foregroundStyle(theme.faint)
             content()
         }
     }
@@ -157,6 +183,10 @@ struct CommandFormView: View {
                 try await command.submit(input)
                 accepted = true
                 message = "Accepted by the server. The status changes once it has processed the command."
+                onSent()
+            } catch let error as CommandSequenceError {
+                // Part of it went through, so the server's status changes too.
+                message = "\(error.localizedDescription) Check the server in your browser before trying again."
                 onSent()
             } catch {
                 // A lost response does not prove the command was not accepted, so it is never sent again automatically.

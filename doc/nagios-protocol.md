@@ -29,7 +29,7 @@ When a real server turns out to behave differently from this document, update th
 | Status | `GET statusjson.cgi?query=hostcount`, `servicecount` and `servicelist`, in parallel | JSON |
 | Check page | `GET extinfo.cgi?type=2&host=…&service=…` | HTML, opened in the browser |
 | Related link | the same `extinfo.cgi` page, read by Polly | HTML |
-| Command form | `GET cmd.cgi?cmd_typ=34\|56&host=…&service=…` | HTML form (+ CSRF cookie on 4.5.12+) |
+| Command form | `GET cmd.cgi?cmd_typ=34\|55\|56\|86&host=…[&service=…]` | HTML form (+ CSRF cookie on 4.5.12+) |
 | Command | `POST cmd.cgi` | HTML confirmation or error |
 
 All CGIs live under `<base URL>/nagios/cgi-bin/`. The user enters only the base URL (e.g.
@@ -227,6 +227,20 @@ it. Nothing changes on the server until the post.
 |---|---|
 | Acknowledge a service problem | `34` (`CMD_ACKNOWLEDGE_SVC_PROBLEM`) |
 | Schedule downtime for a service | `56` (`CMD_SCHEDULE_SVC_DOWNTIME`) |
+| Schedule downtime for a host (not its services) | `55` (`CMD_SCHEDULE_HOST_DOWNTIME`) |
+| Schedule downtime for all services of a host (not the host) | `86` (`CMD_SCHEDULE_HOST_SVC_DOWNTIME`) |
+
+How Polly combines them:
+
+- **Acknowledge** posts `34`.
+- **Schedule downtime** posts `56`, or for "host and its services" `55` and then `86`, since Nagios has no single
+  command for both. With "also acknowledge" it then posts `34`, without notification.
+- When the downtime form opens, Polly fetches all forms it may need, **one after the other**: `56` first, then
+  `55`, `86` and (unless the problem is already acknowledged) `34`. On 4.5.12+ the first answer sets the CSRF
+  cookie; later requests carry it and get the same token, while parallel requests would each get a new cookie
+  and invalidate the tokens of the others. A form that doesn't come back only hides its option.
+- The posts are sent in order and stop at the first one Nagios doesn't confirm; Polly then reports which parts
+  were accepted.
 
 `cmd_mod` selects the step: `1` (`CMDMODE_REQUEST`, the default) shows the form, `2` (`CMDMODE_COMMIT`)
 executes the command.
@@ -246,7 +260,7 @@ The answer is an HTML page with a form (`<form method='post' action='cmd.cgi'>`)
 <TABLE CELLSPACING=0 CELLPADDING=0 CLASS='optBox'>
 <tr><td><INPUT TYPE='HIDDEN' NAME='cmd_typ' VALUE='34'><INPUT TYPE='HIDDEN' NAME='cmd_mod' VALUE='2'></td></tr>
 …<INPUT TYPE='TEXT' NAME='host' VALUE='web01'>…
-…<INPUT TYPE='TEXT' NAME='service' VALUE='HTTP'>…
+…<INPUT TYPE='TEXT' NAME='service' VALUE='HTTP'>                    ← 34 and 56 only; the row isn't closed
 …<INPUT TYPE='checkbox' NAME='sticky_ack' CHECKED>…                ← acknowledge only
 …<INPUT TYPE='checkbox' NAME='send_notification' CHECKED>…         ← acknowledge only
 …<INPUT TYPE='checkbox' NAME='persistent' >…                       ← acknowledge only
@@ -256,8 +270,8 @@ The answer is an HTML page with a form (`<form method='post' action='cmd.cgi'>`)
 …<INPUT TYPE='TEXT' NAME='end_time' VALUE='11-15-2026 16:05:00'>…     ← downtime only
 ```
 
-- **Check the form before using it.** `cmd_typ`, `cmd_mod=2`, `host` and `service` must echo what was asked
-  for. A login page, "It appears as though you do not have permission to submit the command you requested..."
+- **Check the form before using it.** `cmd_typ`, `cmd_mod=2`, `host` and (for `34` and `56`) `service` must echo
+  what was asked for; the host forms `55` and `86` have no `service` field. A login page, "It appears as though you do not have permission to submit the command you requested..."
   (`authorized_for_read_only`) or any other page comes with HTTP `200` too, so the status code proves nothing.
   - The form doesn't prove permission for this service: `is_authorized_for_service_commands` is only checked at
     the commit, which then answers "Sorry, but you are not authorized to commit the specified command."
@@ -340,6 +354,10 @@ plus
 | `fixed` | `1`: a fixed window from start to end |
 | `trigger` | `0`: not triggered by another downtime |
 | `hours`, `minutes` | `2`, `0`: the form's defaults for the duration of a flexible downtime; passed on, but not used for a fixed one |
+
+Body for a **host downtime** (`55`) or **downtime for all services of a host** (`86`): the downtime fields without
+`service`. `55` also takes `childoptions`: Polly sends `0` (leave child hosts alone); `1` and `2` schedule
+triggered or non-triggered downtime for the child hosts too.
 
 - Checkboxes are only checked for presence, so unchecked ones are left out entirely, as a browser would.
 - Nagios writes the command as one semicolon-separated line to its external command file
@@ -509,19 +527,16 @@ downtimes themselves with their ID, times, author and comment; Polly doesn't use
 
 ## Where the mock differs
 
-The mock is close enough for Polly's parsers, but differs from Nagios in these places:
+The mock follows the behaviour described here for the commands Polly uses (`34`, `55`, `56`, `86`), including the
+effects in the core: sticky and normal acknowledgements, ignored acknowledgements of OK services, overlapping and
+flexible downtimes, host downtime depth in `hostlist`, the real success and error texts, and the CSRF cookie per
+version (`csrf=on` for 4.5.12+, `csrf=off` for 4.5.11 and older). What it leaves out:
 
-- The success message is wrapped in `<P><DIV ALIGN=CENTER>…</DIV></P>`; Nagios writes
-  `<P><DIV CLASS='infoMessage'>…</DIV></P>` directly.
-- Its error texts are its own ("Error: You must enter a comment!", "Error: End time must be after start time!"),
-  and the CSRF error is an `errorMessage` div instead of a bare `<p>`.
-- `csrf=on` behaves like 4.5.12+ (the CGI sets the cookie and requires the token), but sets the cookie with
-  `Path=/` and without `SameSite`/`HttpOnly`. `csrf=off` behaves like 4.5.11 or older without a browser cookie.
-- The author is always "Nagios Admin", whatever the user name.
-- An unknown service on `extinfo.cgi` answers "This service does not have any status information associated with
-  it." instead of "Error: Service Not Found!".
-- An unsupported `statusjson.cgi` query answers `type_code` `3` with `type_text` "Option Missing"; in Nagios `3`
-  is "option invalid" and `4` "option missing".
+- Triggered downtimes: a downtime with a `trigger` is ignored, as if the trigger didn't exist.
+- Notifications, comments, `downtimelist`, deleting downtimes and removing acknowledgements.
+- Authorization: the mock user may command every host and service, and the author is always "Nagios Admin".
+- `status_update_interval`: the mock answers with the new state right away.
+- Soft states: every service is in a hard state, so a normal acknowledgement ends on every state change.
 
 ## Debugging an exchange
 

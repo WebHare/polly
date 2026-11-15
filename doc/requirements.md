@@ -147,18 +147,41 @@ servers.
 - Commands are a two-step flow: the form is fetched from the server, then submitted only after the user
   confirms.
   - The form opens in the macOS panel, or as a sheet on iOS.
-  - The form asks for author (prefilled by the server, or the username), a required comment, and for a downtime
-    a start and end time plus whether the server should notify its contacts.
-  - Downtime start and end are in the server's own notation and time zone, prefilled by the server.
-    - Why: Polly can't know the server's time zone, so it can't offer presets yet.
+  - The form asks for author (prefilled by the server, or the username) and a required comment.
   - If the server doesn't return the expected form, the user is told to check their command permissions in the
     browser.
+- An acknowledgement is sticky: it lasts until the service is OK again, also when a warning turns critical.
+  - The user can ask the server to notify its contacts; off by default.
+- A downtime is a fixed window from a start to an end time.
+  - Start and end are in the server's own notation and time zone, prefilled by the server with now and now + 2
+    hours. Polly never converts them.
+    - Why: the server doesn't report its time zone or date notation.
+  - Presets set the end, counted from the start: 30 min, 1 hour, 2 hours, until 09:00 tomorrow. **Custom…** means
+    typing the end (and start) by hand. The preset that matches the current times is shown as selected.
+    - Presets work only when Polly can tell the server's date notation from the prefilled times. When two
+      notations fit (e.g. on 11-11 for US and European dates), a preset is only offered when both give the same
+      result; otherwise it is disabled with an explanation.
+    - Caveat: presets count in wall-clock time, so on the day the server's clock changes for DST the end can be
+      an hour off.
+  - **Applies to**: this service only (default), or the host and all its services.
+    - The host option schedules two downtimes on the server: one for the host and one for all its services.
+    - It is disabled when the server doesn't offer the host forms (e.g. no permission for host commands).
+  - **Also acknowledge the current problem**: on by default; sends a sticky acknowledgement without notification
+    after the downtime.
+    - Not offered when the problem is already acknowledged or the server doesn't offer the acknowledge form.
+  - All forms are fetched when the downtime form opens, one after the other, so nothing is posted before the user
+    confirms and the CSRF token stays the same.
 - A command is sent at most once per form and never retried automatically.
   - Why: a lost response doesn't prove the command wasn't accepted; a retry could acknowledge or schedule twice.
   - When not confirmed, the user is told to check the server in the browser before trying again.
+  - A downtime with options takes several requests, sent in order: host, services, acknowledgement. When one
+    isn't confirmed, the rest isn't sent, and the user is told which parts were accepted, which wasn't confirmed
+    and which weren't sent.
 - Success means Nagios' own confirmation text, not just HTTP 200.
   - "Accepted" means Nagios queued the command; the status changes once it has been processed. The server is
     refreshed right after.
+  - Caveat: Nagios also says "accepted" for a command it then ignores, e.g. an acknowledgement of a service that
+    became OK in the meantime.
 - Caveat: actually submitting acknowledgements and downtimes has only been tested against the mock server.
 
 ## Nagios monitoring
@@ -244,8 +267,6 @@ Drawn from the design and tagged as such, but without function:
 
 - **Recheck now** in the problem detail.
 - **Notified** in the problem detail (Polly keeps no record of what it notified about).
-- Downtime presets (30 min, 1 hour, 2 hours, until 09:00 tomorrow); only Custom works.
-- "Also acknowledge the current problem" and "Applies to: host and its services" in the downtime form.
 - Other monitoring systems in the Type control (Icinga 2, Checkmk, Zabbix).
 - Poll interval and "Verify TLS certificate" in the add-server card; the interval is fixed at 60 seconds.
 - The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
