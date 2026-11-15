@@ -116,8 +116,11 @@ Polly moves the username and password into their own fields. Use the URL the moc
 the port or login, or leave out `nagiosadmin:nagios@` when the mock runs with `--no-auth`.
 
 Besides the status, the mock serves the check page (`extinfo.cgi`) with action and notes links, and the
-acknowledge and downtime forms (`cmd.cgi`) with their CSRF token and cookie, so acknowledging a problem or
-scheduling downtime really changes the mock's state.
+acknowledge and downtime forms (`cmd.cgi`, for a service, a host and all services of a host) with their CSRF token
+and cookie. Commands change the mock's state the way they change Nagios: a normal acknowledgement ends on the next
+state change and a sticky one on recovery, and downtimes count in `scheduled_downtime_depth` while they are in
+effect. Press `s` to see the acknowledgements and downtimes. What the mock leaves out is listed under "Where the
+mock differs" in [doc/nagios-protocol.md](doc/nagios-protocol.md).
 
 ## Tests
 
@@ -141,7 +144,8 @@ The tests put the mock into a known state through endpoints that need no login:
 |---|---|
 | `GET /mock/reset` | All hosts up, all services OK, no acknowledgements or downtimes, default `cmd.cgi` behaviour |
 | `GET /mock/set?host=H&service=S&status=ok\|warning\|critical\|unknown` | Set one service's status |
-| `GET /mock/config?csrf=on\|off&dateFormat=us\|iso8601` | Make `cmd.cgi` leave out the CSRF token or use ISO dates, like monitor.webhare.net |
+| `GET /mock/sethost?host=H&status=up\|down\|unreachable` | Set one host's status |
+| `GET /mock/config?csrf=on\|off&dateFormat=us\|euro\|iso8601\|strict-iso8601` | `csrf=off` behaves like Nagios 4.5.11 and older (no CSRF token, as on monitor.webhare.net); `dateFormat` is Nagios' `date_format` (monitor.webhare.net uses `iso8601`) |
 | `/redirect/<path>` | Answers with a 302 redirect to `/<path>` |
 
 `URLMonitorNetworkTests` checks real websites, including badssl.com's broken certificates. It is skipped

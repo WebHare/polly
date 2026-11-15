@@ -102,19 +102,41 @@ public struct NagiosClient: MonitorBackend {
         return try NagiosHTML.relatedURL(html: try await page(request(url: url)), pageURL: url)
     }
 
-    /// Fetches the command form. Its CSRF token and cookie are what make the later `submit` acceptable to Nagios.
+    /// Fetches the command forms. Their CSRF token and cookie are what make the later `submit` acceptable to Nagios.
+    /// For a downtime it also fetches the forms behind the options (host and services, also acknowledge); an
+    /// option whose form doesn't come back is simply not offered. The forms are fetched one after the other: on
+    /// Nagios 4.5.12+ the first answer sets the CSRF cookie, and later requests have to carry it to get the same token.
     public func prepareCommand(_ kind: CommandKind, for problem: ServiceProblem) async throws -> any PreparedCommand {
-        let formRequest = request(url: try cgiURL("cmd.cgi", ["cmd_typ": kind.nagiosCommandType,
-                                                             "host": problem.host, "service": problem.service]))
-        let form = NagiosCommandForm.inputs(try await page(formRequest))
-        guard form["cmd_typ"] == kind.nagiosCommandType, form["cmd_mod"] == "2",
-              form["host"] == problem.host, form["service"] == problem.service else {
+        let main: NagiosCommand = kind == .acknowledge ? .acknowledge : .serviceDowntime
+        guard let form = try await form(main, for: problem) else {
             throw BackendError("Nagios did not return the expected command form. Check your command permissions in the browser.")
         }
+        var forms = [main: form]
+        if kind == .downtime {
+            // Optional: a failure here only hides the option.
+            for extra in [NagiosCommand.hostDowntime, .hostServicesDowntime] + (problem.acknowledged ? [] : [.acknowledge]) {
+                forms[extra] = try? await self.form(extra, for: problem)
+            }
+        }
+        var options: CommandOptions = []
+        if forms[.hostDowntime] != nil, forms[.hostServicesDowntime] != nil { options.insert(.hostScope) }
+        if kind == .downtime, forms[.acknowledge] != nil { options.insert(.alsoAcknowledge) }
         let defaults = CommandInput(author: form["com_author"].flatMap { $0.isEmpty ? nil : $0 } ?? username,
-                                    start: form["start_time"] ?? "", end: form["end_time"] ?? "")
-        return NagiosPreparedCommand(kind: kind, problem: problem, defaults: defaults, form: form,
-                                     formRequest: formRequest, client: self)
+                                    start: form["start_time"] ?? "", end: form["end_time"] ?? "",
+                                    alsoAcknowledge: options.contains(.alsoAcknowledge))
+        let notations = NagiosDateNotation.candidates(prefilledStart: defaults.start, prefilledEnd: defaults.end)
+        return NagiosPreparedCommand(kind: kind, problem: problem, defaults: defaults, options: options, forms: forms,
+                                     notations: notations, client: self)
+    }
+
+    /// The form for `command`, or nil when Nagios answers with something else (no permission, a login page, ...).
+    fileprivate func form(_ command: NagiosCommand, for problem: ServiceProblem) async throws -> NagiosForm? {
+        var parameters = ["cmd_typ": command.rawValue, "host": problem.host]
+        if command.hasService { parameters["service"] = problem.service }
+        let request = request(url: try cgiURL("cmd.cgi", parameters))
+        let inputs = NagiosCommandForm.inputs(try await page(request))
+        guard NagiosCommandForm.isForm(inputs, for: command, problem: problem) else { return nil }
+        return NagiosForm(inputs: inputs, request: request)
     }
 
     // MARK: - Request plumbing
@@ -205,20 +227,76 @@ private final class RedirectRefuser: NSObject, URLSessionTaskDelegate, Sendable 
 
 // MARK: - Commands
 
+/// A fetched `cmd.cgi` form: its inputs and the request that fetched it.
+private struct NagiosForm: Sendable {
+    var inputs: [String: String]
+    var request: URLRequest
+
+    subscript(name: String) -> String? { inputs[name] }
+}
+
 private struct NagiosPreparedCommand: PreparedCommand {
     let kind: CommandKind
     let problem: ServiceProblem
     let defaults: CommandInput
-    let form: [String: String]
-    let formRequest: URLRequest
+    let options: CommandOptions
+    let forms: [NagiosCommand: NagiosForm]
+    /// The date notations the server may be using, for the presets.
+    let notations: [NagiosDateNotation]
     let client: NagiosClient
 
-    func validate(_ input: CommandInput) throws {
-        _ = try NagiosCommandForm.body(kind: kind, problem: problem, input: input, form: form)
+    func end(for preset: DowntimePreset, from start: String) -> String? {
+        kind == .downtime ? NagiosDateNotation.end(for: preset, from: start, candidates: notations) : nil
     }
 
-    /// Posts with the same session as the form GET, so the CSRF cookie Nagios set there travels along.
+    /// The requests `input` asks for, in the order they are sent, each with its POST body.
+    private func steps(_ input: CommandInput) throws -> [(command: NagiosCommand, body: Data)] {
+        var commands: [NagiosCommand]
+        switch kind {
+        case .acknowledge:
+            commands = [.acknowledge]
+        case .downtime:
+            if input.scope == .hostAndServices {
+                guard options.contains(.hostScope) else { throw BackendError("Nagios does not allow a downtime for this host.") }
+                commands = [.hostDowntime, .hostServicesDowntime]
+            } else {
+                commands = [.serviceDowntime]
+            }
+            if input.alsoAcknowledge {
+                guard options.contains(.alsoAcknowledge) else { throw BackendError("Nagios does not allow acknowledging this problem.") }
+                commands.append(.acknowledge)
+            }
+        }
+        return try commands.map { command in
+            // The acknowledgement that comes with a downtime doesn't notify: the downtime is the news.
+            let stepInput = kind == .downtime && command == .acknowledge
+                ? CommandInput(author: input.author, comment: input.comment) : input
+            return (command, try NagiosCommandForm.body(command, problem: problem, input: stepInput, form: forms[command]!.inputs))
+        }
+    }
+
+    func validate(_ input: CommandInput) throws {
+        _ = try steps(input)
+    }
+
+    /// Posts each request once, in order, with the same session as the form GETs so the CSRF cookie Nagios set there
+    /// travels along. Stops at the first request Nagios doesn't confirm.
     func submit(_ input: CommandInput) async throws {
+        let steps = try steps(input)
+        for (index, step) in steps.enumerated() {
+            do {
+                try await post(step.body, to: forms[step.command]!.request)
+            } catch where steps.count > 1 {
+                if index == 0 { throw error }
+                throw CommandSequenceError(accepted: steps[..<index].map { $0.command.label(for: problem) },
+                                           failed: step.command.label(for: problem),
+                                           notSent: steps[(index + 1)...].map { $0.command.label(for: problem) },
+                                           reason: error.localizedDescription)
+            }
+        }
+    }
+
+    private func post(_ body: Data, to formRequest: URLRequest) async throws {
         var post = formRequest
         // The form's query only selects the form; the command itself is the POST body.
         var components = URLComponents(url: formRequest.url!, resolvingAgainstBaseURL: false)!
@@ -227,7 +305,7 @@ private struct NagiosPreparedCommand: PreparedCommand {
         post.httpMethod = "POST"
         post.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
         post.setValue(formRequest.url!.absoluteString, forHTTPHeaderField: "Referer")
-        post.httpBody = try NagiosCommandForm.body(kind: kind, problem: problem, input: input, form: form)
+        post.httpBody = body
         try NagiosCommandForm.validateResult(try await client.page(post))
     }
 }

@@ -70,11 +70,11 @@ struct NagiosCommandFormTests {
 
     @Test func acknowledgeBodyKeepsTheCSRFTokenAndEncodesStrictly() throws {
         let input = CommandInput(author: "Wouter", comment: "Check + fix & wait")
-        let body = String(decoding: try NagiosCommandForm.body(kind: .acknowledge, problem: target, input: input,
+        let body = String(decoding: try NagiosCommandForm.body(.acknowledge, problem: target, input: input,
                                                                form: ["nagFormId": "abc123"]), as: UTF8.self)
         #expect(body == "cmd_mod=2&cmd_typ=34&com_author=Wouter&com_data=Check%20%2B%20fix%20%26%20wait"
             + "&host=host%20%26%20one&nagFormId=abc123&service=Disk&sticky_ack=on")
-        let notifying = try NagiosCommandForm.body(kind: .acknowledge, problem: target,
+        let notifying = try NagiosCommandForm.body(.acknowledge, problem: target,
                                                    input: CommandInput(author: "me", comment: "x", notify: true), form: [:])
         #expect(String(decoding: notifying, as: UTF8.self).contains("send_notification=on"))
     }
@@ -83,7 +83,7 @@ struct NagiosCommandFormTests {
     @Test func rejectsEmptyAndInjectingValues() {
         for bad in ["", "   ", "inject;command", "line\nbreak"] {
             #expect(throws: BackendError.self) {
-                try NagiosCommandForm.body(kind: .acknowledge, problem: target, input: CommandInput(author: "me", comment: bad), form: [:])
+                try NagiosCommandForm.body(.acknowledge, problem: target, input: CommandInput(author: "me", comment: bad), form: [:])
             }
         }
     }
@@ -91,14 +91,14 @@ struct NagiosCommandFormTests {
     @Test func downtimeBodyAndDateValidation() throws {
         let form = ["nagFormId": "token", "start_time": "11-13-2026 09:00:00"]
         let input = CommandInput(author: "me", comment: "Maintenance", start: "11-13-2026 15:00:00", end: "11-13-2026 16:00:00")
-        let body = String(decoding: try NagiosCommandForm.body(kind: .downtime, problem: target, input: input, form: form), as: UTF8.self)
+        let body = String(decoding: try NagiosCommandForm.body(.serviceDowntime, problem: target, input: input, form: form), as: UTF8.self)
         #expect(body.contains("cmd_typ=56"))
         #expect(body.contains("fixed=1"))
         #expect(body.contains("end_time=11-13-2026%2016%3A00%3A00"))
 
         // date_format=iso8601, as on monitor.webhare.net. Without a token in the form, none is sent.
         let iso = CommandInput(author: "me", comment: "Maintenance", start: "2026-11-14 23:11:46", end: "2026-11-15 01:11:46")
-        let isoBody = String(decoding: try NagiosCommandForm.body(kind: .downtime, problem: target, input: iso,
+        let isoBody = String(decoding: try NagiosCommandForm.body(.serviceDowntime, problem: target, input: iso,
                                                                   form: ["start_time": "2026-11-14 23:11:46"]), as: UTF8.self)
         #expect(isoBody.contains("start_time=2026-11-14%2023%3A11%3A46"))
         #expect(!isoBody.contains("nagFormId"))
@@ -106,10 +106,32 @@ struct NagiosCommandFormTests {
         for (start, end) in [("11-13-2026 16:00:00", "11-13-2026 15:00:00"), ("02-30-2026 10:00:00", "03-01-2026 10:00:00"),
                              ("11-13-2026 10:00:00", "11-13-2026 25:00:00"), ("11-13-2026", "11-14-2026"), ("", "")] {
             #expect(throws: BackendError.self) {
-                try NagiosCommandForm.body(kind: .downtime, problem: target,
+                try NagiosCommandForm.body(.serviceDowntime, problem: target,
                                            input: CommandInput(author: "me", comment: "x", start: start, end: end), form: form)
             }
         }
+    }
+
+    @Test func hostDowntimesNameNoService() throws {
+        let form = ["start_time": "11-13-2026 09:00:00"]
+        let input = CommandInput(author: "me", comment: "Maintenance", start: "11-13-2026 15:00:00", end: "11-13-2026 16:00:00")
+        let host = String(decoding: try NagiosCommandForm.body(.hostDowntime, problem: target, input: input, form: form), as: UTF8.self)
+        #expect(host.contains("cmd_typ=55"))
+        #expect(host.contains("childoptions=0"))
+        #expect(!host.contains("service="))
+        let services = String(decoding: try NagiosCommandForm.body(.hostServicesDowntime, problem: target, input: input, form: form),
+                              as: UTF8.self)
+        #expect(services.contains("cmd_typ=86"))
+        #expect(!services.contains("service=") && !services.contains("childoptions"))
+    }
+
+    @Test func recognizesOnlyTheRequestedForm() {
+        let service = ["cmd_typ": "56", "cmd_mod": "2", "host": "host & one", "service": "Disk"]
+        #expect(NagiosCommandForm.isForm(service, for: .serviceDowntime, problem: target))
+        #expect(!NagiosCommandForm.isForm(service, for: .hostServicesDowntime, problem: target))
+        #expect(NagiosCommandForm.isForm(["cmd_typ": "86", "cmd_mod": "2", "host": "host & one"], for: .hostServicesDowntime, problem: target))
+        #expect(!NagiosCommandForm.isForm(["cmd_typ": "86", "cmd_mod": "2", "host": "other"], for: .hostServicesDowntime, problem: target))
+        #expect(!NagiosCommandForm.isForm([:], for: .acknowledge, problem: target))
     }
 
     @Test func http200AloneIsNotConfirmation() throws {
@@ -118,5 +140,54 @@ struct NagiosCommandFormTests {
                      "<p>Error: Invalid or missing CSRF cookie!</p>", "<div>successfully submitted</div>"] {
             #expect(throws: BackendError.self) { try NagiosCommandForm.validateResult(html) }
         }
+    }
+}
+
+struct NagiosDateNotationTests {
+    private let now = Date(timeIntervalSince1970: 1_794_738_300) // 2026-11-15 10:25:00 UTC
+
+    @Test func candidatesFollowThePrefilledForm() {
+        #expect(NagiosDateNotation.candidates(prefilledStart: "11-15-2026 11:25:00", prefilledEnd: "11-15-2026 13:25:00", now: now) == [.us])
+        #expect(NagiosDateNotation.candidates(prefilledStart: "15-11-2026 11:25:00", prefilledEnd: "15-11-2026 13:25:00", now: now) == [.euro])
+        #expect(NagiosDateNotation.candidates(prefilledStart: "2026-11-15 11:25:00", prefilledEnd: "2026-11-15 13:25:00", now: now) == [.iso8601])
+        #expect(NagiosDateNotation.candidates(prefilledStart: "2026-11-15T11:25:00", prefilledEnd: "2026-11-15T13:25:00", now: now)
+            == [.strictISO8601])
+        // Day and month both 11 or lower: us and euro both fit when the dates are close to now.
+        let early = Date(timeIntervalSince1970: 1_793_780_700) // 2026-11-04 08:25 UTC
+        #expect(NagiosDateNotation.candidates(prefilledStart: "11-04-2026 09:25:00", prefilledEnd: "11-04-2026 11:25:00", now: early) == [.us])
+        let same = Date(timeIntervalSince1970: 1_794_391_860) // 2026-11-11 10:11 UTC
+        #expect(NagiosDateNotation.candidates(prefilledStart: "11-11-2026 11:11:00", prefilledEnd: "11-11-2026 13:11:00", now: same)
+            == [.us, .euro])
+        // Not the server's "now", or not 2 hours apart: no notation.
+        #expect(NagiosDateNotation.candidates(prefilledStart: "11-15-2025 11:25:00", prefilledEnd: "11-15-2025 13:25:00", now: now).isEmpty)
+        #expect(NagiosDateNotation.candidates(prefilledStart: "11-15-2026 11:25:00", prefilledEnd: "11-15-2026 12:25:00", now: now).isEmpty)
+    }
+
+    @Test func presetsCountFromTheStartInWallClockTime() {
+        let us = [NagiosDateNotation.us]
+        #expect(NagiosDateNotation.end(for: .thirtyMinutes, from: "11-15-2026 23:45:00", candidates: us) == "11-16-2026 00:15:00")
+        #expect(NagiosDateNotation.end(for: .oneHour, from: "12-31-2026 23:30:00", candidates: us) == "01-01-2027 00:30:00")
+        #expect(NagiosDateNotation.end(for: .twoHours, from: "11-15-2026 11:25:00", candidates: us) == "11-15-2026 13:25:00")
+        #expect(NagiosDateNotation.end(for: .untilTomorrowMorning, from: "11-15-2026 01:00:00", candidates: us) == "11-16-2026 09:00:00")
+        #expect(NagiosDateNotation.end(for: .untilTomorrowMorning, from: "2026-11-15T22:00:00", candidates: [.strictISO8601])
+            == "2026-11-16T09:00:00")
+        #expect(NagiosDateNotation.end(for: .oneHour, from: "not a date", candidates: us) == nil)
+    }
+
+    /// When us and euro both fit, a preset only works if both give the same text.
+    @Test func ambiguousNotationsOnlyAllowPresetsTheyAgreeOn() {
+        let both = [NagiosDateNotation.us, .euro]
+        #expect(NagiosDateNotation.end(for: .oneHour, from: "11-11-2026 11:11:00", candidates: both) == "11-11-2026 12:11:00")
+        #expect(NagiosDateNotation.end(for: .untilTomorrowMorning, from: "11-11-2026 11:11:00", candidates: both) == nil)
+        #expect(NagiosDateNotation.end(for: .oneHour, from: "11-11-2026 11:11:00", candidates: []) == nil)
+    }
+}
+
+struct CommandSequenceErrorTests {
+    @Test func namesWhatWentThroughAndWhatDidNot() {
+        let error = CommandSequenceError(accepted: ["the downtime of host web1"], failed: "the downtime of the services on web1",
+                                         notSent: ["the acknowledgement"], reason: "Nagios did not confirm submission.")
+        #expect(error.localizedDescription == "Nagios did not confirm submission. Accepted: the downtime of host web1."
+            + " Not confirmed: the downtime of the services on web1. Not sent: the acknowledgement.")
     }
 }

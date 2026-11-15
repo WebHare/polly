@@ -102,6 +102,104 @@ struct MockIntegrationTests {
         #expect(try await problem("HTTP")?.acknowledged == false)
     }
 
+    /// The raw statusjson.cgi entry, for what Polly doesn't decode (host downtime, acknowledgement type).
+    private func statusJSON(_ query: String) async throws -> [String: Any] {
+        var request = URLRequest(url: base.appending(path: "nagios/cgi-bin/statusjson.cgi").appending(queryItems: [
+            URLQueryItem(name: "query", value: query), URLQueryItem(name: "details", value: "true")]))
+        request.setValue("Basic " + Data("nagiosadmin:nagios".utf8).base64EncodedString(), forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let json = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+        return try #require(json["data"] as? [String: Any])
+    }
+
+    /// Polly sends sticky acknowledgements: they survive WARNING -> CRITICAL and end on recovery, like in Nagios.
+    @Test func stickyAcknowledgementLastsUntilRecovery() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=warning")
+        let target = try #require(try await problem("HTTP"))
+        let acknowledge = try await client().prepareCommand(.acknowledge, for: target)
+        try await acknowledge.submit(CommandInput(author: acknowledge.defaults.author, comment: "Investigating"))
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        #expect(try await problem("HTTP")?.acknowledged == true)
+        try await control("/mock/set?host=\(host)&service=HTTP&status=ok")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        #expect(try await problem("HTTP")?.acknowledged == false)
+    }
+
+    /// The downtime form offers both options against the mock; this schedules the host, its services and the
+    /// acknowledgement in one go. Four forms are fetched before anything is posted, so this also proves that the
+    /// CSRF cookie of the first form stays valid for the others.
+    @Test func downtimeForHostAndServicesWithAcknowledgement() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        let target = try #require(try await problem("HTTP"))
+        let downtime = try await client().prepareCommand(.downtime, for: target)
+        #expect(downtime.options == [.hostScope, .alsoAcknowledge])
+        #expect(downtime.defaults.alsoAcknowledge)
+        var input = downtime.defaults
+        input.comment = "Replacing the disks"
+        input.scope = .hostAndServices
+        input.end = try #require(downtime.end(for: .oneHour, from: input.start))
+        try await downtime.submit(input)
+
+        let http = try #require(try await problem("HTTP"))
+        #expect(http.downtimeDepth == 1)
+        #expect(http.acknowledged)
+        let services = try #require(try await statusJSON("servicelist")["servicelist"] as? [String: [String: [String: Any]]])
+        #expect(services[host]?.values.allSatisfy { $0["scheduled_downtime_depth"] as? Int == 1 } == true)
+        #expect(services["web2.example.com"]?["HTTP"]?["scheduled_downtime_depth"] as? Int == 0)
+        let hosts = try #require(try await statusJSON("hostlist")["hostlist"] as? [String: [String: Any]])
+        #expect(hosts[host]?["scheduled_downtime_depth"] as? Int == 1)
+        // The acknowledgement that comes with a downtime is sticky too.
+        #expect(services[host]?["HTTP"]?["acknowledgement_type"] as? Int == 2)
+    }
+
+    /// An already acknowledged problem doesn't offer "also acknowledge".
+    @Test func acknowledgedProblemOffersNoSecondAcknowledgement() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        let acknowledge = try await client().prepareCommand(.acknowledge, for: try #require(try await problem("HTTP")))
+        try await acknowledge.submit(CommandInput(author: "x", comment: "Investigating"))
+        let downtime = try await client().prepareCommand(.downtime, for: try #require(try await problem("HTTP")))
+        #expect(downtime.options == [.hostScope])
+        #expect(!downtime.defaults.alsoAcknowledge)
+        var input = downtime.defaults
+        input.comment = "x"
+        input.alsoAcknowledge = true
+        #expect(throws: BackendError.self) { try downtime.validate(input) }
+    }
+
+    /// Two overlapping downtimes count twice in scheduled_downtime_depth.
+    @Test func overlappingDowntimesAddUp() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        for _ in 0..<2 {
+            let downtime = try await client().prepareCommand(.downtime, for: try #require(try await problem("HTTP")))
+            var input = downtime.defaults
+            input.comment = "Maintenance"
+            input.alsoAcknowledge = false
+            try await downtime.submit(input)
+        }
+        #expect(try await problem("HTTP")?.downtimeDepth == 2)
+    }
+
+    /// date_format=euro: the presets still produce the server's notation.
+    @Test func presetsUseTheServerNotation() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/config?dateFormat=euro")
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        let downtime = try await client().prepareCommand(.downtime, for: try #require(try await problem("HTTP")))
+        var input = downtime.defaults
+        // The prefilled end is 2 hours after the start, so the "2 hours" preset reproduces it.
+        #expect(downtime.end(for: .twoHours, from: input.start) == input.end)
+        input.end = try #require(downtime.end(for: .thirtyMinutes, from: input.start))
+        input.comment = "Short break"
+        input.alsoAcknowledge = false
+        try await downtime.submit(input)
+        #expect(try await problem("HTTP")?.downtimeDepth == 1)
+        try await control("/mock/reset")
+    }
+
     @Test func redirectsAndBadCredentialsFail() async {
         await #expect(throws: NagiosClientError.redirect) { try await client(path: "redirect").testConnection() }
         await #expect(throws: NagiosClientError.unauthorized) { try await client(password: "wrong").testConnection() }

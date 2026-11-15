@@ -39,20 +39,60 @@ public enum CommandKind: String, Sendable {
     case acknowledge, downtime
 }
 
-/// What the user fills in for a command. `start`/`end` are only used for a downtime.
+/// What a downtime covers.
+public enum DowntimeScope: String, Sendable, CaseIterable {
+    /// Only the service of the problem.
+    case service
+    /// The problem's host and every service on it.
+    case hostAndServices
+}
+
+/// Common downtime lengths, counted from the start time.
+public enum DowntimePreset: String, Sendable, CaseIterable, Identifiable {
+    case thirtyMinutes, oneHour, twoHours, untilTomorrowMorning
+
+    public var id: String { rawValue }
+
+    public var label: String {
+        switch self {
+        case .thirtyMinutes: "30 min"
+        case .oneHour: "1 hour"
+        case .twoHours: "2 hours"
+        case .untilTomorrowMorning: "Until 09:00 tomorrow"
+        }
+    }
+}
+
+/// Parts of a command form that depend on what the server allows for this problem.
+public struct CommandOptions: OptionSet, Sendable {
+    public let rawValue: Int
+    public init(rawValue: Int) { self.rawValue = rawValue }
+
+    /// A downtime can cover the host and all its services (`DowntimeScope.hostAndServices`).
+    public static let hostScope = CommandOptions(rawValue: 1 << 0)
+    /// A downtime can acknowledge the problem as well (`CommandInput.alsoAcknowledge`).
+    public static let alsoAcknowledge = CommandOptions(rawValue: 1 << 1)
+}
+
+/// What the user fills in for a command. `start`, `end`, `scope` and `alsoAcknowledge` are only used for a downtime.
 public struct CommandInput: Equatable, Sendable {
     public var author: String
     public var comment: String
     public var start: String
     public var end: String
     public var notify: Bool
+    public var scope: DowntimeScope
+    public var alsoAcknowledge: Bool
 
-    public init(author: String = "", comment: String = "", start: String = "", end: String = "", notify: Bool = false) {
+    public init(author: String = "", comment: String = "", start: String = "", end: String = "", notify: Bool = false,
+                scope: DowntimeScope = .service, alsoAcknowledge: Bool = false) {
         self.author = author
         self.comment = comment
         self.start = start
         self.end = end
         self.notify = notify
+        self.scope = scope
+        self.alsoAcknowledge = alsoAcknowledge
     }
 }
 
@@ -62,10 +102,41 @@ public protocol PreparedCommand: Sendable {
     var problem: ServiceProblem { get }
     /// Proposed values. `start`/`end` are in the notation and time zone the server itself uses.
     var defaults: CommandInput { get }
+    /// What the server offers beyond the basic command.
+    var options: CommandOptions { get }
+    /// The end time for `preset`, counted from `start`, in the server's notation; nil when it can't be calculated.
+    func end(for preset: DowntimePreset, from start: String) -> String?
     /// Runs the same checks as `submit` without sending anything.
     func validate(_ input: CommandInput) throws
     /// Sends the command once. It is never retried: a second attempt could acknowledge or schedule twice.
     func submit(_ input: CommandInput) async throws
+}
+
+public extension PreparedCommand {
+    var options: CommandOptions { [] }
+    func end(for preset: DowntimePreset, from start: String) -> String? { nil }
+}
+
+/// A command that takes several requests (e.g. a downtime plus an acknowledgement) stopped halfway. The requests
+/// before `failed` were accepted, so the whole command must not be sent again.
+public struct CommandSequenceError: LocalizedError, Equatable, Sendable {
+    public var accepted: [String]
+    public var failed: String
+    public var notSent: [String]
+    public var reason: String
+
+    public init(accepted: [String], failed: String, notSent: [String], reason: String) {
+        self.accepted = accepted
+        self.failed = failed
+        self.notSent = notSent
+        self.reason = reason
+    }
+
+    public var errorDescription: String? {
+        var parts = [reason, "Accepted: \(accepted.joined(separator: ", ")).", "Not confirmed: \(failed)."]
+        if !notSent.isEmpty { parts.append("Not sent: \(notSent.joined(separator: ", ")).") }
+        return parts.joined(separator: " ")
+    }
 }
 
 public struct BackendError: LocalizedError, Equatable, Sendable {
