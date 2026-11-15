@@ -4,6 +4,10 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ## [Unreleased]
 
+### Changed
+
+- Open the macOS add-server form in a modal using Add above the server list.
+
 ### Fixed
 
 - Refresh immediately when returning to Polly on iPhone or iPad, and pause polling while inactive.

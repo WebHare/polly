@@ -48,6 +48,10 @@ Read the relevant section before changing behaviour, and update it in the same c
 
 - **When you start working on an issue, move it to `In progress` and assign it to yourself.**
 - **Never push to `main`.** Work on a branch, push the branch and open a pull request against `main`.
+- **For Polly, a request to commit and push authorizes the complete branch → pull request → auto-merge workflow.**
+  This is standing approval to enable auto-merge, including the eventual merge into `main` after CI passes;
+  do not ask for separate merge approval. An explicit no-merge or draft-only request overrides this rule.
+  Before reporting completion, verify that the pull request has auto-merge enabled or is already merged.
 - **Enable auto-merge right after opening the pull request** (`gh pr merge --auto --merge <number>`), so it
   merges by itself once the build is green and nobody has to come back for it.
 - **Merge only when the build is green.** The workflows in `.github/workflows/` run on every pull request; a

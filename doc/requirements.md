@@ -21,7 +21,9 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 ## Servers
 
 - The user can add a server of either type.
-  - macOS: the "Add a monitoring server" card in the Servers pane of the Settings window, with a Type control.
+  - macOS: **Add** above the server list opens the "Add a monitoring server" modal, with a Type control.
+    - Cancel closes the modal without saving; adding successfully closes it and updates the list.
+    - The form cannot be edited or dismissed while the connection test is running.
   - iOS: **Add** (a menu: Nagios Server… / URL…) on the Servers tab, or **Add server…** in the empty states; the
     form opens as a sheet titled "Add Nagios Server" or "Add URL".
   - The URL placeholder and the explanation adapt to the type:
@@ -111,7 +113,7 @@ servers.
     problems without going back.
   - Why in the panel, not a window: the menu bar panel closes as soon as it loses focus.
 - The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
-  - **Servers**: the server list (switch, bell, refresh, delete), the add-server card and the advanced
+  - **Servers**: the server list (switch, bell, refresh, delete), the Add button and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
   - **About Polly**: version and build number, **What's New**, and **Check for Updates…** in release builds.
 
@@ -269,7 +271,7 @@ Drawn from the design and tagged as such, but without function:
 - **Recheck now** in the problem detail.
 - **Notified** in the problem detail (Polly keeps no record of what it notified about).
 - Other monitoring systems in the Type control (Icinga 2, Checkmk, Zabbix).
-- Poll interval and "Verify TLS certificate" in the add-server card; the interval is fixed at 60 seconds.
+- Poll interval and "Verify TLS certificate" in the add-server form; the interval is fixed at 60 seconds.
 - The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
   services on down hosts), notification rules and quiet hours.
 - The Team and Account panes.
