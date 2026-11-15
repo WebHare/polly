@@ -166,6 +166,7 @@ private struct ServersPane: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
     @State private var model = AddServerModel()
+    @State private var addingServer = false
     @State private var errorMessage: String?
 
     private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
@@ -174,13 +175,25 @@ private struct ServersPane: View {
         VStack(alignment: .leading, spacing: 16) {
             PaneHeader(title: "Servers",
                        subtitle: "Polly polls these straight from this Mac. Nothing goes through our servers.")
+            HStack {
+                Spacer()
+                Button("Add", systemImage: "plus") { addingServer = true }
+                    .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
+            }
             serverList
-            addServerCard
             advanced
+        }
+        .sheet(isPresented: $addingServer, onDismiss: resetForm) {
+            addServerCard
+                .frame(width: 720)
+                .interactiveDismissDisabled(model.checkState == .checking)
+                .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
+                    Button("OK") { errorMessage = nil }
+                } message: { Text($0) }
         }
         .onAppear { syncWireLog() }
         .onChange(of: monitor.debugLog) { syncWireLog() }
-        .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
+        .alert("Error", isPresented: .constant(errorMessage != nil && !addingServer), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
     }
@@ -190,7 +203,7 @@ private struct ServersPane: View {
     private var serverList: some View {
         VStack(spacing: 0) {
             if monitor.servers.isEmpty {
-                Text("No servers yet. Add one below.")
+                Text("No servers yet. Click Add to get started.")
                     .foregroundStyle(theme.faint)
                     .padding(.vertical, 10)
                     .padding(.horizontal, 12)
@@ -308,6 +321,7 @@ private struct ServersPane: View {
                     }
                 }
             }
+            .disabled(model.checkState == .checking)
             banner
             HStack(spacing: 8) {
                 Button(model.checkState == .idle ? "Test connection" : "Test again") {
@@ -318,7 +332,9 @@ private struct ServersPane: View {
                     Button("Add anyway") { save() }
                 }
                 Spacer()
-                Button("Cancel") { resetForm() }
+                Button("Cancel") { addingServer = false }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(model.checkState == .checking)
                 Button("Add server") { Task { await testAndAdd() } }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
                     .disabled(!model.canSubmit)
@@ -421,7 +437,7 @@ private struct ServersPane: View {
         guard let server = model.makeServer() else { return }
         do {
             try monitor.add(server, password: model.password.isEmpty ? nil : model.password)
-            resetForm()
+            addingServer = false
         } catch {
             errorMessage = "Could not save server: \(error.localizedDescription)"
         }
