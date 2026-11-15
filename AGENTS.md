@@ -46,6 +46,7 @@ Read the relevant section before changing behaviour, and update it in the same c
 
 ## Workflow: don't break main
 
+- **When you start working on an issue, move it to `In progress` and assign it to yourself.**
 - **Never push to `main`.** Work on a branch, push the branch and open a pull request against `main`.
 - **Enable auto-merge right after opening the pull request** (`gh pr merge --auto --merge <number>`), so it
   merges by itself once the build is green and nobody has to come back for it.

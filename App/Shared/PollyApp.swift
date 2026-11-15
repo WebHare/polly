@@ -6,6 +6,8 @@ struct PollyApp: App {
     @State private var monitor: MonitorModel
     #if os(macOS)
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #else
+    @Environment(\.scenePhase) private var scenePhase
     #endif
 
     init() {
@@ -23,7 +25,9 @@ struct PollyApp: App {
         }
         let monitor = MonitorModel(store: store)
         Notifier.shared.install(on: monitor)
+        #if os(macOS)
         monitor.startPolling()
+        #endif
         _monitor = State(initialValue: monitor)
     }
 
@@ -61,6 +65,9 @@ struct PollyApp: App {
         WindowGroup {
             PhoneRootView()
                 .environment(monitor)
+        }
+        .onChange(of: scenePhase, initial: true) {
+            monitor.setPollingActive(scenePhase == .active)
         }
         #endif
     }

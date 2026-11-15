@@ -127,6 +127,7 @@ servers.
 - **Servers** lists the servers with their state, switch and bell; add, refresh and delete them there.
 - **Settings** has the password storage and debug log settings, the version and build number, and **What's New**.
 - Polly only polls while the app is in the foreground.
+  - It refreshes immediately when it becomes active again, without waiting for the polling interval.
 
 ## Problem detail
 
