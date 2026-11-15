@@ -726,18 +726,22 @@ private struct NotBuiltPane: View {
 private struct AboutPane: View {
     @Environment(\.pollyTheme) private var theme
 
-    private var version: String {
-        let info = Bundle.main.infoDictionary
-        let short = info?["CFBundleShortVersionString"] as? String ?? "?"
-        let build = info?["CFBundleVersion"] as? String ?? "?"
-        return "Version \(short) (\(build))"
-    }
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(spacing: 10) {
             PollyMascot(mood: .ok, size: 96)
             Text("Polly").font(.system(size: 20, weight: .bold))
-            Text(version).foregroundStyle(theme.muted).textSelection(.enabled)
+            Text(AppRelease.versionLabel(info: Bundle.main.infoDictionary ?? [:]))
+                .foregroundStyle(theme.muted).textSelection(.enabled)
+            Button("What's New") { openWindow(id: WindowID.whatsNew) }
+                .buttonStyle(PollyButtonStyle())
+            #if !DEBUG
+            CheckForUpdatesButton().buttonStyle(PollyButtonStyle())
+            #else
+            Text("Development build; updates are available in release builds.")
+                .font(.caption).foregroundStyle(theme.muted)
+            #endif
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 40)

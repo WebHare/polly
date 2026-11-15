@@ -1,6 +1,6 @@
 # Polly requirements
 
-What Polly does and the rules it follows. See [CLAUDE.md](../CLAUDE.md) for how to maintain this file.
+What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how to maintain this file.
 
 ## General
 
@@ -113,7 +113,7 @@ servers.
 - The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
   - **Servers**: the server list (switch, bell, refresh, delete), the add-server card and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
-  - **About Polly**: version and build number.
+  - **About Polly**: version and build number, **What's New**, and **Check for Updates…** in release builds.
 
 ## iPhone and iPad
 
@@ -125,7 +125,7 @@ servers.
   - Tapping a problem opens its detail; pull to refresh refreshes that problem's server.
     - When the server no longer reports the problem, the detail says "Problem resolved".
 - **Servers** lists the servers with their state, switch and bell; add, refresh and delete them there.
-- **Settings** has the password storage and debug log settings.
+- **Settings** has the password storage and debug log settings, the version and build number, and **What's New**.
 - Polly only polls while the app is in the foreground.
 
 ## Problem detail
@@ -272,3 +272,15 @@ Drawn from the design and tagged as such, but without function:
 - The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
   services on down hosts), notification rules and quiet hours.
 - The Team and Account panes.
+
+## Versions and updates
+
+- The app shows its version and build number from the same values used to build it.
+- **What's New** works offline and lists the changelog newest first.
+  - Release builds show published version sections only; development builds also show unreleased entries.
+- macOS release builds check for updates every six hours and allow a manual check from About Polly or the app menu.
+  - The user reviews the release notes and confirms installation through Sparkle.
+  - Downloads must pass signature verification before installation.
+  - Development builds never update themselves to a published release.
+  - The first public update check requires a published release feed.
+- iPhone and iPad updates use TestFlight or the App Store, not the macOS updater.

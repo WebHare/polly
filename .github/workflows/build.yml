@@ -5,21 +5,44 @@ on:
     branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish a signed update from main
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ inputs.publish && 'release' || github.ref }}
+  cancel-in-progress: ${{ !inputs.publish }}
 
 jobs:
   macos:
     runs-on: macos-26
+    permissions:
+      contents: write
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
       # (see README.md, "Continuous integration"). Without them the app is ad-hoc signed.
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H
+      PUBLISH: ${{ github.event_name == 'workflow_dispatch' && inputs.publish }}
     steps:
       - uses: actions/checkout@v7
+
+      - name: Validate release request
+        if: env.PUBLISH == 'true'
+        env:
+          HAS_UPDATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY != '' }}
+        run: |
+          test "$GITHUB_REF" = refs/heads/main
+          test "$HAS_SIGNING" = true
+          test "$HAS_UPDATE_KEY" = true
+
+      - name: Test release notes
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
 
       - name: Test PollyKit
         run: swift test --package-path Packages/PollyKit
@@ -52,12 +75,53 @@ jobs:
           fi
           xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release \
             -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" \
-            CURRENT_PROJECT_VERSION=${{ github.run_number }} ENABLE_HARDENED_RUNTIME=YES \
+            ENABLE_HARDENED_RUNTIME=YES \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             "${SIGNING[@]}" build
           mkdir -p dist
           cp -R "$RUNNER_TEMP/DerivedData/Build/Products/Release/Polly.app" dist/
-          codesign --verify --strict --verbose=2 dist/Polly.app
+          # Plain xcodebuild does not re-sign Sparkle's nested helpers for notarization.
+          if [ "$HAS_SIGNING" = true ]; then
+            FRAMEWORK=dist/Polly.app/Contents/Frameworks/Sparkle.framework/Versions/B
+            for HELPER in XPCServices/Installer.xpc XPCServices/Downloader.xpc Autoupdate Updater.app; do
+              codesign --force --sign "Developer ID Application" --options runtime --timestamp \
+                --preserve-metadata=entitlements "$FRAMEWORK/$HELPER"
+            done
+            codesign --force --sign "Developer ID Application" --options runtime --timestamp "$FRAMEWORK"
+            codesign --force --sign "Developer ID Application" --options runtime --timestamp \
+              --preserve-metadata=entitlements dist/Polly.app
+          fi
+          codesign --verify --deep --strict --verbose=2 dist/Polly.app
+          # A multiplatform build can compile yet fail at launch with the iOS framework search path.
+          otool -l dist/Polly.app/Contents/MacOS/Polly > "$RUNNER_TEMP/load-commands.txt"
+          grep -Fq '@executable_path/../Frameworks' "$RUNNER_TEMP/load-commands.txt"
+
+      - name: Prepare release notes and check version
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' dist/Polly.app/Contents/Info.plist)
+          BUILD=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' dist/Polly.app/Contents/Info.plist)
+          python3 scripts/release_notes.py "$VERSION" CHANGELOG.md > "$RUNNER_TEMP/release-notes.md"
+          gh release list --json tagName > "$RUNNER_TEMP/releases.json"
+          python3 - "$VERSION" "$RUNNER_TEMP/releases.json" <<'PYCODE'
+          import json, sys
+          assert all(r["tagName"] != "v" + sys.argv[1] for r in json.load(open(sys.argv[2]))), "Version already published"
+          PYCODE
+          STATUS=$(curl --silent --show-error --location --output "$RUNNER_TEMP/previous-appcast.xml" \
+            --write-out '%{http_code}' "https://github.com/$GITHUB_REPOSITORY/releases/latest/download/appcast.xml")
+          if [ "$STATUS" = 200 ]; then
+            python3 - "$BUILD" "$RUNNER_TEMP/previous-appcast.xml" <<'PYCODE'
+          import sys, xml.etree.ElementTree as ET
+          versions = ET.parse(sys.argv[2]).findall(".//{http://www.andymatuschak.org/xml-namespaces/sparkle}version")
+          assert versions, "Published appcast has no build number"
+          assert int(sys.argv[1]) > max(int(v.text) for v in versions), "Increase CURRENT_PROJECT_VERSION"
+          PYCODE
+          elif [ "$STATUS" != 404 ]; then
+            echo "❌ Could not read published appcast (HTTP $STATUS)"; exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
 
       - name: Create the DMG
         run: |
@@ -82,6 +146,28 @@ jobs:
             --key "$RUNNER_TEMP/notary.p8" --key-id "$NOTARY_API_KEY_ID" --issuer "$NOTARY_API_ISSUER_ID"
           xcrun stapler staple "$DMG"
           rm "$RUNNER_TEMP/notary.p8"
+
+      - name: Sign and publish the update
+        if: env.PUBLISH == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          mkdir feed
+          cp "$DMG" feed/
+          cp "$RUNNER_TEMP/release-notes.md" "feed/${DMG%.dmg}.md"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" | \
+            "$RUNNER_TEMP/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_appcast" \
+            --ed-key-file - --embed-release-notes \
+            --download-url-prefix "https://github.com/$GITHUB_REPOSITORY/releases/download/v$VERSION/" feed
+          python3 - feed/appcast.xml <<'PYCODE'
+          import sys, xml.etree.ElementTree as ET
+          enclosure = ET.parse(sys.argv[1]).find("./channel/item/enclosure")
+          assert enclosure is not None and enclosure.get("{http://www.andymatuschak.org/xml-namespaces/sparkle}edSignature"), "Missing update signature"
+          PYCODE
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Polly $VERSION" \
+            --notes-file "$RUNNER_TEMP/release-notes.md" "feed/$DMG" feed/appcast.xml
 
       - uses: actions/upload-artifact@v7
         with:

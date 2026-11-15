@@ -9,6 +9,10 @@ struct PollyApp: App {
     #endif
 
     init() {
+        #if os(macOS) && !DEBUG
+        // Start scheduled checks even if the user never opens About Polly.
+        _ = CheckForUpdatesButton.controller
+        #endif
         let store: ServerStore
         do {
             store = try ServerStore.makeDefault()
@@ -40,6 +44,19 @@ struct PollyApp: App {
         // The design draws the sidebar up to the top edge, under the window buttons.
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentMinSize)
+        .commands {
+            CommandGroup(after: .appInfo) {
+                #if !DEBUG
+                CheckForUpdatesButton()
+                #endif
+            }
+        }
+
+        Window("What's New in Polly", id: WindowID.whatsNew) {
+            WhatsNewView().pollyThemed()
+                .frame(minWidth: 420, minHeight: 320)
+        }
+        .defaultSize(width: 580, height: 560)
         #else
         WindowGroup {
             PhoneRootView()
@@ -51,4 +68,5 @@ struct PollyApp: App {
 
 enum WindowID {
     static let servers = "servers"
+    static let whatsNew = "whats-new"
 }

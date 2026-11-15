@@ -167,3 +167,39 @@ change the mock to match, watch the integration tests fail, and then fix the cli
 server sends, turn on `debugLog` (see "Debugging" in the README) and compare its requests and responses with
 the mock's. [doc/nagios-protocol.md](doc/nagios-protocol.md) describes what Polly sends and expects; update it
 too.
+
+## Versions, changelog and updates
+
+`project.yml` owns `MARKETING_VERSION` (currently 0.2.0) and `CURRENT_PROJECT_VERSION` (2).
+Both platforms read those values from the built Info.plist. Bump both before each release, move the
+`CHANGELOG.md` entries from `[Unreleased]` into a dated section for that version, then regenerate and commit
+the Xcode project. Release builds hide unreleased notes; Debug builds include them.
+
+macOS Release builds use Sparkle 2.10.1, as Office_42 does. The updater checks every six hours and offers
+**Check for Updates…** in About Polly and the app menu. Sparkle asks before installing. Debug builds do not
+start the updater, so a local build cannot replace itself with a release. iOS updates remain managed by
+TestFlight or the App Store; it only shares the version display and changelog.
+
+The public feed is `https://github.com/unilynx/polly/releases/latest/download/appcast.xml`.
+There is no feed until the first release is published. The private EdDSA key is stored in the local macOS
+Keychain under service `https://sparkle-project.org`, account `nl.webhare.polly.updates`; only its public key
+is checked in. Back up the private key securely before publishing the first release and store it as the
+GitHub Actions secret `SPARKLE_PRIVATE_KEY`. Do not regenerate it: installed apps trust the existing public key.
+The existing Developer ID and notarization secrets from README.md must also be configured.
+
+Publication is explicit: run the **Build** workflow on `main` with **Publish a signed update from main**
+enabled. Ordinary pushes and PRs only build artifacts. Publishing refuses a missing signing key, an existing
+version, missing release notes or a build number that does not exceed the current feed. It signs Sparkle's
+nested helpers, notarizes the DMG, signs the update with EdDSA and publishes the DMG and appcast in a GitHub
+release. The update dialog and GitHub release use the same version section of CHANGELOG.md.
+
+Validate locally before a PR:
+
+```sh
+swift test --package-path Packages/PollyKit
+python3 -m unittest discover -s scripts -p 'test_*.py'
+xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'platform=macOS' \
+  -derivedDataPath .build/DerivedData CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual build
+xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'generic/platform=iOS Simulator' \
+  -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
+```
