@@ -382,6 +382,122 @@ Note: It may take a while before the command is actually processed.<BR><BR>
 - **Never retry a post.** A lost answer doesn't mean the command wasn't accepted, and a second post would
   acknowledge twice or schedule a second downtime.
 
+## What Nagios does with a command
+
+`cmd.cgi` only writes a line to the external command file; the Nagios core does the actual work. This section
+follows that line through the core (`base/commands.c`, `base/checks.c`, `base/notifications.c`,
+`common/downtime.c`, `common/comments.c`), so it's clear what an acknowledgement or downtime from Polly changes,
+when that becomes visible, and when it ends.
+
+### From command file to status
+
+1. `cmd.cgi` appends one line to `command_file` (`nagios.cmd`, a named pipe), e.g.
+   `[1731590000] ACKNOWLEDGE_SVC_PROBLEM;web01;HTTP;2;0;0;Arnold;Looking into it`. It does this only when
+   `check_external_commands=1`.
+2. In Nagios 4 a command worker reads the pipe and hands each line to the core straight away
+   (`command_input_handler`); `command_check_interval` no longer plays a role.
+3. The core logs `EXTERNAL COMMAND: ACKNOWLEDGE_SVC_PROBLEM;…` (with `log_external_commands=1`) and runs the
+   handler.
+   - A line the core can't use is **silently ignored**: an unknown host or service, a missing field, an
+     acknowledgement of a service that is OK again, or a downtime whose end isn't after its start. By then
+     `cmd.cgi` has already answered "successfully submitted".
+4. The CGIs, `statusjson.cgi` included, read the status file (`status.dat`), which the core rewrites every
+   `status_update_interval` seconds (10 in the sample `nagios.cfg`, 60 when not set). Polly refreshes the server
+   right after an accepted command, but that refresh can still show the old state; the next poll shows the new
+   one.
+
+### Acknowledgement (ACKNOWLEDGE_SVC_PROBLEM)
+
+`ACKNOWLEDGE_SVC_PROBLEM;<host>;<service>;<sticky>;<notify>;<persistent>;<author>;<comment>`, handled by
+`cmd_acknowledge_problem` and `acknowledge_service_problem`.
+
+| Field | Values | Polly sends |
+|---|---|---|
+| sticky | `1` normal, `2` sticky (`ACKNOWLEDGEMENT_NORMAL` / `_STICKY`) | `2` |
+| notify | `1` send an acknowledgement notification | `1` only when the user asks |
+| persistent | `1` keep the comment after the acknowledgement ends | `0` |
+| comment | up to the end of the line, so it may contain `;` | |
+
+What happens, in this order:
+
+1. If the service is OK, nothing happens: you can't acknowledge a problem that isn't there.
+2. With notify, an `ACKNOWLEDGEMENT` notification goes to the service's contacts. It only has to pass the general
+   filters (notifications enabled globally and for the service, the notification period, parent hosts up), not
+   the problem filters, so downtime doesn't stop it.
+3. `problem_has_been_acknowledged` becomes true and `acknowledgement_type` is set to normal or sticky.
+4. An acknowledgement comment is added with the author and comment (comment type `ACKNOWLEDGEMENT_COMMENT`,
+   persistent as requested).
+
+While a problem is acknowledged, Nagios sends no normal problem notifications for it
+(`check_service_notification_viability`). Checks keep running and the state keeps changing as usual.
+
+When it ends (`service_state_or_hard_state_type_change` in `base/checks.c`, evaluated on every state change or
+soft-to-hard change):
+
+| Type | Removed when |
+|---|---|
+| normal | the service changes state, e.g. WARNING → CRITICAL, or recovers. A soft problem becoming hard in the same state keeps it. |
+| sticky | the service is OK again. WARNING ↔ CRITICAL keeps it. |
+
+- Removal clears both fields and deletes the non-persistent acknowledgement comments. Since this happens before
+  notifications are considered, the recovery notification goes out as usual.
+- `REMOVE_SVC_ACKNOWLEDGEMENT` (a separate command, not used by Polly) removes it on request.
+- Acknowledgements survive a restart through the retention file; a non-persistent acknowledgement comment is
+  kept for as long as the acknowledgement is.
+
+In `statusjson.cgi`: `problem_has_been_acknowledged` (boolean) and `acknowledgement_type` (`0` none, `1`
+normal, `2` sticky; text with `formatoptions=enumerate`). Polly only reads the first.
+
+### Scheduled downtime (SCHEDULE_SVC_DOWNTIME)
+
+`SCHEDULE_SVC_DOWNTIME;<host>;<service>;<start>;<end>;<fixed>;<trigger>;<duration>;<author>;<comment>`, handled by
+`cmd_schedule_downtime`, `schedule_downtime` and `register_downtime`. Start and end are Unix times: `cmd.cgi`
+has already converted the server-local strings.
+
+| Field | Values | Polly sends |
+|---|---|---|
+| fixed | `1` fixed window, `0` flexible | `1` |
+| trigger | ID of a downtime that starts this one, `0` none | `0` |
+| duration | seconds; for a fixed downtime the core replaces it with end − start | 7200 (ignored) |
+| comment | up to the next `;` | |
+
+The core refuses (silently) a downtime whose end isn't after its start, a flexible downtime without a duration
+and a trigger that doesn't exist. Otherwise:
+
+1. A downtime record is created with the author and the user's comment, and gets a downtime ID.
+2. A non-persistent comment is added to the service, with the user as author and Nagios' own text: "This service
+   has been scheduled for fixed downtime from \<start\> to \<end\>. Notifications for the service will not be
+   sent out during that time period." The user's comment is on the downtime, not in this comment.
+3. A **fixed** downtime gets a start event at the start time, which runs immediately when that time has passed.
+4. At the start (`handle_scheduled_downtime_start`):
+   - If the service wasn't in downtime yet, Nagios logs `SERVICE DOWNTIME ALERT: <host>;<service>;STARTED` and
+     sends a `DOWNTIMESTART` notification, when the service's notification options include `s` (downtime).
+   - `scheduled_downtime_depth` goes up by one. Depth counts overlapping downtimes, so a second downtime on the
+     same service makes it 2 without a second notification.
+   - An end event is scheduled at the end time.
+5. At the end (`handle_scheduled_downtime_end`): the depth goes down by one; when it reaches 0, Nagios logs
+   `…;STOPPED` and sends `DOWNTIMEEND`. The downtime and its comment are deleted, and downtimes it triggered end
+   too.
+
+While the depth is above 0, Nagios sends no normal problem or recovery notifications for the service. The same
+holds while the **host** is in downtime. Checks keep running and problems keep showing; a downtime doesn't
+acknowledge anything, and an acknowledgement and a downtime are independent of each other.
+
+Not used by Polly, for completeness:
+
+- A **flexible** downtime waits until the service is in a problem state between start and end (or starts at once
+  when it already is), then lasts `duration` seconds. If that never happens, it expires at the end time.
+- A **triggered** downtime starts and ends with the downtime whose ID is in `trigger`.
+- `DEL_SVC_DOWNTIME;<id>` cancels a downtime: the depth goes down, Nagios logs `…;CANCELLED` and sends
+  `DOWNTIMECANCELLED`, and downtimes it triggered are cancelled too.
+
+In `statusjson.cgi`: `scheduled_downtime_depth` per service. `query=downtimelist` (and `downtimecount`) lists the
+downtimes themselves with their ID, times, author and comment; Polly doesn't use those yet.
+
+> **For Polly:** a host downtime doesn't raise the depth of its services. Nagios still keeps those services
+> quiet, but `servicelist` gives no sign of it, so Polly's own notifications would report them. Polly would have
+> to look at the host's `scheduled_downtime_depth` too (`hostlist` with `details=true`) to match Nagios.
+
 ## Known differences between servers
 
 | | Nagios Core 4.5.14 defaults | monitor.webhare.net |
