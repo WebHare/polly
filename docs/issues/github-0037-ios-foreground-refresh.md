@@ -2,7 +2,7 @@
 
 > GitHub: [unilynx/polly#37](https://github.com/unilynx/polly/issues/37)
 > Date: 2026-11-15
-> Status: verified locally, awaiting push approval
+> Status: verified locally, awaiting release
 
 ## Summary
 
