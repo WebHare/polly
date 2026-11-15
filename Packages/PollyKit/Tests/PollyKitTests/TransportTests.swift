@@ -10,6 +10,8 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
         var redirectTo: URL?
         /// Seconds to wait before answering, to let a later request overtake this one.
         var delay: TimeInterval = 0
+        /// Leave the request pending so cancellation tests cannot race a completed response.
+        var waitsForCancellation = false
     }
 
     nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> Response)?
@@ -42,6 +44,7 @@ final class StubProtocol: URLProtocol, @unchecked Sendable {
 
     override func startLoading() {
         let stub = Self.handler!(request)
+        guard !stub.waitsForCancellation else { return }
         if let target = stub.redirectTo {
             let response = HTTPURLResponse(url: request.url!, statusCode: 302, httpVersion: nil,
                                            headerFields: ["Location": target.absoluteString])!
@@ -256,9 +259,12 @@ struct TransportTests {
 
     @MainActor @Test func stoppingAnInFlightPollKeepsTheScheduleCleared() async throws {
         let started = Box(false)
+        let holdResponse = Box(false)
         StubProtocol.handler = { request in
             started.value = true
-            return statusJSON(for: request)
+            var response = statusJSON(for: request)
+            response.waitsForCancellation = holdResponse.value
+            return response
         }
         defer { StubProtocol.handler = nil }
         let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
@@ -269,14 +275,16 @@ struct TransportTests {
         await model.refreshAll()
         let previous = model.states[server.id]
         started.value = false
+        holdResponse.value = true
         model.startPolling()
         let deadline = ContinuousClock.now + .seconds(2)
         while !started.value, ContinuousClock.now < deadline { await Task.yield() }
         try #require(started.value)
-        print("Stopping poll: request started, nextPollAt = \(String(describing: model.nextPollAt))")
+        // Allow a busy test runner to resume after the stub has had time to answer.
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(model.nextPollAt == nil)
         model.stopPolling()
         try await Task.sleep(for: .milliseconds(100))
-        print("After cancellation: nextPollAt = \(String(describing: model.nextPollAt))")
         #expect(model.nextPollAt == nil)
         #expect(model.states[server.id] == previous)
     }

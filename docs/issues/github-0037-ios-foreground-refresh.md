@@ -19,3 +19,7 @@ The app observes the aggregate scene phase, so multiple iPad windows share one l
 [TransportTests.swift](https://github.com/unilynx/polly/blob/codex/37-ios-foreground-refresh/Packages/PollyKit/Tests/PollyKitTests/TransportTests.swift) covers stopping during a request, immediate refresh after resuming, repeated activation without duplicate polls, and preservation of notification baselines. The cancellation tests failed before the guards were added; the package suite passed (103 tests reported; opt-in mock and network suites skipped). Both macOS and iOS Simulator builds passed.
 
 On the iPhone 17 Pro simulator (iOS 26), the Problems screen showed a new critical HTTP problem after returning from Settings in light mode, then the healthy overview after another return in dark mode. The wire log recorded the three status responses within 3.95 and 1.11 seconds of the foreground launch command, respectively, rather than waiting 60 seconds. No requests were logged during each background observation. The existing simulator configuration and log were restored and the local mock stopped. iPad, physical devices and the macOS UI were not inspected. No issue comment has been posted.
+
+## Cold review
+
+The independent review identified a race in the cancellation test: the stub could finish before the test stopped the poll. Delaying cancellation reproduced the false failure. The stub now keeps that request pending until cancellation, so the test no longer depends on winning the response race. No production-code findings were reported.
