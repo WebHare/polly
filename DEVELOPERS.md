@@ -161,4 +161,5 @@ or the network tests, so run those locally when you change the client.
 The mock is developed together with the client. When a real Nagios turns out to behave differently, first
 change the mock to match, watch the integration tests fail, and then fix the client. To find out what a real
 server sends, turn on `debugLog` (see "Debugging" in the README) and compare its requests and responses with
-the mock's.
+the mock's. [doc/nagios-protocol.md](doc/nagios-protocol.md) describes what Polly sends and expects; update it
+too.
