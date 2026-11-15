@@ -1,8 +1,31 @@
 # Polly
 
-A Nagios monitor for macOS (menu bar), iPhone and iPad in Swift/SwiftUI. `README.md` is the reference for the
-layout, the mock server and every design decision; read the relevant section before changing behaviour, and
-update it when a decision changes. This file only holds what an agent needs on top of that.
+A Nagios monitor for macOS (menu bar), iPhone and iPad in Swift/SwiftUI. This file only holds what an agent
+needs on top of the other documentation:
+
+- `doc/requirements.md`: every expected feature, business rule, caveat and product decision (see
+  [Requirements](#requirements)).
+- `README.md`: the layout and the implementation and architecture decisions (project structure, libraries, how
+  a backend is built).
+- `DEVELOPERS.md`: building, running and testing the app and the mock server.
+
+Read the relevant section before changing behaviour, and update it in the same change when a decision changes.
+
+## Requirements
+
+- All expected features, business rules, caveats and product decisions are recorded in
+  [doc/requirements.md](doc/requirements.md).
+  - Read it before changing behaviour, so a change doesn't silently break an earlier decision.
+  - Update it in the same change whenever a feature, rule, caveat or decision is added, changed or dropped.
+  - When the code and requirements.md disagree, treat it as a bug in one of the two and ask which is right
+    instead of guessing.
+- Write requirements.md mostly as indented bulleted lists of requirements / user stories:
+  - One requirement per bullet, describing what the user can do or what the app must (not) do.
+  - Nest bullets for details, rules, edge cases and caveats of their parent.
+  - Add a short *why* to a bullet when the reason isn't obvious, so the decision can be revisited
+    deliberately rather than by accident.
+  - Describe behaviour, not implementation: no type names, file names or code unless the user can see them
+    (such as `polly.yaml` keys).
 
 ## Rules
 

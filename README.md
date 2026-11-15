@@ -18,7 +18,7 @@ Packages/PollyKit/          Platform-independent logic + unit tests
   Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
                             NotificationPolicy, AddServerModel (add-server form logic)
 .mcp.json                   Enables XcodeBuildMCP for Claude Code in this project
-mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
+mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
 ```
 
 - Servers and settings are stored in one YAML file, `Application Support/Polly/polly.yaml`. On macOS
@@ -34,28 +34,9 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see below)
   orange PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
-## Requirements
+## Development
 
-- Xcode (16 or later), macOS 14+ / iOS 17+ deployment targets
-- [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
-- For VS Code: we think you need to install the
-  [SweetPad](https://marketplace.visualstudio.com/items?itemName=sweetpad.sweetpad) extension
-  to build, run and debug the app from VS Code.
-
-## Building
-
-```sh
-xcodegen generate                          # after adding/removing files or editing project.yml
-open Polly.xcodeproj                       # or use SweetPad in VS Code
-
-# command line (if xcode-select points to the Command Line Tools, prefix with
-# DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer)
-xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' build
-(cd Packages/PollyKit && swift test)
-```
-
-Builds are signed with the WebHare bv team (`DEVELOPMENT_TEAM: MF6WPNPK5H` in `project.yml`). Add an Apple ID
-that's a member of that team in Xcode → Settings → Accounts so Xcode can create the signing certificate and profiles.
+See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Nagios server and the tests.
 
 ## Continuous integration
 
@@ -80,42 +61,6 @@ without warnings:
 | `NOTARY_API_ISSUER_ID`       | the Issuer ID shown above the App Store Connect API keys list           |
 
 Only the team's Account Holder can create a Developer ID Application certificate.
-
-## Mock Nagios server
-
-`mock/nagios-mock.mjs` is a dependency-free Node.js server that imitates `statusjson.cgi` with made-up
-hosts and services that slowly rotate through OK/WARNING/CRITICAL/UNKNOWN and host DOWN/UNREACHABLE:
-
-```sh
-node mock/nagios-mock.mjs                # http://localhost:8080, login nagiosadmin / nagios
-node mock/nagios-mock.mjs --port 9000 --interval 5 --no-auth
-```
-
-Add it in Polly as `http://nagiosadmin:nagios@localhost:8080/`. Press `h` in the terminal for keyboard
-controls (force warning/critical/unknown, hosts down, all OK, pause rotation, simulate an outage, toggle auth).
-
-Besides `statusjson.cgi` it serves `extinfo.cgi` (the check page with its action and notes links) and
-`cmd.cgi` (the acknowledge and downtime forms, including the CSRF token and cookie), so commands really
-change the mock's state. `/mock/reset` and `/mock/set?host=..&service=..&status=critical` put it in a known
-state, `/mock/config?csrf=off&dateFormat=iso8601` switches to the variant without a CSRF token and with
-ISO dates, and anything under `/redirect/` answers with a redirect.
-
-The mock is developed together with the client. `MockIntegrationTests` runs the real `NagiosClient` against it:
-
-```sh
-node mock/nagios-mock.mjs --no-rotate &
-POLLY_MOCK_URL=http://localhost:8080 swift test --package-path Packages/PollyKit --filter MockIntegrationTests
-```
-
-When a real Nagios turns out to behave differently, change the mock to match first, watch these tests
-fail, and then fix the client.
-
-`URLMonitorNetworkTests` checks real websites, including badssl.com's broken certificates. It is skipped
-unless `POLLY_NETWORK_TESTS` is set:
-
-```sh
-POLLY_NETWORK_TESTS=1 swift test --package-path Packages/PollyKit --filter URLMonitorNetworkTests
-```
 
 ## Design decisions
 
