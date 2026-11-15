@@ -1,0 +1,253 @@
+# Polly requirements
+
+What Polly does and the rules it follows. See [CLAUDE.md](../CLAUDE.md) for how to maintain this file.
+
+## General
+
+- Polly monitors Nagios servers and websites from macOS (menu bar), iPhone and iPad.
+  - Requires macOS 14 / iOS 17 or later.
+  - Polly polls straight from the device; nothing goes through a Polly server.
+- A user can monitor two types of "server":
+  - **Nagios server**: status is read from the server's Nagios installation (Nagios 4.4 or newer).
+  - **URL**: Polly checks a website itself, with no monitoring system behind it.
+  - Everywhere a server is shown, its type ("Nagios" or "URL") is shown next to its name.
+- Polly never changes anything on a monitored server, except when the user explicitly confirms an
+  acknowledgement or downtime.
+- The screens follow the Polly design, in light and dark.
+  - Polly's mascot reflects the overall mood: ok, warning, critical or unreachable.
+  - Parts of the design that are drawn but don't work yet carry a PLACEHOLDER or PROTOTYPE tag and do nothing
+    (see [Not built yet](#not-built-yet)). A control must never silently do nothing.
+
+## Servers
+
+- The user can add a server of either type.
+  - macOS: the "Add a monitoring server" card in the Servers pane of the Settings window, with a Type control.
+  - iOS: **Add** (a menu: Nagios Server… / URL…) on the Servers tab, or **Add server…** in the empty states; the
+    form opens as a sheet titled "Add Nagios Server" or "Add URL".
+  - The URL placeholder and the explanation adapt to the type:
+    - Nagios: the `statusjson.cgi` URL that will be read.
+    - URL: that the host resolves, that the URL answers and (https only) that the certificate is valid for at
+      least two more weeks.
+  - **Name** is optional; it defaults to the URL's host name.
+  - Username and password are never required. For a URL they are only needed for a page behind HTTP Basic
+    authentication.
+  - On macOS the form says where the password will be stored (keychain or `polly.yaml`).
+- The URL field is paste-friendly:
+  - Pasting `https://user:pass@host/...` moves the (percent-decoded) username and password into their own
+    fields and removes them from the URL.
+  - A URL without a scheme gets `https://`.
+  - The fragment is always removed.
+  - Nagios: query and anything from `/nagios` onwards are removed, so a pasted link to the Nagios web UI just
+    works. The user enters the base URL; Polly appends `/nagios/cgi-bin/statusjson.cgi`.
+  - URL: the path and query are kept as entered.
+- Adding a server tests the connection first.
+  - **Test connection** can also be run on its own before adding; changing the URL or type resets the result.
+  - A failed test shows the error with **Add anyway** (and **Retry** on iOS).
+    - Why: the server may be temporarily down or only reachable from another network.
+  - For a URL, the test only fails on a critical problem; a certificate that expires soon doesn't block adding
+    it.
+- New servers are added at the end of the list. The list order is the order in `polly.yaml`; reordering is done
+  by editing the file.
+- The user can delete a server (context menu; swipe to delete on iOS).
+- The user can refresh one server (context menu) or all servers (menu bar panel, pull to refresh on iOS).
+- Each server has an on/off switch to pause monitoring without deleting it.
+  - A paused server shows "Monitoring paused", is not polled and doesn't count towards the overall status.
+- Each server has a bell to turn notifications on or off (see [Notifications](#notifications)).
+- Each server shows a one-line state:
+  - "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
+  - "Unreachable · <error>" when it can't be read; its URL while it is loading for the first time.
+
+## Overview
+
+The overview is the macOS menu bar panel and the iOS Problems tab. Both show the same summary of all enabled
+servers.
+
+- Problems (warning, critical and unknown services) of all servers are grouped by severity: critical, then
+  warning, then unknown; newest first within a group.
+  - Each problem shows host, service, its age and markers for acknowledged (ACK) and scheduled downtime.
+  - The age is "<1m", "3m", "2h", "3d" (largest unit only), refreshed every minute.
+    - On macOS, hovering shows the exact duration and the local start time.
+    - The age is the time since the service's last state change, so a warning escalating to critical restarts
+      it.
+    - URL problems show no age, as Polly keeps no history for them.
+- Polly's headline says what is going on, worst first:
+  - "Polly is squawking: N hosts down" / "Polly is squawking: N critical".
+  - "Polly is fidgeting: N warnings".
+  - "Polly is confused: N unknown".
+  - "Polly can't reach <server>".
+  - "Polly is checking your servers" before the first answer, or "Polly is not watching: all servers are
+    paused".
+  - "Polly is quiet. Go back to sleep." when everything answered and is fine.
+  - "Polly has nothing to watch yet" without servers.
+- Which screen is shown:
+  - **Problems** when there is a problem or a host is down.
+    - A host can be down while none of its services is listed as a problem; that still counts.
+  - **Unreachable** when a server can't be read: its error, "Polly keeps trying every 60 s", **Retry now** and
+    **Edit server…**.
+  - **Waiting** while nothing has answered yet: "Waiting for the first answer", or how to resume when all
+    servers are paused.
+    - Why: nothing checked is not the same as nothing wrong; it must never look like "all is well".
+  - **All quiet** with the number of hosts and services that are fine and when Polly checks again.
+  - **Empty** without servers, with **Add server…**.
+- A server that can't be reached counts as unreachable in the mood, even when other servers are fine.
+
+## macOS menu bar
+
+- Polly is a menu bar app with no Dock icon by default.
+  - A Dock icon can be turned on in Settings; clicking it opens the Settings window.
+- The menu bar icon is Polly's head plus a count when there is something to read.
+  - Critical: a red pill with Polly on its back and the number of criticals (or hosts down, whichever is
+    larger).
+  - Warning: a warning triangle and the number of warnings.
+  - Unreachable: a faded Polly with the number of unknowns, or "?".
+  - Otherwise just Polly. The non-critical icons adapt to a light or dark menu bar.
+- The panel shows the overview, the list of servers with their state, and **Refresh**, **Settings…** and
+  **Quit**.
+  - The footer says when the last check was ("Checked 14 s ago"), or "Retrying in 46 s" when unreachable.
+  - It sizes to its content up to about a quarter of the screen height, then scrolls.
+  - The user can resize it by dragging; that size is remembered, and **Fit** returns to automatic sizing.
+- Clicking a problem slides the panel to its detail (see [Problem detail](#problem-detail)).
+  - "‹ Problems" (or Escape) goes back; "2 of 6" with up/down buttons (or the arrow keys) steps through the
+    problems without going back.
+  - Why in the panel, not a window: the menu bar panel closes as soon as it loses focus.
+- The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
+  - **Servers**: the server list (switch, bell, refresh, delete), the add-server card and the advanced
+    settings (see [Settings and storage](#settings-and-storage)).
+  - **About Polly**: version and build number.
+
+## iPhone and iPad
+
+- The app has three tabs: Problems, Servers and Settings.
+- **Problems** shows the overview.
+  - Filter chips per severity ("All N", "Critical 2", ...) limit the list to one severity.
+  - An unreachable server is listed separately below the problems.
+  - A button in the toolbar shows the number of servers and switches to the Servers tab.
+  - Tapping a problem opens its detail; pull to refresh refreshes that problem's server.
+    - When the server no longer reports the problem, the detail says "Problem resolved".
+- **Servers** lists the servers with their state, switch and bell; add, refresh and delete them there.
+- **Settings** has the password storage and debug log settings.
+- Polly only polls while the app is in the foreground.
+
+## Problem detail
+
+- Shows the severity, its retry state ("SOFT 2/3" / "HARD 3/3"), ACK and DOWNTIME tags, service, host and the
+  server with its type.
+- Shows the check output and long output (selectable).
+- Shows the duration with its start time, how long ago the last check was, and when the next check is.
+  - A value the server didn't send is shown as "Unknown".
+- Shows the actions the server type supports (Nagios: all of them; URL: none).
+  - **Acknowledge…** (disabled when already acknowledged) and **Schedule downtime…**.
+  - **Open in Nagios**: the check's page in the Nagios web UI.
+  - **Related link**: the action or notes link configured for the check.
+  - If the password can't be read, the detail says why instead of showing no actions.
+- The password is only read when a problem is opened.
+
+## Acknowledge and downtime (Nagios)
+
+- Commands are a two-step flow: the form is fetched from the server, then submitted only after the user
+  confirms.
+  - The form opens in the macOS panel, or as a sheet on iOS.
+  - The form asks for author (prefilled by the server, or the username), a required comment, and for a downtime
+    a start and end time plus whether the server should notify its contacts.
+  - Downtime start and end are in the server's own notation and time zone, prefilled by the server.
+    - Why: Polly can't know the server's time zone, so it can't offer presets yet.
+  - If the server doesn't return the expected form, the user is told to check their command permissions in the
+    browser.
+- A command is sent at most once per form and never retried automatically.
+  - Why: a lost response doesn't prove the command wasn't accepted; a retry could acknowledge or schedule twice.
+  - When not confirmed, the user is told to check the server in the browser before trying again.
+- Success means Nagios' own confirmation text, not just HTTP 200.
+  - "Accepted" means Nagios queued the command; the status changes once it has been processed. The server is
+    refreshed right after.
+- Caveat: actually submitting acknowledgements and downtimes has only been tested against the mock server.
+
+## Nagios monitoring
+
+- Every enabled server is polled every 60 seconds, all servers in parallel.
+  - A result that arrives after the server was paused or deleted is discarded.
+  - When a poll and a manual refresh overlap, the answer of the refresh started last wins, whichever arrives
+    first.
+  - A server that refuses the connection must not crash the app.
+- Credentials are sent with every request (HTTP Basic).
+  - Authentication failures are reported as "check the username and password".
+- Redirects are refused, and the user is asked to enter the final URL.
+  - Why: following a redirect would send the credentials to wherever it points.
+- An answer without data is an error, never "no problems".
+  - The same goes for an installation without any hosts or services: that's what Nagios shows an account that
+    isn't allowed to see anything.
+- **Related link** only opens `http(s)` links without embedded credentials.
+- Plain `http://` servers are supported, as internal Nagios servers often have no TLS.
+- Caveat: self-signed certificates are not supported yet.
+
+## URL monitoring
+
+- A URL is shown as one host with these services:
+  - **DNS**: the host name resolves.
+  - **HTTP**: a GET of the URL answers with a status below 400.
+    - Redirects are not followed; a redirect is an answer, so the site is up.
+    - Times out after 15 seconds; the output includes the response time.
+  - **Certificate** (https only): the certificate is trusted by the system for the host name, and the
+    certificate and its intermediates stay valid for at least 14 more days (otherwise a warning).
+- The host counts as down when DNS or HTTP fails.
+- A failed DNS lookup skips the other checks (counted as pending), so one outage isn't reported three times.
+- URLs are checked from the device on every poll, using a new connection each time so the certificate is always
+  seen. There is no history.
+- An untrusted certificate doesn't hide whether the server answers: the HTTP check continues anyway.
+  - Except when a username or password is configured: credentials are never sent to a server with an untrusted
+    certificate, and HTTP reports that as the reason it didn't connect.
+
+## Notifications
+
+- Notifications are per server and off by default.
+  - Turning them on asks the system for permission; if it's refused, the user is told to allow notifications in
+    the system settings.
+  - Notifications enabled by hand in `polly.yaml` also ask for permission before the first notification.
+- They are local notifications decided by Polly; the Nagios notification configuration is not touched.
+- The first successful poll is the baseline and never notifies.
+- After that, new problems, severity changes and recoveries are bundled into one notification per server.
+  - At most five lines; beyond that the last line says "and N more".
+  - A newer notification for a server replaces the older one.
+  - Notifications are also shown while Polly is in the foreground.
+- Acknowledged problems and problems in scheduled downtime don't notify, including when they recover during the
+  downtime.
+- A failed poll keeps the last known problems, so an outage of the monitoring server itself doesn't report every
+  problem as new once it is back.
+- Caveat: notifications only happen while Polly is polling. On iOS that is only while it is in the foreground;
+  there is no push.
+
+## Settings and storage
+
+- Servers and settings are stored in one human-readable YAML file, `polly.yaml`, in Polly's Application Support
+  folder.
+  - The file may be edited by hand while Polly isn't running; it is read at startup and rewritten after every
+    change.
+  - Every key is optional, but an invalid value (such as an unknown server `type`) is an error.
+  - A server without `type` is a Nagios server.
+  - If the file can't be read, Polly runs with in-memory settings and doesn't overwrite the file.
+  - The file is only readable by the user, as it may contain passwords.
+- Passwords are stored in the keychain by default.
+  - A setting stores them unencrypted in `polly.yaml` instead, after which the keychain is never touched.
+    - Why: debug builds triggered keychain prompts on every rebuild.
+  - Switching moves all existing passwords; if reading them fails, nothing is moved.
+- Settings (macOS: Advanced in the Servers pane; iOS: the Settings tab):
+  - **Store passwords in Keychain**.
+  - **Show Dock icon** (macOS only).
+  - **Log server traffic**: writes every request and response to `polly-debug.log` next to `polly.yaml`, with
+    **Show Log in Finder** on macOS.
+    - Credentials never reach the log.
+    - At 5 MB the log is moved to `polly-debug.log.1` and started anew.
+- The menu bar panel size is window state, not a setting, and is not stored in `polly.yaml`.
+
+## Not built yet
+
+Drawn from the design and tagged as such, but without function:
+
+- **Recheck now** in the problem detail.
+- **Notified** in the problem detail (Polly keeps no record of what it notified about).
+- Downtime presets (30 min, 1 hour, 2 hours, until 09:00 tomorrow); only Custom works.
+- "Also acknowledge the current problem" and "Applies to: host and its services" in the downtime form.
+- Other monitoring systems in the Type control (Icinga 2, Checkmk, Zabbix).
+- Poll interval and "Verify TLS certificate" in the add-server card; the interval is fixed at 60 seconds.
+- The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
+  services on down hosts), notification rules and quiet hours.
+- The Team and Account panes.
