@@ -71,7 +71,28 @@ import Testing
         var paused = nagios
         paused.enabled = false
         let summary = MonitorSummary(servers: [paused], states: [paused.id: .failed("x")])
-        #expect(summary.screen == .ok)
+        #expect(summary.unreachable == nil)
+        #expect(summary.screen == .waiting)
+        #expect(summary.headline == "Polly is not watching: all servers are paused")
+    }
+
+    /// A host can be down while none of its services is reported as a problem (yet).
+    @Test func hostDownWithoutServiceProblemsIsNotQuiet() {
+        let summary = MonitorSummary(servers: [nagios], states: [nagios.id: status(down: 1, [])])
+        #expect(summary.screen == .problems)
+        #expect(summary.mood == .critical)
+        #expect(summary.badge == "1")
+    }
+
+    /// Before the first answer nothing is known, which must not look like "all is well".
+    @Test func nothingCheckedYetIsNotOk() {
+        for states in [[:], [nagios.id: MonitorModel.ServerState.loading]] {
+            let summary = MonitorSummary(servers: [nagios], states: states)
+            #expect(summary.screen == .waiting)
+            #expect(summary.mood == .unreachable)
+            #expect(summary.badge == "?")
+            #expect(summary.headline == "Polly is checking your servers")
+        }
     }
 
     @Test func serverLines() {

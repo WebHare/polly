@@ -109,7 +109,9 @@ private struct PopoverContent: View {
             PollyMascot(mood: summary.mood, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(summary.headline).font(.system(size: 14, weight: .bold))
-                Text(summary.countsLine).font(.system(size: 12)).foregroundStyle(theme.muted)
+                if !summary.countsLine.isEmpty {
+                    Text(summary.countsLine).font(.system(size: 12)).foregroundStyle(theme.muted)
+                }
             }
         }
         .padding(EdgeInsets(top: 12, leading: 14, bottom: 10, trailing: 14))
@@ -171,10 +173,15 @@ private struct PopoverContent: View {
             Text("Add a Nagios server or a URL and Polly starts polling right away.")
         case .unreachable:
             Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
+        case .waiting:
+            Text(summary.isPaused ? "Turn a server back on in Settings and Polly starts checking again."
+                                  : "Waiting for the first answer.")
         case .ok, .problems:
             TimelineView(.periodic(from: .now, by: 1)) { context in
-                let wait = max(0, Int(monitor.nextPollAt?.timeIntervalSince(context.date) ?? 0))
-                Text("\(summary.hosts) hosts and \(summary.services) services are fine. Polly checks again in \(wait) seconds.")
+                // The next poll is only planned once the running one has finished.
+                let wait = Int(monitor.nextPollAt?.timeIntervalSince(context.date) ?? 0)
+                Text("\(summary.hosts) hosts and \(summary.services) services are fine. "
+                     + (wait > 0 ? "Polly checks again in \(wait) seconds." : "Polly is checking now."))
             }
         }
     }
@@ -240,6 +247,8 @@ private struct PopoverContent: View {
         switch summary.screen {
         case .empty:
             return "No servers"
+        case .waiting:
+            return summary.isPaused ? "Paused" : "Checking…"
         case .unreachable:
             guard let next = monitor.nextPollAt else { return "" }
             return "Retrying \(DurationFormatting.until(next.timeIntervalSince(now)))"

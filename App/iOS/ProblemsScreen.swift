@@ -22,7 +22,7 @@ struct ProblemsScreen: View {
             } else {
                 switch summary.screen {
                 case .problems: problems(summary)
-                case .ok, .empty, .unreachable: emptyState(summary)
+                case .ok, .empty, .unreachable, .waiting: emptyState(summary)
                 }
             }
         }
@@ -178,6 +178,10 @@ struct ProblemsScreen: View {
                 .font(.system(size: 17, weight: .semibold))
                 .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 22, vertical: 14, radius: 14))
                 .padding(.top, 10)
+            case .waiting:
+                Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
+                Text(summary.isPaused ? "Turn a server back on and Polly starts checking again." : "Waiting for the first answer.")
+                    .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
             case .unreachable:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
                 Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")

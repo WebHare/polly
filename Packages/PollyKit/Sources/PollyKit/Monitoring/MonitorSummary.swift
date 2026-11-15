@@ -15,7 +15,8 @@ public struct ProblemEntry: Identifiable, Hashable, Sendable {
 /// Everything the overview shows, derived from the servers and their latest state: which screen, the
 /// problems grouped by severity, Polly's mood and the sentence that goes with it.
 public struct MonitorSummary: Sendable {
-    public enum Screen: Sendable { case empty, problems, unreachable, ok }
+    /// `waiting`: servers are configured, but none has answered yet or all of them are paused.
+    public enum Screen: Sendable { case empty, problems, unreachable, waiting, ok }
     public enum Mood: Sendable { case ok, warning, critical, unreachable }
 
     public struct Group: Identifiable, Sendable {
@@ -35,14 +36,19 @@ public struct MonitorSummary: Sendable {
     /// The first server that could not be reached, with its error.
     public private(set) var unreachable: (server: NagiosServer, message: String)?
     private let hasServers: Bool
+    /// Servers that are switched on, and how many of those have a result.
+    private var watching = 0
+    private var checked = 0
 
     @MainActor
     public init(servers: [NagiosServer], states: [UUID: MonitorModel.ServerState]) {
         hasServers = !servers.isEmpty
         var entries: [ProblemEntry] = []
         for server in servers where server.enabled {
+            watching += 1
             switch states[server.id] {
             case .ok(let status):
+                checked += 1
                 hosts += status.hosts.total
                 hostsDown += status.hosts.down + status.hosts.unreachable
                 services += status.services.total
@@ -62,6 +68,9 @@ public struct MonitorSummary: Sendable {
         }
     }
 
+    /// Every configured server is switched off.
+    public var isPaused: Bool { hasServers && watching == 0 }
+
     /// All problems in display order.
     public var entries: [ProblemEntry] { groups.flatMap(\.entries) }
 
@@ -71,14 +80,18 @@ public struct MonitorSummary: Sendable {
 
     public var screen: Screen {
         if !hasServers { return .empty }
-        if !groups.isEmpty { return .problems }
-        return unreachable == nil ? .ok : .unreachable
+        // A host can be down while none of its services is listed as a problem.
+        if !groups.isEmpty || hostsDown > 0 { return .problems }
+        if unreachable != nil { return .unreachable }
+        // Nothing checked is not the same as nothing wrong.
+        return checked == 0 ? .waiting : .ok
     }
 
     public var mood: Mood {
         if hostsDown > 0 || count(.critical) > 0 { return .critical }
         if count(.warning) > 0 { return .warning }
-        return count(.unknown) > 0 || unreachable != nil ? .unreachable : .ok
+        if !hasServers { return .ok }
+        return count(.unknown) > 0 || unreachable != nil || checked == 0 ? .unreachable : .ok
     }
 
     public var headline: String {
@@ -88,6 +101,7 @@ public struct MonitorSummary: Sendable {
         if count(.warning) > 0 { return "Polly is fidgeting: \(count(.warning)) \(count(.warning) == 1 ? "warning" : "warnings")" }
         if count(.unknown) > 0 { return "Polly is confused: \(count(.unknown)) unknown" }
         if let unreachable { return "Polly can't reach \(unreachable.server.name)" }
+        if checked == 0 { return isPaused ? "Polly is not watching: all servers are paused" : "Polly is checking your servers" }
         return "Polly is quiet. Go back to sleep."
     }
 
