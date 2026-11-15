@@ -254,6 +254,76 @@ struct TransportTests {
         #expect(status.problems.isEmpty)
     }
 
+    @MainActor @Test func stoppingAnInFlightPollKeepsTheScheduleCleared() async throws {
+        let started = Box(false)
+        StubProtocol.handler = { request in
+            started.value = true
+            return statusJSON(for: request)
+        }
+        defer { StubProtocol.handler = nil }
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "s3cret")
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        defer { model.stopPolling() }
+
+        await model.refreshAll()
+        let previous = model.states[server.id]
+        started.value = false
+        model.startPolling()
+        let deadline = ContinuousClock.now + .seconds(2)
+        while !started.value, ContinuousClock.now < deadline { await Task.yield() }
+        try #require(started.value)
+        print("Stopping poll: request started, nextPollAt = \(String(describing: model.nextPollAt))")
+        model.stopPolling()
+        try await Task.sleep(for: .milliseconds(100))
+        print("After cancellation: nextPollAt = \(String(describing: model.nextPollAt))")
+        #expect(model.nextPollAt == nil)
+        #expect(model.states[server.id] == previous)
+    }
+
+    @MainActor @Test func foregroundPollingRefreshesImmediatelyAndPreservesTheBaseline() async throws {
+        let critical = Box(true)
+        let requests = Box(0)
+        StubProtocol.handler = { request in
+            requests.value += 1
+            return statusJSON(for: request, problems: critical.value ? #"{"web1":{"HTTP":{"status":16}}}"# : "{}")
+        }
+        defer { StubProtocol.handler = nil }
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "s3cret")
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        defer { model.stopPolling() }
+        var received: [ProblemChanges] = []
+        model.onProblemChanges = { _, changes in received.append(changes) }
+
+        model.setPollingActive(true)
+        let firstDeadline = ContinuousClock.now + .seconds(2)
+        while model.nextPollAt == nil, ContinuousClock.now < firstDeadline { await Task.yield() }
+        try #require(model.nextPollAt != nil)
+        #expect(model.problemCount == 1)
+        #expect(received.isEmpty)
+        let initialRequests = requests.value
+
+        model.setPollingActive(true)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(requests.value == initialRequests)
+        model.setPollingActive(false)
+        #expect(model.nextPollAt == nil)
+        critical.value = false
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(requests.value == initialRequests)
+        #expect(model.problemCount == 1)
+
+        // Resume well before the normal 60-second interval, with a changed server response.
+        model.setPollingActive(true)
+        let resumeDeadline = ContinuousClock.now + .seconds(2)
+        while model.nextPollAt == nil, ContinuousClock.now < resumeDeadline { await Task.yield() }
+        try #require(model.nextPollAt != nil)
+        #expect(requests.value == initialRequests * 2)
+        #expect(model.problemCount == 0)
+        #expect(received.map { $0.recovered.map(\.id) } == [["web1/HTTP"]])
+    }
+
     @MainActor @Test func modelNotifiesAfterTheBaselineAndOnlyWhenEnabled() async throws {
         let critical = Box(true)
         StubProtocol.handler = { request in

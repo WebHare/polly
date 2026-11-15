@@ -124,12 +124,22 @@ public final class MonitorModel {
 
     // MARK: - Polling
 
+    public func setPollingActive(_ active: Bool) {
+        if active {
+            startPolling()
+        } else {
+            stopPolling()
+        }
+    }
+
     public func startPolling() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
             while !Task.isCancelled {
                 guard let self else { return }
                 await self.refreshAll()
+                // Stopping during a request must not restore the canceled loop's schedule.
+                guard !Task.isCancelled else { return }
                 self.nextPollAt = Date.now + TimeInterval(self.pollInterval.components.seconds)
                 try? await Task.sleep(for: self.pollInterval)
             }
@@ -163,7 +173,7 @@ public final class MonitorModel {
         }
         // The server may have been disabled or deleted while the request was in flight, or a refresh
         // that started later has taken over: its answer is the newer one, whichever arrives first.
-        guard let current = enabledServer(server.id), lastRefresh[server.id] == number else { return }
+        guard !Task.isCancelled, let current = enabledServer(server.id), lastRefresh[server.id] == number else { return }
         states[server.id] = result
         guard case .ok(let status) = result else { return }
         let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems)
