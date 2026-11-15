@@ -4,6 +4,10 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ## [Unreleased]
 
+### Fixed
+
+- Disable downtime presets when an edited start time does not match every possible server date format.
+
 ## [0.2.0] - 2026-11-15
 
 ### Added

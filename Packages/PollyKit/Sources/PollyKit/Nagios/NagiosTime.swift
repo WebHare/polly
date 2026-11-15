@@ -44,12 +44,15 @@ enum NagiosDateNotation: CaseIterable, Sendable {
     }
 
     /// The end of `preset` counted from `start`, in each candidate notation. Returns a value only when every candidate
-    /// that can read `start` gives the same text: on 03-04-2026 "us" and "euro" agree on the date of "+30 min" but
+    /// can read `start` and gives the same text: on 03-04-2026 "us" and "euro" agree on the date of "+30 min" but
     /// not on that of "tomorrow".
     static func end(for preset: DowntimePreset, from start: String, candidates: [NagiosDateNotation]) -> String? {
-        let results = Set(candidates.compactMap { notation in
+        let ends = candidates.compactMap { notation in
             notation.parse(start).map { notation.format(preset.end(after: $0)) }
-        })
+        }
+        // Editing the start cannot rule out a notation inferred from the server's form.
+        guard ends.count == candidates.count else { return nil }
+        let results = Set(ends)
         return results.count == 1 ? results.first : nil
     }
 }
