@@ -19,6 +19,7 @@ jobs:
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
       # (see README.md, "Continuous integration"). Without them the app is ad-hoc signed.
+      # The secrets and variables are maintained by WebHare's portal (webhare_portal, data/github-projects.yaml).
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H
     steps:
@@ -83,8 +84,8 @@ jobs:
         if: env.HAS_SIGNING == 'true'
         env:
           NOTARY_API_KEY: ${{ secrets.NOTARY_API_KEY }}
-          NOTARY_API_KEY_ID: ${{ secrets.NOTARY_API_KEY_ID }}
-          NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
+          NOTARY_API_KEY_ID: ${{ vars.NOTARY_API_KEY_ID }}
+          NOTARY_API_ISSUER_ID: ${{ vars.NOTARY_API_ISSUER_ID }}
         run: |
           echo "$NOTARY_API_KEY" | base64 --decode > "$RUNNER_TEMP/notary.p8"
           xcrun notarytool submit "$DMG" --wait \
