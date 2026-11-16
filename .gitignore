@@ -10,3 +10,15 @@ Packages/PollyKit/.build/
 nagioscore/
 
 __pycache__/
+
+# Ruby and fastlane (see "TestFlight" in DEVELOPERS.md)
+/vendor/
+.bundle/
+fastlane/README.md
+fastlane/report.xml
+fastlane/test_output/
+fastlane/*.ipa
+fastlane/*.pkg
+fastlane/*.dSYM.zip
+/build/
+*.p8
