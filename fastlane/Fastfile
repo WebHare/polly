@@ -33,13 +33,32 @@ def build_number(options, platform)
                                  initial_build_number: 0) + 1
 end
 
-def beta(options, platform:, sdk:, destination:)
-  # Automatic signing; with an API key Xcode creates the distribution certificate and profiles itself.
-  xcargs = ["-allowProvisioningUpdates"]
-  if asc_api_key
-    xcargs += ["-authenticationKeyPath", ENV.fetch("ASC_KEY_PATH"), "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
-               "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID")]
+# Manual signing with a fixed certificate and profile when POLLY_PROFILE_NAME names an installed App Store
+# profile (CI). Otherwise automatic signing, which on a clean CI machine would create a new development
+# certificate on every run.
+def signing(platform)
+  profile = ENV["POLLY_PROFILE_NAME"].to_s
+  if profile.empty?
+    # With an API key Xcode creates the distribution certificate and profiles itself.
+    xcargs = ["-allowProvisioningUpdates"]
+    if asc_api_key
+      xcargs += ["-authenticationKeyPath", ENV.fetch("ASC_KEY_PATH"), "-authenticationKeyID", ENV.fetch("ASC_KEY_ID"),
+                 "-authenticationKeyIssuerID", ENV.fetch("ASC_ISSUER_ID")]
+    end
+    return [xcargs, { signingStyle: "automatic", teamID: TEAM_ID }]
   end
+
+  xcargs = ["CODE_SIGN_STYLE=Manual", "DEVELOPMENT_TEAM=#{TEAM_ID}", "CODE_SIGN_IDENTITY=Apple Distribution",
+            "PROVISIONING_PROFILE_SPECIFIER=#{profile}"]
+  export = { signingStyle: "manual", teamID: TEAM_ID, signingCertificate: "Apple Distribution",
+             provisioningProfiles: { BUNDLE_ID => profile } }
+  # The macOS .pkg is signed with the Mac Installer Distribution certificate, which keeps its old name.
+  export[:installerSigningCertificate] = "3rd Party Mac Developer Installer" if platform == "osx"
+  [xcargs, export]
+end
+
+def beta(options, platform:, sdk:, destination:)
+  xcargs, export_options = signing(platform)
   number = build_number(options, platform)
   xcargs << "CURRENT_PROJECT_VERSION=#{number}" if number
 
@@ -52,7 +71,7 @@ def beta(options, platform:, sdk:, destination:)
     destination: destination,
     export_method: "app-store",
     export_team_id: TEAM_ID,
-    export_options: { signingStyle: "automatic", teamID: TEAM_ID },
+    export_options: export_options,
     output_directory: File.join(ROOT, "build/testflight"),
     output_name: "Polly-#{platform}",
     xcargs: xcargs.map { |arg| arg.shellescape }.join(" "),

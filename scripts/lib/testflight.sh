@@ -25,11 +25,11 @@ Needs ASC_KEY_ID, ASC_ISSUER_ID and ASC_KEY_PATH (App Store Connect API key) exc
 USAGE
 }
 
-GROUPS=${POLLY_TESTFLIGHT_GROUPS:-}
+TESTER_GROUPS=${POLLY_TESTFLIGHT_GROUPS:-}
 EXTERNAL=false NO_WAIT=false DRY_RUN=false ALLOW_DIRTY=false NOTES_FILE="" BUILD_NUMBER=""
 while [ $# -gt 0 ]; do
   case $1 in
-    --groups) GROUPS=$2; shift 2 ;;
+    --groups) TESTER_GROUPS=$2; shift 2 ;;
     --external) EXTERNAL=true; shift ;;
     --notes-file) NOTES_FILE=$2; shift 2 ;;
     --build-number) BUILD_NUMBER=$2; shift 2 ;;
@@ -45,12 +45,22 @@ cd "$ROOT"
 if [ "$ALLOW_DIRTY" != true ] && [ -n "$(git status --porcelain)" ]; then
   echo "Uncommitted changes; commit them or pass --allow-dirty." >&2; exit 1
 fi
-if [ "$EXTERNAL" = true ] && [ -z "$GROUPS" ]; then
+if [ "$EXTERNAL" = true ] && [ -z "$TESTER_GROUPS" ]; then
   echo "--external needs --groups (or POLLY_TESTFLIGHT_GROUPS)." >&2; exit 2
 fi
 
-# fastlane needs a current Ruby; macOS ships 2.6.
-if [ -x /opt/homebrew/opt/ruby/bin/ruby ]; then PATH=/opt/homebrew/opt/ruby/bin:$PATH; fi
+# fastlane needs a current Ruby; macOS ships 2.6. Keep a current one from PATH (CI's setup-ruby), else Homebrew's.
+RUBY_BIN=$(dirname "$(command -v ruby)")
+if ! ruby -e 'exit(Gem::Version.new(RUBY_VERSION) >= Gem::Version.new("3.2"))' 2>/dev/null \
+   && [ -x /opt/homebrew/opt/ruby/bin/ruby ]; then
+  RUBY_BIN=/opt/homebrew/opt/ruby/bin
+fi
+# Xcode's export runs /usr/bin/rsync, which starts the first rsync in PATH as its peer; Homebrew's rsync
+# doesn't understand its options and the export fails with "Copy failed". Ruby's folder may be Homebrew's
+# bin with that rsync in it, so only Ruby's own commands go before /usr/bin.
+TOOLS=$(mktemp -d); trap 'rm -rf "$TOOLS"' EXIT
+for tool in ruby gem bundle bundler; do ln -s "$RUBY_BIN/$tool" "$TOOLS/$tool"; done
+PATH=$TOOLS:/usr/bin:$PATH
 export BUNDLE_PATH=vendor/bundle FASTLANE_OPT_OUT_USAGE=1 FASTLANE_SKIP_UPDATE_CHECK=1 FASTLANE_HIDE_CHANGELOG=1
 bundle check >/dev/null 2>&1 || bundle install --quiet
 
@@ -62,6 +72,6 @@ if [ -z "$NOTES_FILE" ]; then
 fi
 echo "What to Test:"; sed 's/^/  /' "$NOTES_FILE"
 
-exec bundle exec fastlane "$PLATFORM" beta \
-  "groups:$GROUPS" "external:$EXTERNAL" "notes_file:$(cd "$(dirname "$NOTES_FILE")" && pwd)/$(basename "$NOTES_FILE")" \
+bundle exec fastlane "$PLATFORM" beta \
+  "groups:$TESTER_GROUPS" "external:$EXTERNAL" "notes_file:$(cd "$(dirname "$NOTES_FILE")" && pwd)/$(basename "$NOTES_FILE")" \
   "build_number:$BUILD_NUMBER" "no_wait:$NO_WAIT" "dry_run:$DRY_RUN"
