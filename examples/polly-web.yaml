@@ -1,7 +1,7 @@
 # Copy this to a private file outside the repository and set POLLY_CONFIG to its absolute path.
 # The service reads this once and never writes it. Restart after editing.
 passwordStorage: file
-servers:
+sources:
   - name: My Nagios
     type: nagios
     url: https://nagios.example.com

@@ -161,14 +161,14 @@ public extension MonitorBackend {
     var capabilities: BackendCapabilities { [] }
 
     func checkURL(for problem: ServiceProblem) throws -> URL {
-        throw BackendError("Opening checks is not supported for this server type.")
+        throw BackendError("Opening checks is not supported for this source type.")
     }
 
     func relatedURL(for problem: ServiceProblem) async throws -> URL {
-        throw BackendError("Check links are not supported for this server type.")
+        throw BackendError("Check links are not supported for this source type.")
     }
 
     func prepareCommand(_ kind: CommandKind, for problem: ServiceProblem) async throws -> any PreparedCommand {
-        throw BackendError("Commands are not supported for this server type.")
+        throw BackendError("Commands are not supported for this source type.")
     }
 }

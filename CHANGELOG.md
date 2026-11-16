@@ -15,23 +15,28 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
   source status and reduced-motion support. TV pages rotate automatically, with manual controls and pauses
   for interaction. The dashboard recovers from connection failures and marks old or incomplete data clearly.
 - Linux support for the shared Nagios monitoring core. URL monitoring and Keychain remain Apple-only.
-- Edit a server: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
-- Duplicate a server to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
-- **Edit server…** on the "Polly can't reach" screen opens the form for that server.
+- Edit a source: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
+- Duplicate a source to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
+- **Edit source…** on the "Polly can't reach" screen opens the form for that source.
 
 ### Changed
 
+- Explain the ideas for shared on-call duties, escalation and billing in the macOS Team placeholder.
+- The Nagios servers and URLs Polly watches are now called sources, so they can't be mistaken for the
+  servers they monitor. `polly.yaml` lists them under `sources:`; an existing native-app file is converted at startup. The web service never rewrites its file.
 - Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
+- The icon in front of a source now only turns red when Polly can't reach it. Critical, warning and
+  unknown services and down hosts get a small icon next to their count in the source's status line instead.
 
-- Open the macOS add-server form in a modal using Add above the server list.
-- The server form asks for the URL before the name, and the example URL no longer looks filled in.
+- Open the macOS add-source form in a modal using Add above the source list.
+- The source form asks for the URL before the name, and the example URL no longer looks filled in.
 
 ### Fixed
 
 - Refresh immediately when returning to Polly on iPhone or iPad, and pause polling while inactive.
 - Disable downtime presets when an edited start time does not match every possible server date format.
 - A URL pasted with a username and password no longer keeps showing them in the URL field on macOS.
-- **Add server** on macOS stayed disabled after entering a URL.
+- **Add source** on macOS stayed disabled after entering a URL.
 
 ## [0.2.0] - 2026-11-15
 

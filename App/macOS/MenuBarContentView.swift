@@ -163,12 +163,12 @@ private struct PopoverContent: View {
             if summary.screen != .ok {
                 HStack(spacing: 8) {
                     if summary.screen == .empty {
-                        Button("Add server…") { showSettings() }
+                        Button("Add source…") { showSettings() }
                             .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
                     } else {
                         Button("Retry now") { Task { await monitor.refreshAll() } }
                             .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
-                        Button("Edit server…") {
+                        Button("Edit source…") {
                             monitor.editRequest = summary.unreachable?.server.id
                             showSettings()
                         }
@@ -189,7 +189,7 @@ private struct PopoverContent: View {
         case .unreachable:
             Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
         case .waiting:
-            Text(summary.isPaused ? "Turn a server back on in Settings and Polly starts checking again."
+            Text(summary.isPaused ? "Turn a source back on in Settings and Polly starts checking again."
                                   : "Waiting for the first answer.")
         case .ok, .problems:
             TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -203,7 +203,7 @@ private struct PopoverContent: View {
 
     private var servers: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Servers")
+            Text("Sources")
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.66)
                 .textCase(.uppercase)
@@ -215,9 +215,7 @@ private struct PopoverContent: View {
                         .padding(.top, 1)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(server.name).fontWeight(.semibold) + Text("  \(server.kind.displayName)").foregroundStyle(theme.faint)
-                        Text(ServerStateIcon.line(for: server, state: monitor.states[server.id]))
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.muted)
+                        ServerLineText(server: server, state: monitor.states[server.id])
                             .lineLimit(2)
                     }
                 }
@@ -261,7 +259,7 @@ private struct PopoverContent: View {
     private func footNote(_ summary: MonitorSummary, now: Date) -> String {
         switch summary.screen {
         case .empty:
-            return "No servers"
+            return "No sources"
         case .waiting:
             return summary.isPaused ? "Paused" : "Checking…"
         case .unreachable:

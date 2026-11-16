@@ -236,7 +236,8 @@ reduced motion and hidden tabs pause it too; Previous/Next remain available. Tab
 
 Copy [examples/polly-web.yaml](examples/polly-web.yaml) to a private location outside the checkout. Set its
 Nagios URLs and credentials, use file permissions `600`, and leave `passwordStorage: file`. The service
-reads the file at startup without rewriting it. Even paused sources must use `type: nagios`; URL monitoring
+reads the file at startup without rewriting it. Use `sources:` for the source list; the legacy `servers:`
+key is accepted without rewriting, but do not combine both keys. Even paused sources must use `type: nagios`; URL monitoring
 and Keychain are unavailable to the service. Native traffic logging and notification settings are ignored.
 
 Start on loopback from any directory, replacing the absolute paths:

@@ -42,6 +42,22 @@ struct ConfigurationTests {
         #expect(throws: (any Error).self) { try WebConfiguration(environment: ["POLLY_CONFIG": "/missing/polly.yaml"]) }
     }
 
+    @Test func loadsCurrentSourceKeyWithoutRewriting() throws {
+        try withConfig("""
+            passwordStorage: file
+            sources:
+              - name: Current format
+                url: https://nagios.example.test
+                username: nagiosadmin
+                password: upstream-secret
+            """) { env in
+            let config = try WebConfiguration(environment: env)
+            print("Current configuration format: expected 1 source, observed \(config.settings.servers.count)")
+            #expect(config.settings.servers.count == 1)
+            #expect(config.settings.servers.first?.server.name == "Current format")
+        }
+    }
+
     @Test func viewerSecretsAndBindingAreValidated() throws {
         try withConfig("passwordStorage: file\nservers: []") { environment in
             let config = try WebConfiguration(environment: environment)

@@ -101,7 +101,7 @@ public struct MonitorSummary: Sendable {
         if count(.warning) > 0 { return "Polly is fidgeting: \(count(.warning)) \(count(.warning) == 1 ? "warning" : "warnings")" }
         if count(.unknown) > 0 { return "Polly is confused: \(count(.unknown)) unknown" }
         if let unreachable { return "Polly can't reach \(unreachable.server.name)" }
-        if checked == 0 { return isPaused ? "Polly is not watching: all servers are paused" : "Polly is checking your servers" }
+        if checked == 0 { return isPaused ? "Polly is not watching: all sources are paused" : "Polly is checking your sources" }
         return "Polly is quiet. Go back to sleep."
     }
 
@@ -117,9 +117,9 @@ public struct MonitorSummary: Sendable {
         headline.split(separator: ": ", maxSplits: 1).map(String.init)
     }
 
-    /// "218 hosts and 930 services OK on 2 servers. Last checked 9 s ago." for the all-quiet screen.
+    /// "218 hosts and 930 services OK on 2 sources. Last checked 9 s ago." for the all-quiet screen.
     public func quietDetail(now: Date) -> String {
-        var text = "\(hosts) hosts and \(services) services OK on \(answeredServers) \(answeredServers == 1 ? "server" : "servers")."
+        var text = "\(hosts) hosts and \(services) services OK on \(answeredServers) \(answeredServers == 1 ? "source" : "sources")."
         if let lastFetched {
             text += " Last checked \(DurationFormatting.ago(now.timeIntervalSince(lastFetched)))."
         }
@@ -159,16 +159,4 @@ public extension HostCounts {
 
 public extension ServiceCounts {
     var total: Int { ok + warning + critical + unknown + pending }
-}
-
-public extension ServerStatus {
-    /// "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
-    var summaryLine: String {
-        let down = hosts.down + hosts.unreachable
-        let hostPart = down > 0 ? "\(hosts.total) hosts, \(down) down" : "\(hosts.total) hosts up"
-        let bad = [(services.critical, "crit"), (services.warning, "warn"), (services.unknown, "unknown")]
-            .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }
-        let servicePart = bad.isEmpty ? "\(services.total) services OK" : (["\(services.total) services"] + bad).joined(separator: ", ")
-        return "\(hostPart) · \(servicePart)"
-    }
 }

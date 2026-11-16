@@ -21,7 +21,7 @@ struct PhoneRootView: View {
                 .tabItem { Label("Problems", systemImage: "triangle.fill") }
                 .tag(Tab.problems)
             NavigationStack { ServersScreen() }
-                .tabItem { Label("Servers", systemImage: "rectangle.split.1x2.fill") }
+                .tabItem { Label("Sources", systemImage: "rectangle.split.1x2.fill") }
                 .tag(Tab.servers)
             NavigationStack { PhoneSettingsScreen() }
                 .tabItem { Label("Settings", systemImage: "gearshape.fill") }

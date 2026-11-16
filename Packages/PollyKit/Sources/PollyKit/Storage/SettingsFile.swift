@@ -1,7 +1,7 @@
 import Foundation
 import Yams
 
-/// Where server passwords are kept.
+/// Where source passwords are kept.
 public enum PasswordStorage: String, Sendable, CaseIterable {
     /// In the system keychain (default).
     case keychain
@@ -43,7 +43,7 @@ public struct SettingsFileError: LocalizedError {
 }
 
 /// Reads and writes `PollySettings` as YAML. Writing is done by hand (rather than through an encoder)
-/// so the file gets comments, a stable key order and blank lines between servers.
+/// so the file gets comments, a stable key order and blank lines between sources.
 public enum SettingsFile {
     // MARK: Reading
 
@@ -52,6 +52,17 @@ public enum SettingsFile {
     }
 
     public static func parse(_ yaml: String) throws -> PollySettings {
+        try parseMigrating(yaml).settings
+    }
+
+    // TODO: Remove the `servers:` migration after 2026-11-23, once every install has rewritten its file.
+    /// Like `load`, but also says whether the file still lists its sources under the old `servers:` key and
+    /// should be rewritten.
+    public static func loadMigrating(from url: URL) throws -> (settings: PollySettings, isLegacy: Bool) {
+        try parseMigrating(String(contentsOf: url, encoding: .utf8))
+    }
+
+    static func parseMigrating(_ yaml: String) throws -> (settings: PollySettings, isLegacy: Bool) {
         let raw: RawSettings
         do {
             raw = try YAMLDecoder().decode(RawSettings.self, from: yaml)
@@ -68,14 +79,17 @@ public enum SettingsFile {
         }
         settings.showDockIcon = raw.showDockIcon ?? false
         settings.debugLog = raw.debugLog ?? false
-        settings.servers = try (raw.servers ?? []).enumerated().map { index, entry in
+        if raw.sources != nil, raw.servers != nil {
+            throw SettingsFileError(message: "polly.yaml: has both 'sources' and the old 'servers'; merge them into 'sources'")
+        }
+        settings.servers = try (raw.sources ?? raw.servers ?? []).enumerated().map { index, entry in
             guard let urlText = entry.url, let url = URL(string: urlText) else {
-                throw SettingsFileError(message: "polly.yaml: server #\(index + 1) has no valid url")
+                throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has no valid url")
             }
             var kind = BackendKind.nagios
             if let type = entry.type {
                 guard let value = BackendKind(rawValue: type) else {
-                    throw SettingsFileError(message: "polly.yaml: server #\(index + 1) has unknown type '\(type)'")
+                    throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has unknown type '\(type)'")
                 }
                 kind = value
             }
@@ -90,7 +104,7 @@ public enum SettingsFile {
             )
             return PollySettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
         }
-        return settings
+        return (settings, raw.servers != nil)
     }
 
     /// Lenient mirror of the file: every key is optional so hand-edited files with missing keys still load.
@@ -109,6 +123,8 @@ public enum SettingsFile {
         var passwordStorage: String?
         var showDockIcon: Bool?
         var debugLog: Bool?
+        var sources: [RawServer]?
+        /// The old name of `sources`; read once and rewritten as `sources`.
         var servers: [RawServer]?
     }
 
@@ -128,7 +144,7 @@ public enum SettingsFile {
             # Written by Polly whenever you change something in the app. You can edit it by hand
             # while Polly is not running; changes are read at startup.
 
-            # Where server passwords are kept:
+            # Where source passwords are kept:
             #   keychain  in the system keychain (recommended)
             #   file      unencrypted, as "password:" entries in this file
             passwordStorage: \(settings.passwordStorage.rawValue)
@@ -136,7 +152,7 @@ public enum SettingsFile {
             # macOS only: show a Dock icon in addition to the menu bar icon.
             showDockIcon: \(settings.showDockIcon)
 
-            # Write polly-debug.log next to this file: every request to and response from the servers,
+            # Write polly-debug.log next to this file: every request to and response from the sources,
             # without credentials. For troubleshooting only.
             debugLog: \(settings.debugLog)
 
@@ -144,11 +160,11 @@ public enum SettingsFile {
             """
 
         if settings.servers.isEmpty {
-            out += "servers: []\n"
+            out += "sources: []\n"
             return out
         }
 
-        out += "servers:\n"
+        out += "sources:\n"
         for (index, entry) in settings.servers.enumerated() {
             if index > 0 { out += "\n" }
             let server = entry.server

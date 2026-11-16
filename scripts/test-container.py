@@ -43,6 +43,13 @@ def main():
     print(f"Building {image} from {revision} (plus current working changes)", flush=True)
     subprocess.run([*build, "--build-arg", f"REVISION={revision}", str(ROOT)], check=True)
     print(run("docker", "image", "inspect", image, "--format", "{{.Id}} {{.Os}}/{{.Architecture}}"), flush=True)
+    architecture = run("docker", "image", "inspect", image, "--format", "{{.Architecture}}")
+    machine = int(run("docker", "run", "--rm", "--entrypoint", "od", image,
+                      "-An", "-t", "u2", "-j", "18", "-N", "2", "/app/polly-web"))
+    assert machine == {"amd64": 62, "arm64": 183}[architecture], "Executable ELF architecture differs from image"
+    if platform:
+        assert platform == "linux/" + architecture
+    print(f"✅ Executed Linux {architecture} image; ELF machine={machine}.", flush=True)
     with tempfile.TemporaryDirectory(prefix="polly-container-") as temporary:
         directory = Path(temporary)
         password = "container-viewer-" + uuid.uuid4().hex
