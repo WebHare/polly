@@ -308,7 +308,11 @@ Drawn from the design and tagged as such, but without function:
 - Poll interval and "Verify TLS certificate" in the add-server form; the interval is fixed at 60 seconds.
 - The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
   services on down hosts), notification rules and quiet hours.
-- The Team and Account panes.
+- The Team pane remains labeled **PLACEHOLDER** and explains the ideas for a future version:
+  - A shared on-call schedule, escalation to the next person if nobody acknowledges an alert, and
+    central billing with Pro features for each team member.
+  - The explanation makes clear that these features are not available yet and offers no working controls.
+- The Account pane.
 
 ## Versions and updates
 
