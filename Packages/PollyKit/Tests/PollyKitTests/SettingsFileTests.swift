@@ -29,7 +29,7 @@ struct SettingsFileTests {
         ])
         let yaml = SettingsFile.render(settings)
         #expect(yaml.contains("""
-            servers:
+            sources:
               - name: Production
                 type: nagios
                 url: https://mon.example.com
@@ -48,7 +48,7 @@ struct SettingsFileTests {
 
     @Test func toleratesMinimalHandWrittenFile() throws {
         let settings = try SettingsFile.parse("""
-            servers:
+            sources:
             - url: https://mon.example.com
             """)
         #expect(settings.passwordStorage == .keychain)
@@ -59,8 +59,8 @@ struct SettingsFileTests {
 
     @Test func rejectsBadValues() {
         #expect(throws: SettingsFileError.self) { try SettingsFile.parse("passwordStorage: cloud") }
-        #expect(throws: SettingsFileError.self) { try SettingsFile.parse("servers:\n  - name: x\n") }
-        #expect(throws: SettingsFileError.self) { try SettingsFile.parse("servers:\n  - url: https://x.example\n    type: zabbix\n") }
+        #expect(throws: SettingsFileError.self) { try SettingsFile.parse("sources:\n  - name: x\n") }
+        #expect(throws: SettingsFileError.self) { try SettingsFile.parse("sources:\n  - url: https://x.example\n    type: zabbix\n") }
     }
 
     @Test func roundTripsBackendNotificationsAndDebugLog() throws {
@@ -71,8 +71,21 @@ struct SettingsFileTests {
         #expect(parsed == settings)
         #expect(parsed.servers[0].server.kind == .nagios)
         // Files written before these keys existed keep loading with the defaults.
-        let old = try SettingsFile.parse("servers:\n  - url: https://mon.example.com\n")
+        let old = try SettingsFile.parse("sources:\n  - url: https://mon.example.com\n")
         #expect(!old.debugLog)
         #expect(!old.servers[0].server.notifications)
+    }
+
+    // TODO: Remove with the `servers:` migration after 2026-11-23.
+    @Test func readsLegacyServersKey() throws {
+        let legacy = try SettingsFile.parseMigrating("servers:\n  - url: https://mon.example.com\n")
+        #expect(legacy.isLegacy)
+        #expect(legacy.settings.servers.map(\.server.name) == ["mon.example.com"])
+        #expect(try !SettingsFile.parseMigrating("sources:\n  - url: https://mon.example.com\n").isLegacy)
+        #expect(try !SettingsFile.parseMigrating("debugLog: true\n").isLegacy)
+        // Both keys: refuse rather than silently dropping one of the lists.
+        #expect(throws: SettingsFileError.self) {
+            try SettingsFile.parse("servers:\n  - url: https://a.example\nsources:\n  - url: https://b.example\n")
+        }
     }
 }

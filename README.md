@@ -21,7 +21,7 @@ Packages/PollyKit/          Platform-independent logic + unit tests
 mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
 ```
 
-- Servers and settings are stored in one YAML file, `Application Support/Polly/polly.yaml`. On macOS
+- Sources (Nagios servers and URLs) and settings are stored in one YAML file, `Application Support/Polly/polly.yaml`. On macOS
   that's `~/Library/Containers/nl.webhare.polly/Data/Library/Application Support/Polly/polly.yaml`.
   Passwords are kept in the keychain unless you turn that off, in which case they go into the YAML file.
   You can edit the file by hand while Polly isn't running.
@@ -194,10 +194,10 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Storage
 
-- **One human-readable YAML file (`polly.yaml`)** for servers and settings. It started as SQLite, but a
+- **One human-readable YAML file (`polly.yaml`)** for sources and settings. It started as SQLite, but a
   single commented file is easier to inspect, back up, diff and hand-edit, and the data is tiny.
 - **Yams for reading, hand-written output for writing.** An encoder can't emit comments, a fixed key order
-  or blank lines between servers. Strings are only quoted when YAML needs it (`"yes"`, `"a: b"`, leading
+  or blank lines between sources. Strings are only quoted when YAML needs it (`"yes"`, `"a: b"`, leading
   digits, ...), and a round-trip test guards against quoting mistakes.
 - **Lenient reading, strict values.** Every key is optional so a minimal hand-written file loads, but an
   invalid value (e.g. an unknown `passwordStorage`) is an error. If the file can't be read the app runs with

@@ -73,7 +73,7 @@ import Testing
         let summary = MonitorSummary(servers: [paused], states: [paused.id: .failed("x")])
         #expect(summary.unreachable == nil)
         #expect(summary.screen == .waiting)
-        #expect(summary.headline == "Polly is not watching: all servers are paused")
+        #expect(summary.headline == "Polly is not watching: all sources are paused")
     }
 
     /// A host can be down while none of its services is reported as a problem (yet).
@@ -91,7 +91,7 @@ import Testing
             #expect(summary.screen == .waiting)
             #expect(summary.mood == .unreachable)
             #expect(summary.badge == "?")
-            #expect(summary.headline == "Polly is checking your servers")
+            #expect(summary.headline == "Polly is checking your sources")
         }
     }
 

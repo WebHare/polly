@@ -1,6 +1,6 @@
 import Foundation
 
-/// Persists servers and settings in a single YAML file (see `SettingsFile`). Passwords go either to a
+/// Persists sources and settings in a single YAML file (see `SettingsFile`). Passwords go either to a
 /// `CredentialStore` (the keychain) or into that file, depending on `passwordStorage`.
 ///
 /// The file is read once at startup and rewritten after every change.
@@ -15,7 +15,12 @@ public final class ServerStore: @unchecked Sendable {
         self.fileURL = fileURL
         self.credentials = credentials
         if let fileURL, FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) {
-            settings = try SettingsFile.load(from: fileURL)
+            let (loaded, isLegacy) = try SettingsFile.loadMigrating(from: fileURL)
+            settings = loaded
+            // TODO: Remove the `servers:` migration after 2026-11-23.
+            if isLegacy {
+                try SettingsFile.save(loaded, to: fileURL)
+            }
         } else {
             settings = initial
         }

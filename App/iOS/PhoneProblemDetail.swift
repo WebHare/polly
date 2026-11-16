@@ -132,7 +132,7 @@ private struct ProblemDetailContent: View {
                 theme.surfaceDivider.frame(height: 1)
                 fact("Next check", problem.nextCheck.map { DurationFormatting.until($0.timeIntervalSince(context.date)) })
                 theme.surfaceDivider.frame(height: 1)
-                fact("Server", server.kind.displayName)
+                fact("Source", server.kind.displayName)
             }
             .background(theme.surface, in: RoundedRectangle(cornerRadius: 14))
         }
