@@ -23,15 +23,5 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
-	<key>SUEnableAutomaticChecks</key>
-	<true/>
-	<key>SUEnableInstallerLauncherService</key>
-	<true/>
-	<key>SUFeedURL</key>
-	<string>https://github.com/unilynx/polly/releases/latest/download/appcast.xml</string>
-	<key>SUPublicEDKey</key>
-	<string>GrZ98ctK1NSaV5xWJknpg4/mvrvzK+CHbszkWAjg7us=</string>
-	<key>SUScheduledCheckInterval</key>
-	<integer>21600</integer>
 </dict>
 </plist>

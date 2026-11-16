@@ -6,6 +6,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Changed
 
+- Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
+
 - Open the macOS add-server form in a modal using Add above the server list.
 
 ### Fixed

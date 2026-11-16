@@ -115,7 +115,7 @@ servers.
 - The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
   - **Servers**: the server list (switch, bell, refresh, delete), the Add button and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
-  - **About Polly**: version and build number, **What's New**, and **Check for Updates…** in release builds.
+  - **About Polly**: version and build number and **What's New**.
 
 ## iPhone and iPad
 
@@ -281,9 +281,6 @@ Drawn from the design and tagged as such, but without function:
 - The app shows its version and build number from the same values used to build it.
 - **What's New** works offline and lists the changelog newest first.
   - Release builds show published version sections only; development builds also show unreleased entries.
-- macOS release builds check for updates every six hours and allow a manual check from About Polly or the app menu.
-  - The user reviews the release notes and confirms installation through Sparkle.
-  - Downloads must pass signature verification before installation.
-  - Development builds never update themselves to a published release.
-  - The first public update check requires a published release feed.
-- iPhone and iPad updates use TestFlight or the App Store, not the macOS updater.
+- Polly is distributed through TestFlight and the App Store on macOS, iPhone and iPad.
+  - The app never checks for or installs updates itself; Apple delivers them.
+    - *Why:* Mac App Store apps may not update themselves, and Apple then handles signing and delivery.

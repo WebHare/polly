@@ -32,7 +32,8 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
   link, acknowledge it or schedule downtime.
 - The macOS and iOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an
   orange PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
-- **About Polly** (macOS) and **Settings** (iOS) show the version and bundled changelog. Release builds on macOS also check for signed updates using Sparkle.
+- **About Polly** (macOS) and **Settings** (iOS) show the version and bundled changelog. Updates come from
+  TestFlight and the App Store; the app has no updater of its own.
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
 ## Development
@@ -43,7 +44,8 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 `.github/workflows/build.yml` runs the PollyKit tests and builds a universal (arm64 + x86_64) Release build of
 the macOS app on every push to `main` and every pull request. The result is attached to the run as a
-`Polly-<version>-<run>.dmg` artifact.
+`Polly-<version>-<run>.dmg` artifact for testing; it is not a distribution channel. Polly is distributed
+through TestFlight and the App Store (see "Versions, changelog and distribution" in DEVELOPERS.md).
 
 Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
 open it once via System Settings → Privacy & Security → **Open Anyway**, or run
@@ -210,7 +212,9 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Tooling
 
-- **Yams for YAML and Sparkle for macOS updates**; the keychain is a system library.
+- **Yams for YAML**; the keychain is a system library.
+- **No in-app updater.** Polly is distributed through TestFlight and the Mac App Store, which handle
+  updates. Sparkle was used briefly in 0.2.0 and removed before any release was published.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is

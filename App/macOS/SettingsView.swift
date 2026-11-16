@@ -752,12 +752,6 @@ private struct AboutPane: View {
                 .foregroundStyle(theme.muted).textSelection(.enabled)
             Button("What's New") { openWindow(id: WindowID.whatsNew) }
                 .buttonStyle(PollyButtonStyle())
-            #if !DEBUG
-            CheckForUpdatesButton().buttonStyle(PollyButtonStyle())
-            #else
-            Text("Development build; updates are available in release builds.")
-                .font(.caption).foregroundStyle(theme.muted)
-            #endif
         }
         .frame(maxWidth: .infinity)
         .padding(.top, 40)
