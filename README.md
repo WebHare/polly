@@ -280,6 +280,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Yams for YAML**; the keychain is a system library.
 - **No in-app updater.** Polly is distributed through TestFlight and the Mac App Store, which handle
   updates. Sparkle was used briefly in 0.2.0 and removed before any release was published.
+- **fastlane for TestFlight uploads**, pinned in the `Gemfile`, with automatic signing through an App Store
+  Connect API key so nobody has to export certificates.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is
