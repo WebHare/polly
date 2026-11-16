@@ -233,6 +233,8 @@ servers.
 
 ## URL monitoring
 
+- URL monitoring is available in the macOS, iPhone and iPad apps only. Linux monitoring supports Nagios;
+  trying to monitor a URL on Linux returns an explicit unsupported-platform error.
 - A URL is shown as one host with these services:
   - **DNS**: the host name resolves.
   - **HTTP**: a GET of the URL answers with a status below 400.

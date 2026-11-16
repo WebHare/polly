@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// A server to monitor: a Nagios server, or a URL that Polly checks itself (see `kind`). The password is not part of this record; `ServerStore` keeps it
 /// in the keychain or the settings file depending on its `passwordStorage` setting.
@@ -31,17 +34,21 @@ public struct NagiosServer: Identifiable, Hashable, Sendable {
         baseURL.appending(path: "nagios/cgi-bin/statusjson.cgi")
     }
 
-    /// The client for this server's monitoring system.
-    public func makeBackend(password: String?, session: URLSession = .shared, wireLog: WireLog? = nil) -> any MonitorBackend {
+    /// The client for this server's monitoring system. Throws when its type is unavailable on this platform.
+    public func makeBackend(password: String?, session: URLSession = .shared, wireLog: WireLog? = nil) throws -> any MonitorBackend {
         switch kind {
         case .nagios:
             var client = NagiosClient(server: self, password: password, session: session)
             client.wireLog = wireLog
             return client
         case .url:
+            #if canImport(Security)
             var monitor = URLMonitor(server: self, password: password, session: session)
             monitor.wireLog = wireLog
             return monitor
+            #else
+            throw BackendError("URL monitoring is only supported on Apple platforms.")
+            #endif
         }
     }
 }

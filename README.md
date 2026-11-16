@@ -90,6 +90,22 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Deployment targets macOS 14 / iOS 17**, the minimum for the `@Observable` macro used by the models.
 - **Swift 6 language mode** with strict concurrency; UI-facing models are `@MainActor`.
 
+### Linux core
+
+- **PollyKit's Nagios path also runs on Linux**: parsing, HTTP transport, polling, summaries, settings and
+  file/in-memory credential storage are shared with the native apps. The web service is not built yet.
+- **Apple-only functionality stays native**: URL monitoring (DNS/HTTP/certificate checks), Keychain,
+  default Application Support storage and the long tooltip duration formatter. `makeBackend` throws for
+  a URL server on Linux; it never substitutes a healthy result or a different backend.
+- **Explicit storage on Linux**: supply a `ServerStore` with a chosen file or in-memory settings and a
+  credential store. There is no Linux `makeDefault()` that might open the native app's settings.
+- **Linux uses Swift 6.4.2**, with the upstream fix for the
+  [URLSession cancellation deadlock](https://github.com/swiftlang/swift-corelibs-foundation/issues/5412)
+  reproduced on Swift 6.2. Native apps still build with Apple Swift 6.2. The transport implementation stays
+  shared; redirects, credentials, cookies and cancellation are checked over real HTTP.
+- Run the reproducible Docker test command in [DEVELOPERS.md](DEVELOPERS.md#linux-tests) for the proven
+  platform matrix and real HTTP integration.
+
 ### Backends
 
 - **`MonitorBackend` is the only thing the rest of the app knows about a monitoring system**: test the

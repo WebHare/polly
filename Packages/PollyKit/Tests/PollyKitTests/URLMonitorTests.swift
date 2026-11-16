@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Security)
 import Security
+#endif
 import Testing
 @testable import PollyKit
 
@@ -34,6 +36,7 @@ struct CertificateTests {
         #expect(CertificateCheck.expiry(of: [], warningPeriod: 14 * 86400, now: now) == .valid)
     }
 
+    #if canImport(Security)
     @Test func untrustedCertificateIsInvalid() throws {
         let certificate = try #require(SecCertificateCreateWithData(nil, utcTimeCertificate as CFData))
         var trust: SecTrust?
@@ -43,6 +46,7 @@ struct CertificateTests {
             return
         }
     }
+    #endif
 }
 
 struct URLKindTests {
@@ -59,7 +63,9 @@ struct URLKindTests {
         #expect(server.kind == .url)
         #expect(server.baseURL.absoluteString == "https://www.example.com/status")
         #expect(server.name == "www.example.com")
-        #expect(server.makeBackend(password: nil) is URLMonitor)
+        #if canImport(Security)
+        #expect(try server.makeBackend(password: nil) is URLMonitor)
+        #endif
     }
 
     @Test func roundTripsInSettingsFile() throws {
@@ -70,6 +76,7 @@ struct URLKindTests {
         #expect(try SettingsFile.parse(yaml) == settings)
     }
 
+    #if canImport(Security)
     @Test func statusCountsOneHostWithAServicePerCheck() {
         let now = Date()
         let healthy = URLMonitor.status(host: "web", results: [("DNS", .ok("")), ("HTTP", .ok("")), ("Certificate", .ok(""))],
@@ -101,8 +108,10 @@ struct URLKindTests {
             return
         }
     }
+    #endif
 }
 
+#if canImport(Security)
 /// Uses the shared `StubProtocol` handler, so it runs in the serialized `TransportTests` suite.
 extension TransportTests {
     private func urlMonitor(_ url: String, password: String? = nil,
@@ -205,3 +214,4 @@ struct URLMonitorNetworkTests {
         #expect(try await problems("https://polly-does-not-exist.invalid/") == ["DNS": .critical])
     }
 }
+#endif

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Observation
 
 /// Backs the server form: adding a server, editing one, or adding a copy of one. Parses pasted URLs and runs

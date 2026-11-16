@@ -1,6 +1,9 @@
 /* node mock/nagios-mock.mjs --no-rotate &
    POLLY_MOCK_URL=http://localhost:8080 swift test --package-path Packages/PollyKit --filter MockIntegrationTests */
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Testing
 @testable import PollyKit
 
@@ -198,6 +201,40 @@ struct MockIntegrationTests {
         try await downtime.submit(input)
         #expect(try await problem("HTTP")?.downtimeDepth == 1)
         try await control("/mock/reset")
+    }
+
+    /// Regression test for a startup crash with `async let` in `fetchStatus()`: a refused server next to busy ones
+    /// crashed the process ("freed pointer was not the last allocation", or a jump into freed memory). It is timing
+    /// dependent, so it catches a regression most of the time, not always. Needs nothing listening on 127.0.0.1:9.
+    /// Real HTTP avoids Linux URLProtocol's unsafe task-registry access from delayed stub callbacks.
+    @Test func refusedServerNextToBusyOnesDoesNotCrash() async throws {
+        try await control("/mock/reset")
+        let busy = client()
+        let refused = NagiosClient(endpoint: URL(string: "http://127.0.0.1:9/nagios/cgi-bin/statusjson.cgi")!,
+                                   username: "", password: nil)
+        for _ in 0..<20 {
+            await withTaskGroup(of: Void.self) { group in
+                for _ in 0..<64 {
+                    group.addTask {
+                        do {
+                            let status = try await busy.fetchStatus()
+                            #expect(status.hosts.up == 6)
+                            #expect(status.services.ok == 23)
+                        } catch {
+                            Issue.record("Mock request failed: \(error)")
+                        }
+                    }
+                    group.addTask {
+                        do {
+                            _ = try await refused.fetchStatus()
+                            Issue.record("A refused connection must fail")
+                        } catch NagiosClientError.transport { } catch {
+                            Issue.record("Expected a transport failure, got \(error)")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     @Test func redirectsAndBadCredentialsFail() async {

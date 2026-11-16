@@ -6,6 +6,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Added
 
+- Linux support for the shared Nagios monitoring core. URL monitoring and Keychain remain Apple-only;
+  a standalone web dashboard is not included yet.
 - Edit a server: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
 - Duplicate a server to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
 - **Edit server…** on the "Polly can't reach" screen opens the form for that server.

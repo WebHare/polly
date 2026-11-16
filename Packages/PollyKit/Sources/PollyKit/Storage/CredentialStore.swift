@@ -1,5 +1,7 @@
 import Foundation
+#if canImport(Security)
 import Security
+#endif
 
 /// Stores server passwords outside polly.yaml, so they are not lying around in plain text.
 public protocol CredentialStore: Sendable {
@@ -8,6 +10,7 @@ public protocol CredentialStore: Sendable {
     func setPassword(_ password: String?, for serverID: UUID) throws
 }
 
+#if canImport(Security)
 public struct KeychainError: Error, CustomStringConvertible {
     public let status: OSStatus
     public var description: String {
@@ -59,6 +62,8 @@ public struct KeychainCredentialStore: CredentialStore {
         }
     }
 }
+
+#endif
 
 /// Non-persistent store for tests and previews.
 public final class InMemoryCredentialStore: CredentialStore, @unchecked Sendable {

@@ -28,6 +28,7 @@ public enum DurationFormatting {
         return "\(seconds / 3600) h"
     }
 
+    #if canImport(Darwin)
     /// Exact duration for tooltips, e.g. "2 days, 3 hours, 12 minutes".
     public static func long(_ interval: TimeInterval) -> String {
         let formatter = DateComponentsFormatter()
@@ -35,4 +36,5 @@ public enum DurationFormatting {
         formatter.allowedUnits = interval < 60 ? [.second] : [.day, .hour, .minute]
         return formatter.string(from: max(0, interval)) ?? ""
     }
+    #endif
 }
