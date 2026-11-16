@@ -32,13 +32,13 @@ import Testing
         let summary = MonitorSummary(servers: [nagios, other],
                                      states: [nagios.id: status(fetchedAt: 1000), other.id: status(fetchedAt: 1030)])
         #expect(summary.quietDetail(now: Date(timeIntervalSince1970: 1039))
-                == "20 hosts and 40 services OK on 2 servers. Last checked 9 s ago.")
+                == "20 hosts and 40 services OK on 2 sources. Last checked 9 s ago.")
     }
 
     @Test func quietDetailSkipsServersThatDidNotAnswer() {
         let summary = MonitorSummary(servers: [nagios, other], states: [nagios.id: status(), other.id: .loading])
         #expect(summary.quietDetail(now: Date(timeIntervalSince1970: 1000))
-                == "10 hosts and 20 services OK on 1 server. Last checked 0 s ago.")
+                == "10 hosts and 20 services OK on 1 source. Last checked 0 s ago.")
     }
 
     @Test func problemStateNote() {

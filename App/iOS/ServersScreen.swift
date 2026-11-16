@@ -17,7 +17,7 @@ struct ServersScreen: View {
                     Text("Polly has nothing to watch yet").font(.system(size: 17, weight: .bold)).padding(.top, 6)
                     Text("Add a Nagios server or a URL and Polly starts polling right away.")
                         .font(.system(size: 14)).foregroundStyle(theme.muted)
-                    Menu("Add server…") {
+                    Menu("Add source…") {
                         Button("Nagios Server…", systemImage: "server.rack") { form = ServerFormModel(kind: .nagios) }
                         Button("URL…", systemImage: "globe") { form = ServerFormModel(kind: .url) }
                     }
@@ -55,7 +55,7 @@ struct ServersScreen: View {
         }
         .listStyle(.insetGrouped)
         .phoneListBackground(theme)
-        .navigationTitle("Servers")
+        .navigationTitle("Sources")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Menu("Add", systemImage: "plus") {
@@ -91,7 +91,7 @@ struct ServersScreen: View {
             .contentShape(Rectangle())
             .onTapGesture { edit(server) }
             .accessibilityAddTraits(.isButton)
-            .accessibilityHint("Edit this server")
+            .accessibilityHint("Edit this source")
             Button(server.notifications ? "Turn off notifications" : "Turn on notifications",
                    systemImage: server.notifications ? "bell.fill" : "bell.slash") {
                 setNotifications(!server.notifications, for: server)

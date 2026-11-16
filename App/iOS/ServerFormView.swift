@@ -124,7 +124,7 @@ struct ServerFormView: View {
             }
             dismiss()
         } catch {
-            saveError = "Could not save server: \(error.localizedDescription)"
+            saveError = "Could not save source: \(error.localizedDescription)"
         }
     }
 }

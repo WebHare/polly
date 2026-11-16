@@ -7,10 +7,11 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 - Polly monitors Nagios servers and websites from macOS (menu bar), iPhone and iPad.
   - Requires macOS 14 / iOS 17 or later.
   - Polly polls straight from the device; nothing goes through a Polly server.
-- A user can monitor two types of "server":
+- A user can monitor two types of source:
+  - Why "source" and not "server": the hosts Polly reports on are servers too, so "server" was ambiguous.
   - **Nagios server**: status is read from the server's Nagios installation (Nagios 4.4 or newer).
   - **URL**: Polly checks a website itself, with no monitoring system behind it.
-  - Everywhere a server is shown, its type ("Nagios" or "URL") is shown next to its name.
+  - Everywhere a source is shown, its type ("Nagios" or "URL") is shown next to its name.
 - Polly never changes anything on a monitored server, except when the user explicitly confirms an
   acknowledgement or downtime.
 - The screens follow the Polly design, in light and dark.
@@ -18,13 +19,13 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - Parts of the design that are drawn but don't work yet carry a PLACEHOLDER or PROTOTYPE tag and do nothing
     (see [Not built yet](#not-built-yet)). A control must never silently do nothing.
 
-## Servers
+## Sources
 
-- The user can add a server of either type.
-  - macOS: **Add** above the server list opens the "Add a monitoring server" modal, with a Type control.
+- The user can add a source of either type.
+  - macOS: **Add** above the source list opens the "Add a source" modal, with a Type control.
     - Cancel closes the modal without saving; adding successfully closes it and updates the list.
     - The form cannot be edited or dismissed while the connection test is running.
-  - iOS: **Add** (a menu: Nagios Server… / URL…) on the Servers tab, or **Add server…** in the empty states; the
+  - iOS: **Add** (a menu: Nagios Server… / URL…) on the Sources tab, or **Add source…** in the empty states; the
     form opens as a sheet titled "Add Nagios Server" or "Add URL".
   - The URL placeholder and the explanation adapt to the type:
     - Nagios: the `statusjson.cgi` URL that will be read.
@@ -46,46 +47,46 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - Nagios: query and anything from `/nagios` onwards are removed, so a pasted link to the Nagios web UI just
     works. The user enters the base URL; Polly appends `/nagios/cgi-bin/statusjson.cgi`.
   - URL: the path and query are kept as entered.
-- Adding a server tests the connection first.
+- Adding a source tests the connection first.
   - **Test connection** can also be run on its own before adding; changing the URL or type resets the result.
   - A failed test shows the error with **Add anyway** (and **Retry** on iOS).
     - Why: the server may be temporarily down or only reachable from another network.
   - For a URL, the test only fails on a critical problem; a certificate that expires soon doesn't block adding
     it.
-- The user can edit a server: its type, name, URL, username and password.
-  - macOS: double-click the server or choose **Edit…** in its context menu; the form opens as the "Edit monitoring
-    server" modal.
-  - iOS: tap the server (not its bell or switch), swipe left and choose **Edit**, or **Edit…** in its context menu;
+- The user can edit a source: its type, name, URL, username and password.
+  - macOS: double-click the source or choose **Edit…** in its context menu; the form opens as
+    the "Edit source" modal.
+  - iOS: tap the source (not its bell or switch), swipe left and choose **Edit**, or **Edit…** in its context menu;
     the form opens as a sheet titled "Edit Nagios Server" or "Edit URL".
   - The form is the add form, prefilled, with **Save** instead of **Add**; the password field shows the current
     password.
-  - The server keeps its place in the list, its switch and its bell.
+  - The source keeps its place in the list, its switch and its bell.
   - Saving tests the connection first, like adding, with **Save anyway** when the test fails. When only the name
     changed, it saves without a test.
-    - Why: renaming a server that is down must not need an override.
+    - Why: renaming a source that is down must not need an override.
   - A name that equals the URL's host is shown empty, so it keeps following the URL when that changes.
-  - After a change of URL or type the server's old state is forgotten and it is checked again right away; the
+  - After a change of URL or type the source's old state is forgotten and it is checked again right away; the
     first answer doesn't notify.
     - Why: it is a different system now; its problems are not changes of the old one's.
-  - **Edit server…** on the Unreachable screen opens this form for the unreachable server (macOS: in the
-    Settings window, on the Servers pane; iOS: on the Servers tab).
-- The user can duplicate a server to add a similar one without typing everything again.
+  - **Edit source…** on the Unreachable screen opens this form for the unreachable source (macOS: in the
+    Settings window, on the Sources pane; iOS: on the Sources tab).
+- The user can duplicate a source to add a similar one without typing everything again.
   - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
-  - Opens the add form prefilled with the server's type, URL, username, password and bell; the name gets
-    " copy" appended (or stays empty when it was just the host). The copy is a new server, switched on.
-- New servers are added at the end of the list. The list order is the order in `polly.yaml`; reordering is done
+  - Opens the add form prefilled with the source's type, URL, username, password and bell; the name gets
+    " copy" appended (or stays empty when it was just the host). The copy is a new source, switched on.
+- New sources are added at the end of the list. The list order is the order in `polly.yaml`; reordering is done
   by editing the file.
-- The user can delete a server (context menu; swipe left on iOS).
-- The user can refresh one server (context menu) or all servers (menu bar panel, pull to refresh on iOS).
-- Each server has an on/off switch to pause monitoring without deleting it.
-  - A paused server shows "Monitoring paused", is not polled and doesn't count towards the overall status.
-- Each server has a bell to turn notifications on or off (see [Notifications](#notifications)).
-- Each server shows a one-line state:
+- The user can delete a source (context menu; swipe left on iOS).
+- The user can refresh one source (context menu) or all sources (menu bar panel, pull to refresh on iOS).
+- Each source has an on/off switch to pause monitoring without deleting it.
+  - A paused source shows "Monitoring paused", is not polled and doesn't count towards the overall status.
+- Each source has a bell to turn notifications on or off (see [Notifications](#notifications)).
+- Each source shows a one-line state:
   - "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
     - Each problem count ("1 down", "1 crit", "3 warn", "2 unknown") has a small status icon in front of it
       and is written in its status color.
   - "Unreachable · <error>" in red when it can't be read; its URL while it is loading for the first time.
-- The icon in front of a server only says whether Polly can reach that monitor: a green check when it answers,
+- The icon in front of a source only says whether Polly can reach it: a green check when it answers,
   a red error icon when it can't be reached, a pause icon when it is paused, a spinner while loading.
   - Problems on the hosts and services it monitors never change that icon; they show in the state line.
     *Why:* a red icon for one critical service made healthy monitors look unreachable.
@@ -93,9 +94,9 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 ## Overview
 
 The overview is the macOS menu bar panel and the iOS Problems tab. Both show the same summary of all enabled
-servers.
+sources.
 
-- Problems (warning, critical and unknown services) of all servers are grouped by severity: critical, then
+- Problems (warning, critical and unknown services) of all sources are grouped by severity: critical, then
   warning, then unknown; newest first within a group.
   - Each problem shows host, service, its age and markers for acknowledged (ACK) and scheduled downtime.
   - The age is "<1m", "3m", "2h", "3d" (largest unit only), refreshed every minute.
@@ -107,22 +108,22 @@ servers.
   - "Polly is squawking: N hosts down" / "Polly is squawking: N critical".
   - "Polly is fidgeting: N warnings".
   - "Polly is confused: N unknown".
-  - "Polly can't reach <server>".
-  - "Polly is checking your servers" before the first answer, or "Polly is not watching: all servers are
+  - "Polly can't reach <source>".
+  - "Polly is checking your sources" before the first answer, or "Polly is not watching: all sources are
     paused".
   - "Polly is quiet. Go back to sleep." when everything answered and is fine.
-  - "Polly has nothing to watch yet" without servers.
+  - "Polly has nothing to watch yet" without sources.
 - Which screen is shown:
   - **Problems** when there is a problem or a host is down.
     - A host can be down while none of its services is listed as a problem; that still counts.
-  - **Unreachable** when a server can't be read: its error, "Polly keeps trying every 60 s", **Retry now** and
-    **Edit server…**.
+  - **Unreachable** when a source can't be read: its error, "Polly keeps trying every 60 s", **Retry now** and
+    **Edit source…**.
   - **Waiting** while nothing has answered yet: "Waiting for the first answer", or how to resume when all
-    servers are paused.
+    sources are paused.
     - Why: nothing checked is not the same as nothing wrong; it must never look like "all is well".
   - **All quiet** with the number of hosts and services that are fine and when Polly checks again.
-  - **Empty** without servers, with **Add server…**.
-- A server that can't be reached counts as unreachable in the mood, even when other servers are fine.
+  - **Empty** without sources, with **Add source…**.
+- A source that can't be reached counts as unreachable in the mood, even when other sources are fine.
 
 ## macOS menu bar
 
@@ -134,7 +135,7 @@ servers.
   - Warning: a warning triangle and the number of warnings.
   - Unreachable: a faded Polly with the number of unknowns, or "?".
   - Otherwise just Polly. The non-critical icons adapt to a light or dark menu bar.
-- The panel shows the overview, the list of servers with their state, and **Refresh**, **Settings…** and
+- The panel shows the overview, the list of sources with their state, and **Refresh**, **Settings…** and
   **Quit**.
   - The footer says when the last check was ("Checked 14 s ago"), or "Retrying in 46 s" when unreachable.
   - It sizes to its content up to about a quarter of the screen height, then scrolls.
@@ -143,21 +144,21 @@ servers.
   - "‹ Problems" (or Escape) goes back; "2 of 6" with up/down buttons (or the arrow keys) steps through the
     problems without going back.
   - Why in the panel, not a window: the menu bar panel closes as soon as it loses focus.
-- The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
-  - **Servers**: the server list (switch, bell, edit, duplicate, refresh, delete), the Add button and the advanced
+- The Settings window has a sidebar with Sources, Alerts, Team, Account and About Polly.
+  - **Sources**: the source list (switch, bell, edit, duplicate, refresh, delete), the Add button and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
   - **About Polly**: version and build number and **What's New**.
 
 ## iPhone and iPad
 
-- The app has three tabs: Problems, Servers and Settings.
+- The app has three tabs: Problems, Sources and Settings.
 - **Problems** shows the overview.
   - Filter chips per severity ("All N", "Critical 2", ...) limit the list to one severity.
-  - An unreachable server is listed separately below the problems.
-  - A button in the toolbar shows the number of servers and switches to the Servers tab.
-  - Tapping a problem opens its detail; pull to refresh refreshes that problem's server.
-    - When the server no longer reports the problem, the detail says "Problem resolved".
-- **Servers** lists the servers with their state, switch and bell; add, edit, duplicate, refresh and delete them
+  - An unreachable source is listed separately below the problems.
+  - A button in the toolbar shows the number of sources and switches to the Sources tab.
+  - Tapping a problem opens its detail; pull to refresh refreshes that problem's source.
+    - When the source no longer reports the problem, the detail says "Problem resolved".
+- **Sources** lists the sources with their state, switch and bell; add, edit, duplicate, refresh and delete them
   there.
 - **Settings** has the password storage and debug log settings, the version and build number, and **What's New**.
 - Polly only polls while the app is in the foreground.
@@ -166,11 +167,11 @@ servers.
 ## Problem detail
 
 - Shows the severity, its retry state ("SOFT 2/3" / "HARD 3/3"), ACK and DOWNTIME tags, service, host and the
-  server with its type.
+  source with its type.
 - Shows the check output and long output (selectable).
 - Shows the duration with its start time, how long ago the last check was, and when the next check is.
   - A value the server didn't send is shown as "Unknown".
-- Shows the actions the server type supports (Nagios: all of them; URL: none).
+- Shows the actions the source type supports (Nagios: all of them; URL: none).
   - **Acknowledge…** (disabled when already acknowledged) and **Schedule downtime…**.
   - **Open in Nagios**: the check's page in the Nagios web UI.
   - **Related link**: the action or notes link configured for the check.
@@ -221,8 +222,8 @@ servers.
 
 ## Nagios monitoring
 
-- Every enabled server is polled every 60 seconds, all servers in parallel.
-  - A result that arrives after the server was paused or deleted is discarded.
+- Every enabled source is polled every 60 seconds, all sources in parallel.
+  - A result that arrives after the source was paused or deleted is discarded.
   - When a poll and a manual refresh overlap, the answer of the refresh started last wins, whichever arrives
     first.
   - A server that refuses the connection must not crash the app.
@@ -258,15 +259,15 @@ servers.
 
 ## Notifications
 
-- Notifications are per server and off by default.
+- Notifications are per source and off by default.
   - Turning them on asks the system for permission; if it's refused, the user is told to allow notifications in
     the system settings.
   - Notifications enabled by hand in `polly.yaml` also ask for permission before the first notification.
 - They are local notifications decided by Polly; the Nagios notification configuration is not touched.
 - The first successful poll is the baseline and never notifies.
-- After that, new problems, severity changes and recoveries are bundled into one notification per server.
+- After that, new problems, severity changes and recoveries are bundled into one notification per source.
   - At most five lines; beyond that the last line says "and N more".
-  - A newer notification for a server replaces the older one.
+  - A newer notification for a source replaces the older one.
   - Notifications are also shown while Polly is in the foreground.
 - Acknowledged problems and problems in scheduled downtime don't notify, including when they recover during the
   downtime.
@@ -277,19 +278,21 @@ servers.
 
 ## Settings and storage
 
-- Servers and settings are stored in one human-readable YAML file, `polly.yaml`, in Polly's Application Support
+- Sources and settings are stored in one human-readable YAML file, `polly.yaml`, in Polly's Application Support
   folder.
   - The file may be edited by hand while Polly isn't running; it is read at startup and rewritten after every
     change.
-  - Every key is optional, but an invalid value (such as an unknown server `type`) is an error.
-  - A server without `type` is a Nagios server.
+  - Every key is optional, but an invalid value (such as an unknown source `type`) is an error.
+  - A source without `type` is a Nagios source.
+  - Sources are listed under `sources:`. A file that still uses the old `servers:` key is rewritten with
+    `sources:` once at startup; a file with both keys is an error.
   - If the file can't be read, Polly runs with in-memory settings and doesn't overwrite the file.
   - The file is only readable by the user, as it may contain passwords.
 - Passwords are stored in the keychain by default.
   - A setting stores them unencrypted in `polly.yaml` instead, after which the keychain is never touched.
     - Why: debug builds triggered keychain prompts on every rebuild.
   - Switching moves all existing passwords; if reading them fails, nothing is moved.
-- Settings (macOS: Advanced in the Servers pane; iOS: the Settings tab):
+- Settings (macOS: Advanced in the Sources pane; iOS: the Settings tab):
   - **Store passwords in Keychain**.
   - **Show Dock icon** (macOS only).
   - **Log server traffic**: writes every request and response to `polly-debug.log` next to `polly.yaml`, with
@@ -305,7 +308,7 @@ Drawn from the design and tagged as such, but without function:
 - **Recheck now** in the problem detail.
 - **Notified** in the problem detail (Polly keeps no record of what it notified about).
 - Other monitoring systems in the Type control (Icinga 2, Checkmk, Zabbix).
-- Poll interval and "Verify TLS certificate" in the add-server form; the interval is fixed at 60 seconds.
+- Poll interval and "Verify TLS certificate" in the add-source form; the interval is fixed at 60 seconds.
 - The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
   services on down hosts), notification rules and quiet hours.
 - The Team pane remains labeled **PLACEHOLDER** and explains the ideas for a future version:

@@ -1,6 +1,6 @@
 import Foundation
 
-/// How one server is shown in a server list: an icon that only says whether Polly can reach the monitor,
+/// How one source is shown in a source list: an icon that only says whether Polly can reach it,
 /// and one line with what it reports, each problem count a part of its own so it can carry a status icon.
 public struct ServerLine: Equatable, Sendable {
     public enum Icon: Equatable, Sendable {

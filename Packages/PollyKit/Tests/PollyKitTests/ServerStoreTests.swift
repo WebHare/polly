@@ -51,6 +51,19 @@ struct ServerStoreTests {
         #expect(store.allServers().isEmpty)
     }
 
+    // TODO: Remove with the `servers:` migration after 2026-11-23.
+    @Test func migratesLegacyServersKeyOnce() throws {
+        let file = tempFile()
+        defer { try? FileManager.default.removeItem(at: file) }
+        try "servers:\n  - name: Prod\n    url: https://mon.example.com\n".write(to: file, atomically: true, encoding: .utf8)
+
+        let store = try ServerStore(fileURL: file, credentials: InMemoryCredentialStore())
+        #expect(store.allServers().map(\.name) == ["Prod"])
+        let rewritten = try String(contentsOf: file, encoding: .utf8)
+        #expect(rewritten.contains("\nsources:\n  - name: Prod\n"))
+        #expect(!rewritten.contains("servers:"))
+    }
+
     @Test func switchingPasswordStorageMovesPasswords() throws {
         let file = tempFile()
         defer { try? FileManager.default.removeItem(at: file) }

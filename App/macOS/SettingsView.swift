@@ -5,7 +5,7 @@ import SwiftUI
 /// Servers is real; Alerts is a clickable prototype; Team and Account are placeholders.
 struct SettingsView: View {
     enum Pane: String, CaseIterable, Identifiable {
-        case servers = "Servers"
+        case servers = "Sources"
         case alerts = "Alerts"
         case team = "Team"
         case account = "Account"
@@ -180,7 +180,7 @@ private struct ServersPane: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            PaneHeader(title: "Servers",
+            PaneHeader(title: "Sources",
                        subtitle: "Polly polls these straight from this Mac. Nothing goes through our servers.")
             HStack {
                 Spacer()
@@ -207,7 +207,7 @@ private struct ServersPane: View {
     private var serverList: some View {
         VStack(spacing: 0) {
             if monitor.servers.isEmpty {
-                Text("No servers yet. Click Add to get started.")
+                Text("No sources yet. Click Add to get started.")
                     .foregroundStyle(theme.faint)
                     .padding(.vertical, 10)
                     .padding(.horizontal, 12)
@@ -238,11 +238,11 @@ private struct ServersPane: View {
             .labelStyle(.iconOnly)
             .buttonStyle(.borderless)
             .foregroundStyle(theme.faint)
-            .help(server.notifications ? "Notifications are on for this server" : "Notifications are off for this server")
+            .help(server.notifications ? "Notifications are on for this source" : "Notifications are off for this source")
             Toggle("Monitor \(server.name)", isOn: enabledBinding(for: server))
                 .labelsHidden()
                 .toggleStyle(PollyToggleStyle())
-                .help(server.enabled ? "Pause monitoring this server" : "Resume monitoring this server")
+                .help(server.enabled ? "Pause monitoring this source" : "Resume monitoring this source")
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
@@ -388,7 +388,7 @@ private struct ServerFormSheet: View {
 
     private var serverFormCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(model.isEditing ? "Edit monitoring server" : "Add a monitoring server").font(.system(size: 15, weight: .bold))
+            Text(model.isEditing ? "Edit source" : "Add a source").font(.system(size: 15, weight: .bold))
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
                 GridRow {
                     label("Type")
@@ -470,7 +470,7 @@ private struct ServerFormSheet: View {
                 Button("Cancel") { close() }
                     .keyboardShortcut(.cancelAction)
                     .disabled(model.checkState == .checking)
-                Button(model.isEditing ? "Save" : "Add server") { Task { await testAndSave() } }
+                Button(model.isEditing ? "Save" : "Add source") { Task { await testAndSave() } }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
                     .disabled(!model.canSubmit)
             }
@@ -539,7 +539,7 @@ private struct ServerFormSheet: View {
             }
             close()
         } catch {
-            errorMessage = "Could not save server: \(error.localizedDescription)"
+            errorMessage = "Could not save source: \(error.localizedDescription)"
         }
     }
 }

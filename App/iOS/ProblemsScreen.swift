@@ -4,7 +4,7 @@ import SwiftUI
 /// The main iPhone screen: Polly's summary, the problems of all servers grouped by severity, or one of the
 /// empty states (no servers, all quiet, server unreachable).
 struct ProblemsScreen: View {
-    /// Switches to the Servers tab.
+    /// Switches to the Sources tab.
     let showServers: () -> Void
 
     @Environment(MonitorModel.self) private var monitor
@@ -31,7 +31,7 @@ struct ProblemsScreen: View {
         .toolbar {
             if !monitor.servers.isEmpty {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button(monitor.servers.count == 1 ? "1 server" : "\(monitor.servers.count) servers", action: showServers)
+                    Button(monitor.servers.count == 1 ? "1 source" : "\(monitor.servers.count) sources", action: showServers)
                         .font(.system(size: 15))
                         .foregroundStyle(theme.link)
                 }
@@ -170,7 +170,7 @@ struct ProblemsScreen: View {
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
                 Text("Add a Nagios server or a URL and Polly starts polling right away.")
                     .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
-                Menu("Add server…") {
+                Menu("Add source…") {
                     Button("Nagios Server…", systemImage: "server.rack") { adding = .nagios }
                     Button("URL…", systemImage: "globe") { adding = .url }
                 }
@@ -180,7 +180,7 @@ struct ProblemsScreen: View {
                 .padding(.top, 10)
             case .waiting:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
-                Text(summary.isPaused ? "Turn a server back on and Polly starts checking again." : "Waiting for the first answer.")
+                Text(summary.isPaused ? "Turn a source back on and Polly starts checking again." : "Waiting for the first answer.")
                     .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
             case .unreachable:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
@@ -189,7 +189,7 @@ struct ProblemsScreen: View {
                 HStack(spacing: 8) {
                     Button("Retry now") { Task { await monitor.refreshAll() } }
                         .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 16, vertical: 9, radius: 10))
-                    Button("Edit server…") {
+                    Button("Edit source…") {
                         monitor.editRequest = summary.unreachable?.server.id
                         showServers()
                     }
