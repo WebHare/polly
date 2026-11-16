@@ -212,7 +212,8 @@ must provide their own store configuration and use the portable compact duration
 
 Native verification used macOS arm64, Swift 6.2 / Xcode 26.0.1: 109 tests executed with mock integration and
 Keychain enabled, plus the four external URL checks separately. Both the universal macOS Release build
-and iOS Simulator Release build pass. Linux amd64 and physical iOS devices have not been verified.
+and iOS Simulator Release build pass. CI also verifies all 100 portable tests on Linux amd64 with Swift
+6.4.2, including real HTTP mock integration. Physical iOS devices have not been verified.
 The opt-in Keychain test uses a unique temporary service and deletes its own credentials:
 
 ```sh
