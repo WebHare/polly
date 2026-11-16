@@ -4,16 +4,25 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ## [Unreleased]
 
+### Added
+
+- Edit a server: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
+- Duplicate a server to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
+- **Edit server…** on the "Polly can't reach" screen opens the form for that server.
+
 ### Changed
 
 - Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
 
 - Open the macOS add-server form in a modal using Add above the server list.
+- The server form asks for the URL before the name, and the example URL no longer looks filled in.
 
 ### Fixed
 
 - Refresh immediately when returning to Polly on iPhone or iPad, and pause polling while inactive.
 - Disable downtime presets when an edited start time does not match every possible server date format.
+- A URL pasted with a username and password no longer keeps showing them in the URL field on macOS.
+- **Add server** on macOS stayed disabled after entering a URL.
 
 ## [0.2.0] - 2026-11-15
 

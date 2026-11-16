@@ -53,7 +53,7 @@ struct URLKindTests {
     }
 
     @MainActor @Test func addFormForAURL() throws {
-        let model = AddServerModel(kind: .url)
+        let model = ServerFormModel(kind: .url)
         model.urlText = "www.example.com/status"
         let server = try #require(model.makeServer())
         #expect(server.kind == .url)

@@ -41,7 +41,7 @@ struct ProblemsScreen: View {
         .navigationDestination(for: ProblemEntry.ID.self) { id in
             PhoneProblemDetail(entryID: id)
         }
-        .sheet(item: $adding) { kind in AddServerView(kind: kind) }
+        .sheet(item: $adding) { kind in ServerFormView(model: ServerFormModel(kind: kind)) }
         .onChange(of: summary.groups.map(\.severity)) { _, severities in
             if let filter, !severities.contains(filter) { self.filter = nil }
         }
@@ -189,7 +189,10 @@ struct ProblemsScreen: View {
                 HStack(spacing: 8) {
                     Button("Retry now") { Task { await monitor.refreshAll() } }
                         .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 16, vertical: 9, radius: 10))
-                    Button("Edit server…", action: showServers)
+                    Button("Edit server…") {
+                        monitor.editRequest = summary.unreachable?.server.id
+                        showServers()
+                    }
                         .buttonStyle(PollyButtonStyle(horizontal: 16, vertical: 9, radius: 10))
                 }
                 .font(.system(size: 14, weight: .semibold))

@@ -24,6 +24,7 @@ struct SettingsView: View {
         }
     }
 
+    @Environment(MonitorModel.self) private var monitor
     @State private var pane = Pane.servers
 
     var body: some View {
@@ -48,6 +49,9 @@ struct SettingsView: View {
         .frame(minWidth: 800, minHeight: 560)
         .modifier(WindowBackground())
         .pollyThemed()
+        .onChange(of: monitor.editRequest, initial: true) {
+            if monitor.editRequest != nil { pane = .servers }
+        }
     }
 }
 
@@ -165,8 +169,10 @@ extension SwitchRow where Accessory == EmptyView {
 private struct ServersPane: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
-    @State private var model = AddServerModel()
-    @State private var addingServer = false
+    /// The open add/edit form, if any; it says what it is for.
+    @State private var form: ServerFormModel?
+    /// The type last used in the add form, so the next one starts with it.
+    @State private var lastKind = BackendKind.nagios
     @State private var errorMessage: String?
 
     private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
@@ -177,23 +183,20 @@ private struct ServersPane: View {
                        subtitle: "Polly polls these straight from this Mac. Nothing goes through our servers.")
             HStack {
                 Spacer()
-                Button("Add", systemImage: "plus") { addingServer = true }
+                Button("Add", systemImage: "plus") { openForm(ServerFormModel(kind: lastKind)) }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
             }
             serverList
             advanced
         }
-        .sheet(isPresented: $addingServer, onDismiss: resetForm) {
-            addServerCard
-                .frame(width: 720)
-                .interactiveDismissDisabled(model.checkState == .checking)
-                .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
-                    Button("OK") { errorMessage = nil }
-                } message: { Text($0) }
+        .sheet(item: $form) { form in
+            ServerFormSheet(model: form) {
+                if !form.isEditing { lastKind = form.kind }
+                self.form = nil
+            }
         }
-        .onAppear { syncWireLog() }
-        .onChange(of: monitor.debugLog) { syncWireLog() }
-        .alert("Error", isPresented: .constant(errorMessage != nil && !addingServer), presenting: errorMessage) { _ in
+        .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
+        .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
     }
@@ -243,139 +246,14 @@ private struct ServersPane: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
+        .onTapGesture(count: 2) { edit(server) }
         .contextMenu {
+            Button("Edit…") { edit(server) }
+            Button("Duplicate…") { duplicate(server) }
+            Divider()
             Button("Refresh") { Task { await monitor.refresh(server) } }
             Button("Delete", role: .destructive) { delete(server) }
         }
-    }
-
-    // MARK: Add server
-
-    private var addServerCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Add a monitoring server").font(.system(size: 15, weight: .bold))
-            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
-                GridRow {
-                    label("Type")
-                    HStack(spacing: 8) {
-                        TypePicker(selection: $model.kind)
-                        PlaceholderTag()
-                    }
-                }
-                GridRow {
-                    label("Name")
-                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
-                        .pollyField()
-                }
-                GridRow {
-                    label("URL")
-                    TextField("URL", text: $model.urlText,
-                              prompt: Text(model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        .pollyField()
-                }
-                GridRow {
-                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                    (model.kind == .url
-                        ? Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
-                        : Text("Polly reads ")
-                            + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
-                            + Text(" (Nagios 4.4 or newer)."))
-                        .font(.system(size: 12))
-                        .foregroundStyle(theme.faint)
-                        .padding(.top, -4)
-                }
-                GridRow {
-                    label("Username")
-                    TextField("Username", text: $model.username)
-                        .textContentType(.username)
-                        .autocorrectionDisabled()
-                        .pollyField()
-                }
-                GridRow {
-                    label("Password")
-                    HStack(spacing: 10) {
-                        SecureField("Password", text: $model.password)
-                            .textContentType(.password)
-                            .pollyField()
-                        Text(monitor.passwordStorage == .keychain ? "Stored in your Keychain" : "Stored in polly.yaml")
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.faint)
-                    }
-                }
-                GridRow {
-                    label("Poll every")
-                    HStack(spacing: 8) {
-                        HStack(spacing: 14) {
-                            Text("\(pollSeconds) seconds ⌄")
-                                .padding(.vertical, 4)
-                                .padding(.horizontal, 10)
-                                .background(theme.field, in: RoundedRectangle(cornerRadius: 6))
-                                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(theme.fieldBorder, lineWidth: 1))
-                            Toggle("Verify TLS certificate", isOn: .constant(true))
-                                .toggleStyle(PollyCheckboxStyle())
-                        }
-                        .placeholderControl()
-                        PlaceholderTag()
-                    }
-                }
-            }
-            .disabled(model.checkState == .checking)
-            banner
-            HStack(spacing: 8) {
-                Button(model.checkState == .idle ? "Test connection" : "Test again") {
-                    Task { await test() }
-                }
-                .disabled(!model.canSubmit)
-                if case .failed = model.checkState {
-                    Button("Add anyway") { save() }
-                }
-                Spacer()
-                Button("Cancel") { addingServer = false }
-                    .keyboardShortcut(.cancelAction)
-                    .disabled(model.checkState == .checking)
-                Button("Add server") { Task { await testAndAdd() } }
-                    .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
-                    .disabled(!model.canSubmit)
-            }
-            .buttonStyle(PollyButtonStyle(kind: .outlined, horizontal: 12, vertical: 4, radius: 6))
-        }
-        .padding(.vertical, 16)
-        .padding(.horizontal, 18)
-        .settingsCard()
-    }
-
-    private func label(_ text: String) -> some View {
-        Text(text).foregroundStyle(theme.muted).frame(width: 110, alignment: .trailing)
-    }
-
-    @ViewBuilder private var banner: some View {
-        switch model.checkState {
-        case .idle:
-            EmptyView()
-        case .checking:
-            HStack(spacing: 8) {
-                ProgressView().controlSize(.small)
-                Text("Testing connection…").foregroundStyle(theme.muted)
-            }
-        case .succeeded:
-            bannerRow(severity: .ok, background: theme.successBackground,
-                      text: Text("Connected.").bold() + Text(" Polly likes this one."))
-        case .failed(let message):
-            bannerRow(severity: .critical, background: theme.failureBackground, text: Text(message))
-        }
-    }
-
-    private func bannerRow(severity: Severity, background: Color, text: Text) -> some View {
-        HStack(spacing: 8) {
-            StatusIcon(severity: severity, size: 16)
-            text.frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .foregroundStyle(theme.severityText(severity))
-        .padding(.vertical, 8)
-        .padding(.horizontal, 10)
-        .background(background, in: RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: Advanced
@@ -411,36 +289,24 @@ private struct ServersPane: View {
 
     // MARK: Actions
 
-    private func syncWireLog() {
-        model.wireLog = monitor.debugLog ? monitor.wireLog : nil
+    private func openForm(_ form: ServerFormModel) {
+        form.wireLog = monitor.debugLog ? monitor.wireLog : nil
+        self.form = form
     }
 
-    private func resetForm() {
-        model = AddServerModel(kind: model.kind)
-        syncWireLog()
+    private func edit(_ server: NagiosServer) {
+        do { openForm(try monitor.editForm(for: server)) } catch { errorMessage = error.localizedDescription }
     }
 
-    private func test() async {
-        await model.testConnection()
+    private func duplicate(_ server: NagiosServer) {
+        do { openForm(try monitor.duplicateForm(for: server)) } catch { errorMessage = error.localizedDescription }
     }
 
-    private func testAndAdd() async {
-        if model.checkState == .succeeded {
-            save()
-        } else if await model.testConnection() {
-            save()
-        }
-        // On failure the banner shows the error and "Add anyway" appears.
-    }
-
-    private func save() {
-        guard let server = model.makeServer() else { return }
-        do {
-            try monitor.add(server, password: model.password.isEmpty ? nil : model.password)
-            addingServer = false
-        } catch {
-            errorMessage = "Could not save server: \(error.localizedDescription)"
-        }
+    private func openRequestedEdit() {
+        guard let id = monitor.editRequest else { return }
+        monitor.editRequest = nil
+        guard form == nil, let server = monitor.servers.first(where: { $0.id == id }) else { return }
+        edit(server)
     }
 
     private var keychainBinding: Binding<Bool> {
@@ -498,6 +364,185 @@ private struct ServersPane: View {
         do { try monitor.delete(server) } catch { errorMessage = error.localizedDescription }
     }
 }
+
+/// The add/edit server form, shown as a sheet. It gets the form model directly, so the fields and the
+/// buttons always work on the same model and this view updates as it changes.
+private struct ServerFormSheet: View {
+    @Bindable var model: ServerFormModel
+    let close: () -> Void
+    @Environment(MonitorModel.self) private var monitor
+    @Environment(\.pollyTheme) private var theme
+    @State private var errorMessage: String?
+
+    private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
+
+    var body: some View {
+        serverFormCard
+            .frame(width: 720)
+            .interactiveDismissDisabled(model.checkState == .checking)
+            .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
+                Button("OK") { errorMessage = nil }
+            } message: { Text($0) }
+    }
+
+    private var serverFormCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(model.isEditing ? "Edit monitoring server" : "Add a monitoring server").font(.system(size: 15, weight: .bold))
+            Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
+                GridRow {
+                    label("Type")
+                    HStack(spacing: 8) {
+                        TypePicker(selection: $model.kind)
+                        PlaceholderTag()
+                    }
+                }
+                GridRow {
+                    label("URL")
+                    TextField("URL", text: $model.urlFieldText,
+                              prompt: Text(verbatim: model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
+                        .textContentType(.URL)
+                        .autocorrectionDisabled()
+                        .pollyField()
+                }
+                GridRow {
+                    Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                    (model.kind == .url
+                        ? Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
+                        : Text("Polly reads ")
+                            + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
+                            + Text(" (Nagios 4.4 or newer)."))
+                        .font(.system(size: 12))
+                        .foregroundStyle(theme.faint)
+                        .padding(.top, -4)
+                }
+                GridRow {
+                    label("Name")
+                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
+                        .pollyField()
+                }
+                GridRow {
+                    label("Username")
+                    TextField("Username", text: $model.username)
+                        .textContentType(.username)
+                        .autocorrectionDisabled()
+                        .pollyField()
+                }
+                GridRow {
+                    label("Password")
+                    HStack(spacing: 10) {
+                        SecureField("Password", text: $model.password)
+                            .textContentType(.password)
+                            .pollyField()
+                        Text(monitor.passwordStorage == .keychain ? "Stored in your Keychain" : "Stored in polly.yaml")
+                            .font(.system(size: 12))
+                            .foregroundStyle(theme.faint)
+                    }
+                }
+                GridRow {
+                    label("Poll every")
+                    HStack(spacing: 8) {
+                        HStack(spacing: 14) {
+                            Text("\(pollSeconds) seconds ⌄")
+                                .padding(.vertical, 4)
+                                .padding(.horizontal, 10)
+                                .background(theme.field, in: RoundedRectangle(cornerRadius: 6))
+                                .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(theme.fieldBorder, lineWidth: 1))
+                            Toggle("Verify TLS certificate", isOn: .constant(true))
+                                .toggleStyle(PollyCheckboxStyle())
+                        }
+                        .placeholderControl()
+                        PlaceholderTag()
+                    }
+                }
+            }
+            .disabled(model.checkState == .checking)
+            banner
+            HStack(spacing: 8) {
+                Button(model.checkState == .idle ? "Test connection" : "Test again") {
+                    Task { await test() }
+                }
+                .disabled(!model.canSubmit)
+                if case .failed = model.checkState {
+                    Button(model.isEditing ? "Save anyway" : "Add anyway") { save() }
+                }
+                Spacer()
+                Button("Cancel") { close() }
+                    .keyboardShortcut(.cancelAction)
+                    .disabled(model.checkState == .checking)
+                Button(model.isEditing ? "Save" : "Add server") { Task { await testAndSave() } }
+                    .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
+                    .disabled(!model.canSubmit)
+            }
+            .buttonStyle(PollyButtonStyle(kind: .outlined, horizontal: 12, vertical: 4, radius: 6))
+        }
+        .padding(.vertical, 16)
+        .padding(.horizontal, 18)
+        .settingsCard()
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text).foregroundStyle(theme.muted).frame(width: 110, alignment: .trailing)
+    }
+
+    @ViewBuilder private var banner: some View {
+        switch model.checkState {
+        case .idle:
+            EmptyView()
+        case .checking:
+            HStack(spacing: 8) {
+                ProgressView().controlSize(.small)
+                Text("Testing connection…").foregroundStyle(theme.muted)
+            }
+        case .succeeded:
+            bannerRow(severity: .ok, background: theme.successBackground,
+                      text: Text("Connected.").bold() + Text(" Polly likes this one."))
+        case .failed(let message):
+            bannerRow(severity: .critical, background: theme.failureBackground, text: Text(message))
+        }
+    }
+
+    private func bannerRow(severity: Severity, background: Color, text: Text) -> some View {
+        HStack(spacing: 8) {
+            StatusIcon(severity: severity, size: 16)
+            text.frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .foregroundStyle(theme.severityText(severity))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(background, in: RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: Actions
+
+    private func test() async {
+        await model.testConnection()
+    }
+
+    private func testAndSave() async {
+        if model.checkState == .succeeded || !model.needsConnectionTest {
+            save()
+        } else if await model.testConnection() {
+            save()
+        }
+        // On failure the banner shows the error and "Add anyway" / "Save anyway" appears.
+    }
+
+    private func save() {
+        guard let server = model.makeServer() else { return }
+        let password = model.password.isEmpty ? nil : model.password
+        do {
+            if model.isEditing {
+                try monitor.update(server, password: password)
+            } else {
+                try monitor.add(server, password: password)
+            }
+            close()
+        } catch {
+            errorMessage = "Could not save server: \(error.localizedDescription)"
+        }
+    }
+}
+
 
 /// The type segmented control: Nagios and URL work, the other systems are drawn from the design.
 private struct TypePicker: View {

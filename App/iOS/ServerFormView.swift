@@ -1,17 +1,18 @@
 import PollyKit
 import SwiftUI
 
-/// Form for adding a Nagios server or a URL to check. Pasting `https://user:pass@host/` fills username and
-/// password. The connection is tested before saving; if the test fails the user can still choose "Add Anyway".
-struct AddServerView: View {
+/// Form for adding, editing or duplicating a Nagios server or a URL to check. Pasting `https://user:pass@host/`
+/// fills username and password. The connection is tested before saving (for an edit only when the connection
+/// changed); if the test fails the user can still choose "Add Anyway" / "Save Anyway".
+struct ServerFormView: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.dismiss) private var dismiss
     @Environment(\.pollyTheme) private var theme
-    @State private var model: AddServerModel
+    @State private var model: ServerFormModel
     @State private var saveError: String?
 
-    init(kind: BackendKind) {
-        _model = State(initialValue: AddServerModel(kind: kind))
+    init(model: ServerFormModel) {
+        _model = State(initialValue: model)
     }
 
     private var isURLMonitor: Bool { model.kind == .url }
@@ -20,8 +21,8 @@ struct AddServerView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("URL", text: $model.urlText,
-                              prompt: Text(isURLMonitor ? "https://www.example.com/" : "https://nagios.example.com"))
+                    TextField("URL", text: $model.urlFieldText,
+                              prompt: Text(verbatim: isURLMonitor ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
@@ -62,17 +63,19 @@ struct AddServerView: View {
             }
             .formStyle(.grouped)
             .phoneListBackground(theme)
-            .navigationTitle(isURLMonitor ? "Add URL" : "Add Nagios Server")
+            .navigationTitle(model.isEditing ? (isURLMonitor ? "Edit URL" : "Edit Nagios Server")
+                             : (isURLMonitor ? "Add URL" : "Add Nagios Server"))
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Add") { Task { await testAndAdd() } }
+                    Button(model.isEditing ? "Save" : "Add") { Task { await testAndSave() } }
                         .disabled(!model.canSubmit)
                 }
             }
         }
+        .interactiveDismissDisabled(model.checkState == .checking)
         .onAppear { model.wireLog = monitor.debugLog ? monitor.wireLog : nil }
     }
 
@@ -92,7 +95,7 @@ struct AddServerView: View {
                     .foregroundStyle(theme.severityText(.critical))
                 HStack {
                     Button("Retry") { Task { await model.testConnection() } }
-                    Button("Add Anyway") { save() }
+                    Button(model.isEditing ? "Save Anyway" : "Add Anyway") { save() }
                 }
             }
         }
@@ -101,19 +104,24 @@ struct AddServerView: View {
         }
     }
 
-    private func testAndAdd() async {
-        if model.checkState == .succeeded {
+    private func testAndSave() async {
+        if model.checkState == .succeeded || !model.needsConnectionTest {
             save()
         } else if await model.testConnection() {
             save()
         }
-        // On failure the form shows the error with an "Add Anyway" override.
+        // On failure the form shows the error with an "Add Anyway" / "Save Anyway" override.
     }
 
     private func save() {
         guard let server = model.makeServer() else { return }
+        let password = model.password.isEmpty ? nil : model.password
         do {
-            try monitor.add(server, password: model.password.isEmpty ? nil : model.password)
+            if model.isEditing {
+                try monitor.update(server, password: password)
+            } else {
+                try monitor.add(server, password: password)
+            }
             dismiss()
         } catch {
             saveError = "Could not save server: \(error.localizedDescription)"
