@@ -10,14 +10,32 @@ struct ProblemDetailView: View {
     let back: () -> Void
     /// Moves to the previous (-1) or next (+1) problem without going back to the list.
     let step: (Int) -> Void
+    /// Known before the view appears, so the action buttons slide in with the rest of the detail.
+    private let capabilities: BackendCapabilities
 
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.openURL) private var openURL
     @Environment(\.pollyTheme) private var theme
-    @State private var capabilities: BackendCapabilities = []
     @State private var command: (any PreparedCommand)?
     @State private var working = false
     @State private var message: String?
+
+    init(entry: ProblemEntry, position: Int, total: Int, capabilities: Result<BackendCapabilities, any Error>,
+         back: @escaping () -> Void, step: @escaping (Int) -> Void) {
+        self.entry = entry
+        self.position = position
+        self.total = total
+        self.back = back
+        self.step = step
+        switch capabilities {
+        case .success(let capabilities):
+            self.capabilities = capabilities
+        case .failure(let error):
+            // Without this a password that can't be read looks like a server without any actions.
+            self.capabilities = []
+            _message = State(initialValue: error.localizedDescription)
+        }
+    }
 
     private var problem: ServiceProblem { entry.problem }
     private var server: NagiosServer { entry.server }
@@ -42,16 +60,6 @@ struct ProblemDetailView: View {
             }
         }
         .frame(maxHeight: .infinity, alignment: .top)
-        // Creating a backend reads the password, so only do that for a problem that is actually opened.
-        .onAppear {
-            do {
-                capabilities = try monitor.backend(for: server).capabilities
-            } catch {
-                // Without this a password that can't be read looks like a server without any actions.
-                capabilities = []
-                message = error.localizedDescription
-            }
-        }
     }
 
     private func bar(@ViewBuilder content: () -> some View) -> some View {
