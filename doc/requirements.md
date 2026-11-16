@@ -295,7 +295,24 @@ servers.
 ## Web service
 
 - A standalone web service can monitor Nagios on macOS and Linux without running the native app.
-  - This stage provides a small start page and a status API. The designed dashboard is not included yet.
+  - The dashboard uses Polly's own status shapes, fonts and four animated mascot poses, with dark as the
+    default and a light-theme button. All artwork and fonts load locally; no CDN is required.
+  - Separate figures show hosts down and critical, warning and unknown services. Source coverage and
+    reachability remain visible alongside problems, including when another source is critical.
+  - Empty configuration, all paused, waiting, unknown, partial coverage and unreachable sources have
+    explicit messages and never use the healthy pose.
+  - A viewer can expand any problem with a click, Enter or Space to read the full, literal Nagios output
+    and long output. ACK and DOWNTIME are informational markers, not actions.
+    - Long names and output wrap in details. Refreshing an unchanged row preserves focus and open details.
+  - The layout scales for 1080p and 4K, becomes compact at 720p, and uses a vertical list on tablets/phones.
+    - Eight collapsed rows fit at 1080p/4K and five at 720p. Larger lists currently scroll; automatic
+      pagination and unattended-display recovery are still being built.
+  - A viewer can pause mascot motion. System reduced-motion preferences stop the loops, as do a hidden
+    browser tab or a mascot outside the viewport. Status remains understandable without motion.
+  - The page reads current status every five seconds without triggering an upstream poll. A failed read
+    immediately marks retained values as old data and shows a disconnected pose while retrying.
+    - Browser-side monotonic freshness and resume handling are not yet complete; this stage is not the
+      final unattended-TV release.
   - It has no acknowledgements, downtime actions, rechecks, configuration writes or arbitrary-URL proxy.
 - The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
   - The file is read once at startup and never rewritten. Restart to apply changes.

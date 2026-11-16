@@ -175,9 +175,18 @@ def main():
                 assert request(base + path, password="wrong")[0] == 401
                 assert request(base + path, password=PASSWORD)[0] == 200
             for path in ["/polly.yaml", "/viewer.hash", "/../polly.yaml", "/%2e%2e/viewer.hash", "/api/command"]:
-                assert request(base + path, password=PASSWORD)[0] == 404
+                assert request(base + path, password=PASSWORD)[0] in (403, 404)
             for method in ["POST", "PUT", "PATCH", "DELETE"]:
                 assert request(base + "/api/status", password=PASSWORD, method=method)[0] == 405
+            for path, mime in [("/app.mjs", "javascript"), ("/dashboard.mjs", "javascript"),
+                               ("/dashboard.css", "text/css"), ("/design.mjs", "javascript"),
+                               ("/fonts/83ddc2f0-8211-487f-a86b-c3e677e1d298.woff2", "font/woff2")]:
+                assert request(base + path)[0] == 401
+                status, headers, body = request(base + path, password=PASSWORD)
+                assert status == 200 and mime in headers["Content-Type"] and body
+                assert headers["Cache-Control"] == "no-store"
+            for path in ["/__test__/fixtures.mjs", "/doc/design/polly-web/source/Polly%20Animations.html"]:
+                assert request(base + path, password=PASSWORD)[0] == 404
             assert config.read_text() == yaml
             assert not (directory / "polly-debug.log").exists()
             stop(service)

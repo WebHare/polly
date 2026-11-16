@@ -223,8 +223,9 @@ POLLY_KEYCHAIN_TESTS=1 swift test --package-path /absolute/path/to/polly/Package
 ## Web service
 
 `Packages/PollyWeb` is a separate executable package. It uses Vapor 4.122.3 and its committed lockfile;
-native apps still depend only on PollyKit. Build with Apple Swift 6.2 or Linux Swift 6.4.2. The start page is
-intentionally small at this stage; the status API is ready for the dashboard.
+native apps still depend only on PollyKit. Build with Apple Swift 6.2 or Linux Swift 6.4.2. The bundled
+HTML/CSS/JavaScript dashboard uses the same-origin status API. Its fonts and artwork require no internet
+connection. Browser pagination and the final unattended-TV recovery cycle are a subsequent stage.
 
 Copy [examples/polly-web.yaml](examples/polly-web.yaml) to a private location outside the checkout. Set its
 Nagios URLs and credentials, use file permissions `600`, and leave `passwordStorage: file`. The service
@@ -327,3 +328,46 @@ xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destin
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
 ```
+
+### Dashboard development and tests
+
+The production public directory is `Packages/PollyWeb/Sources/PollyWeb/Public`. Keep test fixtures and
+original design exports outside it. The authenticated FileMiddleware serves only that bundled directory;
+WOFF2 gets an explicit MIME type because Vapor 4.122.3 does not define one. Inline script/style is not
+allowed by the production CSP. Generated SVG styles are external CSS classes, preserving the exact pivots.
+
+Use absolute checkout paths in these commands:
+
+```sh
+python3 /absolute/path/to/polly/scripts/generate-web-design.py --check
+node --test /absolute/path/to/polly/scripts/web/design.test.mjs /absolute/path/to/polly/scripts/web/presentation.test.mjs
+```
+
+Omit `--check` to regenerate. The five original export hashes are verified before generation, and the
+Node tests compare SVG trees, origins and animation timings directly to the archived source. See
+[design provenance and fonts](doc/design/polly-web/README.md).
+
+For manual inspection, start the loopback-only preview (Ctrl-C stops it):
+
+```sh
+python3 /absolute/path/to/polly/scripts/preview-web.py
+```
+
+The printed URL supports `?state=quiet`, `warning`, `critical`, `unknown`, `unreachable`, `empty`, `paused`,
+`waiting`, `partial`, `long`, `five` and `eight`. `/__test__/dom.html` runs the actual DOM suite; the page must
+say PASS. `/__test__/reference.html` shows the original animation SVG and CSS without executing the design
+runtime. Only that development reference permits inline styles. These routes do not exist in PollyWeb.
+
+The automated browser runner requires an installed Playwright package and its Chromium browser. Point
+`POLLY_PLAYWRIGHT` to that package's `index.mjs` (or omit it when `playwright` is resolvable by Node):
+
+```sh
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-browser.mjs
+```
+
+It starts/stops its own preview, exercises the real DOM, keyboard focus, literal XSS output, motion controls,
+reduced motion and offscreen pausing, and rejects external asset requests. The viewport matrix is
+1920×1080, 1280×720, 3840×2160, 1024×1366 and 390×844 in both themes and motion preferences. Screenshots
+are saved to `/tmp/polly-browser-screens`, or `POLLY_SCREENSHOTS`. Local verification used Chromium
+158.0.8127.18 via Playwright 1.66.0-alpha-2026-11-09 and the internal desktop browser. A stable CI browser
+installation is part of the container/CI phase; this is a development-only dependency.

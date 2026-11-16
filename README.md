@@ -110,8 +110,13 @@ Why things are the way they are, so they can be revisited deliberately rather th
 
 ### Web service
 
-- **`Packages/PollyWeb` runs independently** on macOS and Linux. It serves a small start page, `/api/status`
-  and `/healthz`; the designed dashboard follows in a later phase. It has no write or proxy routes.
+- **`Packages/PollyWeb` runs independently** on macOS and Linux. It serves the Polly dashboard, `/api/status`
+  and `/healthz`. It has no write or proxy routes.
+- **The dashboard is plain HTML/CSS/JavaScript.** Local fonts, original animated SVG poses and status shapes
+  come from [the archived design exports](doc/design/polly-web/README.md). No frontend framework, Node
+  runtime or external assets are needed in production. Source strings are inserted as text, and native
+  disclosure rows preserve open details and keyboard focus on refresh. TV pagination and robust long-running
+  browser recovery follow in the next stage.
 - **Vapor stays outside the native dependency graph.** PollyWeb pins Vapor 4.122.3 and its own lockfile.
   swift-log is constrained to 1.8.0 because newer releases use a compiler attribute unavailable in Apple
   Swift 6.2. Linux uses the Swift 6.4.2 toolchain established by the core tests.

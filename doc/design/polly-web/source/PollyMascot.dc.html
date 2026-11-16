@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<div style="width:{{s}}px; height:{{s}}px; position:relative; flex:none; border-radius:{{radius}}; background:{{bg}}; overflow:hidden; box-shadow:{{shadow}};">
+<sc-if value="{{isOk}}" hint-placeholder-val="{{true}}">
+<svg viewBox="{{vb}}" width="100%" height="100%" style="display:block">
+<path d="M90 146 L72 192 Q90 190 102 158 Z" fill="#2563C9"></path>
+<path d="M102 150 L96 196 Q112 186 112 156 Z" fill="#3378F0"></path>
+<ellipse cx="104" cy="120" rx="33" ry="44" fill="#3D8BFF"></ellipse>
+<ellipse cx="117" cy="124" rx="20" ry="35" fill="#FFD166"></ellipse>
+<path d="M75 102 Q68 142 98 162 Q104 128 95 104 Q86 95 75 102 Z" fill="#2563C9"></path>
+<rect x="40" y="158" width="128" height="9" rx="4.5" fill="#C98B5A"></rect>
+<rect x="104" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<rect x="117" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<path d="M106 52 Q98 36 104 24 Q114 36 113 52 Z" fill="#2563C9"></path>
+<path d="M114 50 Q116 32 125 25 Q129 40 121 52 Z" fill="#3D8BFF"></path>
+<circle cx="118" cy="76" r="30" fill="#3D8BFF"></circle>
+<path d="M141 60 Q160 58 165 77 Q166 92 157 97 Q156 82 143 82 Z" fill="#FF9F1C"></path>
+<path d="M142 84 Q154 82 156 95 Q147 99 141 92 Z" fill="#E07800"></path>
+<circle cx="128" cy="72" r="12" fill="#EEF4FF"></circle>
+<circle cx="131" cy="72" r="6" fill="#14213D"></circle>
+<circle cx="133.2" cy="69.6" r="2" fill="#FFFFFF"></circle>
+</svg>
+</sc-if>
+<sc-if value="{{isWarn}}" hint-placeholder-val="{{false}}">
+<svg viewBox="{{vb}}" width="100%" height="100%" style="display:block">
+<g transform="rotate(8 112 160)">
+<path d="M90 146 L72 192 Q90 190 102 158 Z" fill="#2563C9"></path>
+<path d="M102 150 L96 196 Q112 186 112 156 Z" fill="#3378F0"></path>
+<ellipse cx="104" cy="120" rx="33" ry="44" fill="#3D8BFF"></ellipse>
+<ellipse cx="117" cy="124" rx="20" ry="35" fill="#FFD166"></ellipse>
+<path d="M75 102 Q68 142 98 162 Q104 128 95 104 Q86 95 75 102 Z" fill="#2563C9"></path>
+<path d="M104 54 Q88 36 92 14 Q110 30 113 52 Z" fill="#2563C9"></path>
+<path d="M114 51 Q116 24 133 12 Q136 38 121 53 Z" fill="#3D8BFF"></path>
+<circle cx="118" cy="76" r="30" fill="#3D8BFF"></circle>
+<path d="M142 84 Q154 82 156 95 Q147 99 141 92 Z" fill="#E07800" transform="rotate(26 142 86)"></path>
+<path d="M141 60 Q160 58 165 77 Q166 88 159 92 Q156 80 143 80 Z" fill="#FF9F1C"></path>
+<circle cx="129" cy="71" r="13.5" fill="#EEF4FF"></circle>
+<circle cx="131" cy="71" r="4.2" fill="#14213D"></circle>
+<circle cx="132.6" cy="69.2" r="1.4" fill="#FFFFFF"></circle>
+</g>
+<rect x="40" y="158" width="128" height="9" rx="4.5" fill="#C98B5A"></rect>
+<rect x="106" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<rect x="119" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<path d="M181 56 L193 45" stroke="#FFD166" fill="none" style="stroke-width:5;stroke-linecap:round"></path>
+<path d="M186 78 L200 77" stroke="#FFD166" fill="none" style="stroke-width:5;stroke-linecap:round"></path>
+<path d="M182 99 L194 108" stroke="#FFD166" fill="none" style="stroke-width:5;stroke-linecap:round"></path>
+</svg>
+</sc-if>
+<sc-if value="{{isCrit}}" hint-placeholder-val="{{false}}">
+<svg viewBox="{{vb}}" width="100%" height="100%" style="display:block">
+<ellipse cx="106" cy="174" rx="72" ry="6" fill="#000000" opacity="0.22"></ellipse>
+<path d="M148 128 L194 140 Q192 154 168 154 Z" fill="#2563C9"></path>
+<path d="M148 138 L188 166 Q176 172 158 160 Z" fill="#3378F0"></path>
+<rect x="112" y="86" width="5" height="34" rx="2.5" fill="#FF9F1C"></rect>
+<rect x="130" y="86" width="5" height="34" rx="2.5" fill="#FF9F1C"></rect>
+<rect x="105" y="81" width="19" height="6" rx="3" fill="#FF9F1C"></rect>
+<rect x="123" y="81" width="19" height="6" rx="3" fill="#FF9F1C"></rect>
+<ellipse cx="112" cy="138" rx="46" ry="28" fill="#3D8BFF"></ellipse>
+<ellipse cx="120" cy="123" rx="31" ry="13" fill="#FFD166"></ellipse>
+<path d="M78 148 Q108 172 152 150 Q132 136 102 140 Q86 140 78 148 Z" fill="#2563C9"></path>
+<path d="M46 130 Q28 120 18 128 Q30 140 46 138 Z" fill="#3378F0"></path>
+<path d="M46 142 Q30 146 22 158 Q38 158 48 148 Z" fill="#2563C9"></path>
+<circle cx="66" cy="136" r="26" fill="#3D8BFF"></circle>
+<path d="M56 114 Q58 94 78 92 Q92 94 90 108 Q78 104 72 116 Z" fill="#FF9F1C"></path>
+<path d="M78 114 Q82 104 92 108 Q92 118 84 120 Z" fill="#E07800"></path>
+<circle cx="62" cy="138" r="11" fill="#EEF4FF"></circle>
+<path d="M57 133 L67 143 M67 133 L57 143" stroke="#14213D" fill="none" style="stroke-width:3.5;stroke-linecap:round"></path>
+</svg>
+</sc-if>
+<sc-if value="{{isUnr}}" hint-placeholder-val="{{false}}">
+<svg viewBox="{{vb}}" width="100%" height="100%" style="display:block">
+<path d="M90 146 L72 192 Q90 190 102 158 Z" fill="#2563C9"></path>
+<path d="M102 150 L96 196 Q112 186 112 156 Z" fill="#3378F0"></path>
+<ellipse cx="104" cy="120" rx="33" ry="44" fill="#3D8BFF"></ellipse>
+<ellipse cx="117" cy="124" rx="20" ry="35" fill="#FFD166"></ellipse>
+<path d="M75 102 Q68 142 98 162 Q104 128 95 104 Q86 95 75 102 Z" fill="#2563C9"></path>
+<rect x="40" y="158" width="128" height="9" rx="4.5" fill="#C98B5A"></rect>
+<rect x="104" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<rect x="117" y="152" width="8" height="14" rx="4" fill="#FF9F1C"></rect>
+<g transform="rotate(-10 116 84)">
+<path d="M104 58 Q88 48 76 54 Q88 66 108 62 Z" fill="#2563C9"></path>
+<path d="M110 52 Q102 36 88 36 Q94 52 112 58 Z" fill="#3378F0"></path>
+<circle cx="118" cy="76" r="30" fill="#3D8BFF"></circle>
+<path d="M141 60 Q160 58 165 77 Q166 92 157 97 Q156 82 143 82 Z" fill="#FF9F1C"></path>
+<path d="M142 84 Q154 82 156 95 Q147 99 141 92 Z" fill="#E07800"></path>
+<circle cx="128" cy="72" r="12" fill="#EEF4FF"></circle>
+<circle cx="127" cy="76" r="5.5" fill="#14213D"></circle>
+<path d="M115.5 72 A12.5 12.5 0 0 1 140.5 72 Z" fill="#2563C9"></path>
+</g>
+<circle cx="158" cy="58" r="3.5" fill="#B4A8FF"></circle>
+<text x="166" y="50" fill="#B4A8FF" style="font-family:'Bricolage Grotesque',Figtree,sans-serif;font-size:46px;font-weight:800">?</text>
+</svg>
+</sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:200,&quot;height&quot;:200},&quot;mood&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;ok&quot;,&quot;warning&quot;,&quot;critical&quot;,&quot;unreachable&quot;],&quot;default&quot;:&quot;ok&quot;,&quot;tsType&quot;:&quot;'ok'|'warning'|'critical'|'unreachable'&quot;},&quot;size&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:160,&quot;min&quot;:16,&quot;max&quot;:512,&quot;tsType&quot;:&quot;number&quot;},&quot;tile&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const mood = this.props.mood ?? 'ok';
+    const s = Number(this.props.size ?? 160);
+    const tile = this.props.tile === true || this.props.tile === 'true';
+    const tiles = {
+      ok: 'linear-gradient(180deg,#22365F 0%,#14213D 100%)',
+      warning: 'linear-gradient(180deg,#6B4A12 0%,#3A2608 100%)',
+      critical: 'linear-gradient(180deg,#6E1D33 0%,#38101C 100%)',
+      unreachable: 'linear-gradient(180deg,#3B4160 0%,#20243A 100%)'
+    };
+    return {
+      s,
+      isOk: mood === 'ok', isWarn: mood === 'warning', isCrit: mood === 'critical', isUnr: mood === 'unreachable',
+      bg: tile ? tiles[mood] : 'transparent',
+      radius: tile ? Math.round(s * 0.225) + 'px' : '0',
+      vb: tile ? '-24 -18 248 248' : '0 0 200 200',
+      shadow: tile ? 'inset 0 1px 0 rgba(255,255,255,.10), 0 1px 2px rgba(20,33,61,.18)' : 'none'
+    };
+  }
+}
+</script>
+</body>
+</html>

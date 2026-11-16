@@ -7,9 +7,10 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 ### Added
 
 - A standalone read-only Nagios web service for macOS and Linux, with viewer authentication, a status API,
-  source freshness and coverage checks, and a separate configuration file. The designed dashboard follows later.
-- Linux support for the shared Nagios monitoring core. URL monitoring and Keychain remain Apple-only;
-  a standalone web dashboard is not included yet.
+  source freshness and coverage checks, and a separate configuration file.
+- A Polly web dashboard with light/dark themes, the four animated mascot poses, accessible problem details,
+  source status and reduced-motion support. TV pagination and unattended recovery are still in development.
+- Linux support for the shared Nagios monitoring core. URL monitoring and Keychain remain Apple-only.
 - Edit a server: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
 - Duplicate a server to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
 - **Edit server…** on the "Polly can't reach" screen opens the form for that server.

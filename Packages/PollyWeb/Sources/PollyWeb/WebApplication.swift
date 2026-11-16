@@ -15,6 +15,7 @@ public func configureWeb(_ app: Application, configuration: WebConfiguration) as
         app.middleware.use(ViewerAuthenticator(credentials: viewer))
         app.middleware.use(Viewer.guardMiddleware(throwing: Abort(.unauthorized, headers: ["WWW-Authenticate": "Basic realm=\"Polly\""])))
     }
+    app.middleware.use(try FileMiddleware(bundle: .module, publicDirectory: "Public"))
     let page = try Data(contentsOf: Bundle.module.url(forResource: "index", withExtension: "html", subdirectory: "Public")!)
     let homepage: @Sendable (Request) -> Response = { _ in
         Response(status: .ok, headers: ["Content-Type": "text/html; charset=utf-8"], body: .init(data: page))
@@ -85,6 +86,10 @@ private struct SafeHTTP: AsyncMiddleware {
             let status = failure?.status ?? .internalServerError
             // Never serialize or log arbitrary errors; they can carry upstream URLs or credentials.
             response = Response(status: status, headers: failure?.headers ?? [:], body: .init(string: status.reasonPhrase))
+        }
+        // Vapor's MIME table omits WOFF2; nosniff must still allow our bundled fonts.
+        if response.status == .ok && request.url.path.hasSuffix(".woff2") {
+            response.headers.replaceOrAdd(name: .contentType, value: "font/woff2")
         }
         response.headers.replaceOrAdd(name: .cacheControl, value: "no-store")
         response.headers.replaceOrAdd(name: "X-Content-Type-Options", value: "nosniff")

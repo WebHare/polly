@@ -54,6 +54,22 @@ struct HTTPTests {
         }
     }
 
+    @Test func bundledAssetsAreAuthenticatedAndHaveCorrectTypes() async throws {
+        try await withWebApp { app, _, _ in
+            for (path, type) in [("/design.mjs", "javascript"), ("/design.css", "text/css"),
+                                 ("/fonts.css", "text/css"), ("/fonts/83ddc2f0-8211-487f-a86b-c3e677e1d298.woff2", "font/woff2")] {
+                try await app.test(.GET, path) { response in #expect(response.status == .unauthorized) }
+                try await app.test(.GET, path, headers: headers()) { response in
+                    print("Asset route \(path): \(response.status)")
+                    #expect(response.status == .ok)
+                    #expect(response.headers.first(name: .contentType)?.contains(type) == true)
+                    #expect(response.headers.first(name: .cacheControl) == "no-store")
+                    #expect(response.body.readableBytes > 0)
+                }
+            }
+        }
+    }
+
     @Test func onlyDisplayDataIsReturnedAndReadsDoNotStartPolling() async throws {
         try await withWebApp { app, monitor, _ in
             for _ in 0..<3 {
@@ -79,7 +95,7 @@ struct HTTPTests {
             }
             for path in ["/polly.yaml", "/viewer.hash", "/../polly.yaml", "/%2e%2e/viewer.hash", "/api/command", "/api/config"] {
                 try await app.test(.GET, path, headers: headers()) { response in
-                    #expect(response.status == .notFound)
+                    #expect([HTTPResponseStatus.notFound, .forbidden].contains(response.status))
                     #expect(!response.body.string.contains("passwordStorage"))
                 }
             }
