@@ -160,15 +160,3 @@ public extension HostCounts {
 public extension ServiceCounts {
     var total: Int { ok + warning + critical + unknown + pending }
 }
-
-public extension ServerStatus {
-    /// "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
-    var summaryLine: String {
-        let down = hosts.down + hosts.unreachable
-        let hostPart = down > 0 ? "\(hosts.total) hosts, \(down) down" : "\(hosts.total) hosts up"
-        let bad = [(services.critical, "crit"), (services.warning, "warn"), (services.unknown, "unknown")]
-            .filter { $0.0 > 0 }.map { "\($0.0) \($0.1)" }
-        let servicePart = bad.isEmpty ? "\(services.total) services OK" : (["\(services.total) services"] + bad).joined(separator: ", ")
-        return "\(hostPart) · \(servicePart)"
-    }
-}

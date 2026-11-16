@@ -15,6 +15,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 ### Changed
 
 - Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
+- The icon in front of a server now only turns red when Polly can't reach that monitor. Critical, warning and
+  unknown services and down hosts get a small icon next to their count in the server's status line instead.
 
 - Open the macOS add-server form in a modal using Add above the server list.
 - The server form asks for the URL before the name, and the example URL no longer looks filled in.

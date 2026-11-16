@@ -82,9 +82,8 @@ struct ServersScreen: View {
                     (Text(server.name).font(.system(size: 16, weight: .semibold))
                         + Text("  \(server.kind.displayName)").font(.system(size: 14)).foregroundStyle(theme.faint))
                         .lineLimit(1)
-                    Text(ServerStateIcon.line(for: server, state: monitor.states[server.id]))
-                        .font(.system(size: 14))
-                        .foregroundStyle(theme.secondary)
+                    ServerLineText(server: server, state: monitor.states[server.id], fontSize: 14,
+                                   plainColor: theme.secondary)
                         .lineLimit(2)
                 }
                 Spacer(minLength: 4)

@@ -102,6 +102,42 @@ import Testing
         #expect(bad.summaryLine == "11 hosts, 1 down · 22 services, 1 crit, 1 warn")
         #expect(good.summaryLine == "10 hosts up · 20 services OK")
     }
+
+    /// Each problem count is its own part, so the views can put a small status icon in front of it.
+    @Test func serverLineMarksEachProblemCount() {
+        let line = ServerLine(server: nagios, state: status(down: 1, [
+            ServiceProblem(host: "a", service: "x", severity: .critical),
+            ServiceProblem(host: "a", service: "y", severity: .warning),
+            ServiceProblem(host: "a", service: "z", severity: .unknown)]))
+        #expect(line.icon == .reachable)
+        #expect(line.tint == nil)
+        #expect(line.parts == [.init("11 hosts, "), .init("1 down", .critical), .init(" · 23 services, "),
+                               .init("1 crit", .critical), .init(", "), .init("1 warn", .warning), .init(", "),
+                               .init("1 unknown", .unknown)])
+        #expect(line.text == "11 hosts, 1 down · 23 services, 1 crit, 1 warn, 1 unknown")
+    }
+
+    /// Problems on the monitored hosts don't make the monitor itself look broken.
+    @Test func serverIconOnlyShowsWhetherTheMonitorAnswers() {
+        let fine = ServerLine(server: nagios, state: status([]))
+        #expect(fine.icon == .reachable)
+        #expect(fine.parts == [.init("10 hosts up · 20 services OK")])
+
+        let down = ServerLine(server: nagios, state: .failed("The request timed out."))
+        #expect(down.icon == .unreachable)
+        #expect(down.tint == .critical)
+        #expect(down.text == "Unreachable · The request timed out.")
+
+        #expect(ServerLine(server: nagios, state: .loading).icon == .loading)
+        #expect(ServerLine(server: nagios, state: nil).text == "https://monitor.example.com")
+
+        var paused = nagios
+        paused.enabled = false
+        let pausedLine = ServerLine(server: paused, state: .failed("x"))
+        #expect(pausedLine.icon == .paused)
+        #expect(pausedLine.text == "Monitoring paused")
+        #expect(pausedLine.tint == nil)
+    }
 }
 
 struct RelativeTimeTests {
