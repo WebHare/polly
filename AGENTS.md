@@ -43,6 +43,8 @@ Read the relevant section before changing behaviour, and update it in the same c
 - **Releases:** add user-facing changes to `CHANGELOG.md`; before publishing, bump both version values in
   `project.yml`, date the matching changelog section and regenerate the Xcode project. See DEVELOPERS.md.
 - **Commits:** `feat:` / `fix:` / `chore:` / `ci:` plus a sentence, as in `git log`.
+- **GitHub in English:** write issues, pull requests, comments, reviews and all other GitHub communication in
+  English, even when the issue or the request is in another language.
 
 ## Workflow: don't break main
 
