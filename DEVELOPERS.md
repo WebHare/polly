@@ -500,6 +500,27 @@ release or an update feed.
 The 0.2.0 build briefly carried a Sparkle updater; it was removed before any release was published. Its EdDSA
 key backup stays in 1Password but is not used; do not configure it as a GitHub secret.
 
+### TestFlight
+
+`scripts/testflight-macos.sh` and `scripts/testflight-ios.sh` build the current checkout with fastlane
+(`fastlane/Fastfile`, lanes `mac beta` and `ios beta`) and upload it to TestFlight. Run either with `--help`
+for the options. They install fastlane into `vendor/bundle` on first use and need a current Ruby
+(`brew install ruby`; macOS ships 2.6).
+
+- **Credentials**: an App Store Connect API key, given as `ASC_KEY_ID`, `ASC_ISSUER_ID` and `ASC_KEY_PATH` (the
+  path to the `.p8` file; never commit it). The key needs the Admin role, as only that may use cloud-managed
+  distribution certificates. Xcode uses it to create those certificates and the App Store profiles (automatic
+  signing), and fastlane uses it to upload. A `--dry-run` without a key uses the Apple ID signed in to Xcode and uploads nothing.
+- **Version and build number** come from `project.yml`. TestFlight refuses a build number it already has for
+  that platform, so bump `CURRENT_PROJECT_VERSION` first, or pass `--build-number auto` for an in-between
+  beta (the latest TestFlight build of that platform + 1; the repository is not changed).
+- **What to Test** is this version's dated `CHANGELOG.md` section, or `[Unreleased]` while the version is not
+  dated yet, as plain text. Override it with `--notes-file`.
+- **Testers**: `--groups` (or `POLLY_TESTFLIGHT_GROUPS`) adds the build to TestFlight groups; `--external`
+  also distributes it to their external testers, which submits it for beta review.
+- The builds are exported to `build/testflight/` (`Polly-osx.pkg` or `Polly-ios.ipa`, plus dSYMs).
+- iOS: automatic signing needs at least one iOS device registered in the team, even for an App Store build.
+
 Validate locally before a PR:
 
 ```sh
