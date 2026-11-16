@@ -157,8 +157,9 @@ POLLY_NETWORK_TESTS=1 swift test --package-path Packages/PollyKit --filter URLMo
 
 CI runs the unit tests and builds the macOS app ([.github/workflows/build.yml](.github/workflows/build.yml),
 see "Continuous integration" in the README), and checks that the iOS app compiles
-([.github/workflows/build-ios.yml](.github/workflows/build-ios.yml)). It doesn't run the mock integration tests
-or the network tests, so run those locally when you change the client.
+([.github/workflows/build-ios.yml](.github/workflows/build-ios.yml)). Linux amd64 CI runs the full portable
+suite and real HTTP mock integration with `scripts/test-linux.py`. Run the native mock integration and
+external network tests locally when you change the client; those are not enabled in macOS CI.
 
 ### Changing the mock
 

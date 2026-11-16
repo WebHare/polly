@@ -48,8 +48,10 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 ## Continuous integration
 
-`.github/workflows/build.yml` runs the PollyKit tests and builds a universal (arm64 + x86_64) Release build of
-the macOS app on every push to `main` and every pull request. The result is attached to the run as a
+`.github/workflows/build.yml` runs the PollyKit tests on macOS and Linux amd64, including real HTTP mock
+integration on Linux, and builds a universal (arm64 + x86_64) Release build of the macOS app on every push
+to `main` and every pull request. The required macOS check also fails if the Linux tests fail, preventing
+auto-merge without Linux coverage. The result is attached to the run as a
 `Polly-<version>-<run>.dmg` artifact for testing; it is not a distribution channel. Polly is distributed
 through TestFlight and the App Store (see "Versions, changelog and distribution" in DEVELOPERS.md).
 
