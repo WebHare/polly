@@ -35,7 +35,8 @@ struct SettingsView: View {
                     switch pane {
                     case .servers: ServersPane()
                     case .alerts: AlertsPane()
-                    case .team, .account: NotBuiltPane(title: pane.rawValue)
+                    case .team: TeamPane()
+                    case .account: NotBuiltPane(title: pane.rawValue)
                     case .about: AboutPane()
                     }
                 }
@@ -768,6 +769,39 @@ private struct RuleColumns: Layout {
 }
 
 // MARK: - Team, Account, About
+
+private struct TeamPane: View {
+    @Environment(\.pollyTheme) private var theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            NotBuiltPane(title: "Team")
+            Text("The idea: share on-call duties with your team, so everyone knows who is handling an alert.")
+                .foregroundStyle(theme.muted)
+            VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Shared on-call schedule").font(.headline)
+                    Text("Plan who is on call and who takes over next.").foregroundStyle(theme.muted)
+                }
+                RowDivider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Escalation").font(.headline)
+                    Text("If nobody acknowledges an alert, notify the next person on duty.").foregroundStyle(theme.muted)
+                }
+                RowDivider()
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Central billing").font(.headline)
+                    Text("All Pro features for each team member, with one invoice for the whole team.").foregroundStyle(theme.muted)
+                }
+            }
+            .padding(16)
+            .settingsCard()
+            Text("These are ideas for a future version. Team schedules, escalation and billing are not available yet.")
+                .font(.callout)
+                .foregroundStyle(theme.muted)
+        }
+    }
+}
 
 private struct NotBuiltPane: View {
     let title: String
