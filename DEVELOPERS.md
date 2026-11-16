@@ -422,6 +422,23 @@ until the upgrade has been verified. No automatic update or registry publication
 
 ### Container verification
 
+Local acceptance on 17 November 2026 used runtime source revision `2e8e14e`:
+
+| Environment | Executed verification |
+| --- | --- |
+| macOS arm64, Xcode 26.0.1 / Swift 6.2 | 119 core tests executed (123 registered, four opt-in external URL checks skipped), 14 web tests, real HTTP/source recovery and temporary Keychain |
+| macOS Release | Universal arm64 + x86_64 build |
+| iOS Simulator Release | arm64 + x86_64 build; no physical-device run |
+| Linux arm64, Swift 6.4.2, OrbStack VM | 110 core tests, 14 web tests, real HTTP integration and production Compose image |
+| Linux amd64, Swift 6.4.2, OrbStack emulation | Production image built and executed, authenticated HTTP, exact assets, restart, config preservation and CA trust; native CI covers the full package suites |
+| Chromium 159.0.8154.6, Playwright 1.65.1 on macOS arm64 | 14 fixtures, six viewports, light/dark, both motion settings, HTTP failures/lifecycle, plus both production images after render |
+
+Both binaries' ELF machine types were measured (arm64 183, amd64 62). The 60m22s three-tab soak from the
+previous phase remains valid for the unchanged production assets; its browser was Chromium 158.0.8127.18.
+No Safari, Firefox, physical TV or physical iOS device is claimed. The HTTPS proxy example was validated
+with Caddy 2.10.2; a public hostname/certificate deployment was not performed. CI uses native Linux runners
+for both architectures, plus macOS tests/builds and the iOS Simulator build.
+
 Install the pinned browser dependency with the commands in [Dashboard development and tests](#dashboard-development-and-tests), then run:
 
 ```sh

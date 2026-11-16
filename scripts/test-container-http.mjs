@@ -11,7 +11,7 @@ const password = await new Promise(resolve => {
 assert.ok(password.length >= 12);
 const base = "http://polly:8088";
 const authorization = `Basic ${Buffer.from(`viewer:${password}`).toString("base64")}`;
-async function request(path, auth = authorization, method = "GET") {
+async function request(path, {auth = authorization, method = "GET"} = {}) {
   return fetch(base + path, {method, headers: auth ? {authorization: auth} : {}, redirect: "manual", signal: AbortSignal.timeout(5000)});
 }
 const deadline = performance.now() + 60000;
@@ -30,17 +30,17 @@ assert.equal(snapshot?.coverage.fresh, 1, "Container did not poll the real mock"
 assert.equal(snapshot.counts.hosts, 6);
 assert.equal(snapshot.counts.services, 23);
 for (const path of ["/", "/api/status", "/healthz", "/app.mjs", "/dashboard.css", "/fonts.css"]) {
-  assert.equal((await request(path, null)).status, 401);
+  assert.equal((await request(path, {auth: null})).status, 401);
   const response = await request(path);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
 }
-assert.equal((await request("/", `Basic ${Buffer.from("viewer:wrong").toString("base64")}`)).status, 401);
+assert.equal((await request("/", {auth: `Basic ${Buffer.from("viewer:wrong").toString("base64")}`})).status, 401);
 for (const path of ["/run/secrets/polly.yaml", "/polly.yaml", "/viewer.hash", "/.git/config", "/__test__/fixtures.mjs", "/api/command"]) {
   assert.equal((await request(path)).status, 404);
 }
 for (const method of ["POST", "PUT", "PATCH", "DELETE"]) {
-  assert.equal((await request("/api/status", authorization, method)).status, 405);
+  assert.equal((await request("/api/status", {method})).status, 405);
 }
 const publicDirectory = new URL("../Packages/PollyWeb/Sources/PollyWeb/Public/", import.meta.url);
 let assets = 0;
