@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 public enum NagiosClientError: LocalizedError, Equatable {
     case invalidResponse
@@ -172,6 +175,12 @@ public struct NagiosClient: MonitorBackend {
         let data: Data
         let response: URLResponse
         do {
+            #if canImport(FoundationNetworking)
+            // Corelibs ignores the per-task redirect delegate; keep cookies/configuration but use a session delegate.
+            // shortcut: one session per request; reuse an owned session if Linux polling becomes frequent.
+            let session = URLSession(configuration: session.configuration, delegate: RedirectRefuser(), delegateQueue: nil)
+            defer { session.finishTasksAndInvalidate() }
+            #endif
             (data, response) = try await session.data(for: request, delegate: RedirectRefuser())
         } catch {
             wireLog?.record(request: request, status: nil, body: nil, error: error.localizedDescription)

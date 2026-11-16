@@ -14,7 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test PollyKit with real HTTP on Linux
+        run: python3 scripts/test-linux.py
+
   macos:
+    needs: linux
+    if: ${{ always() }}
     runs-on: macos-26
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
@@ -23,6 +34,12 @@ jobs:
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H
     steps:
+      # A skipped required job can permit merging; explicitly fail when Linux did not pass.
+      - name: Require passing Linux tests
+        env:
+          LINUX_RESULT: ${{ needs.linux.result }}
+        run: test "$LINUX_RESULT" = success
+
       - uses: actions/checkout@v7
 
       - name: Test release notes

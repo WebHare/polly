@@ -3,6 +3,23 @@ import Testing
 @testable import PollyKit
 
 struct ServerStoreTests {
+    #if canImport(Security)
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["POLLY_KEYCHAIN_TESTS"] != nil))
+    func realKeychainRoundTrip() throws {
+        // A unique service keeps this opt-in check away from the app's real credentials.
+        let credentials = KeychainCredentialStore(service: "nl.webhare.polly.test.\(UUID().uuidString)")
+        let id = UUID()
+        defer { try? credentials.setPassword(nil, for: id) }
+        #expect(try credentials.password(for: id) == nil)
+        try credentials.setPassword("first", for: id)
+        #expect(try credentials.password(for: id) == "first")
+        try credentials.setPassword("updated", for: id)
+        #expect(try credentials.password(for: id) == "updated")
+        try credentials.setPassword(nil, for: id)
+        #expect(try credentials.password(for: id) == nil)
+    }
+    #endif
+
     private func tempFile() -> URL {
         FileManager.default.temporaryDirectory.appending(path: "polly-test-\(UUID().uuidString).yaml")
     }

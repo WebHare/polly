@@ -1,4 +1,5 @@
 import Foundation
+#if canImport(Security)
 import Security
 
 /// Monitors a single website without any monitoring system behind it. The URL is one host with three
@@ -170,6 +171,8 @@ public struct URLMonitor: MonitorBackend {
     }
 }
 
+#endif
+
 // MARK: - Certificate
 
 enum CertificateCheck: Equatable, Sendable {
@@ -178,6 +181,7 @@ enum CertificateCheck: Equatable, Sendable {
     /// Trusted now, but a certificate in the chain expires at this date.
     case expiring(Date)
 
+    #if canImport(Security)
     static func evaluate(_ trust: SecTrust, warningPeriod: TimeInterval, now: Date = Date()) -> CertificateCheck {
         var error: CFError?
         guard SecTrustEvaluateWithError(trust, &error) else {
@@ -189,6 +193,8 @@ enum CertificateCheck: Equatable, Sendable {
         return expiry(of: chain.compactMap { CertificateDates.notAfter(SecCertificateCopyData($0) as Data) },
                       warningPeriod: warningPeriod, now: now)
     }
+
+    #endif
 
     static func expiry(of notAfters: [Date], warningPeriod: TimeInterval, now: Date = Date()) -> CertificateCheck {
         guard let first = notAfters.min(), first < now.addingTimeInterval(warningPeriod) else { return .valid }
@@ -270,6 +276,7 @@ struct DERReader {
     }
 }
 
+#if canImport(Security)
 /// Records the outcome of the server trust evaluation and refuses redirects.
 private final class TLSRecorder: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     private let warningPeriod: TimeInterval
@@ -349,3 +356,4 @@ public enum DNSResolver {
         return addresses
     }
 }
+#endif

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 
 /// Debug log of everything sent to and received from the servers, one JSON object per line.
 ///

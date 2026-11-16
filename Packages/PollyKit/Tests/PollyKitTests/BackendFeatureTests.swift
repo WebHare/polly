@@ -2,6 +2,33 @@ import Foundation
 import Testing
 @testable import PollyKit
 
+struct BackendPlatformTests {
+    @Test func nagiosBackendIsAvailable() throws {
+        let server = NagiosServer(name: "Mock", baseURL: URL(string: "http://localhost")!, username: "")
+        #expect(try server.makeBackend(password: nil) is NagiosClient)
+    }
+
+    #if !canImport(Security)
+    @MainActor @Test func unsupportedURLBackendFailsThroughEveryCaller() async throws {
+        let server = NagiosServer(name: "Site", baseURL: URL(string: "https://example.com")!, username: "", kind: .url)
+        let error = BackendError("URL monitoring is only supported on Apple platforms.")
+        #expect(throws: error) { try server.makeBackend(password: nil) }
+
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: nil)
+        let model = MonitorModel(store: store)
+        #expect(throws: error) { try model.backend(for: server) }
+        await model.refreshAll()
+        #expect(model.states[server.id] == .failed(error.message))
+
+        let form = ServerFormModel(kind: .url)
+        form.urlText = server.baseURL.absoluteString
+        #expect(await form.testConnection() == false)
+        #expect(form.checkState == .failed(error.message))
+    }
+    #endif
+}
+
 private func problem(_ severity: Severity = .critical, service: String = "HTTP", acknowledged: Bool = false,
                      downtimeDepth: Int = 0) -> ServiceProblem {
     ServiceProblem(host: "web1", service: service, severity: severity, acknowledged: acknowledged, downtimeDepth: downtimeDepth)

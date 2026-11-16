@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
 import Observation
 
 /// App-wide state: the configured servers and their latest status. Polls periodically.
@@ -95,7 +98,7 @@ public final class MonitorModel {
 
     /// The backend for a server, with its password. Used by the UI for links and commands.
     public func backend(for server: NagiosServer) throws -> any MonitorBackend {
-        server.makeBackend(password: try store.password(for: server.id), session: session,
+        try server.makeBackend(password: store.password(for: server.id), session: session,
                            wireLog: debugLog ? wireLog : nil)
     }
 

@@ -21,6 +21,7 @@ public final class ServerStore: @unchecked Sendable {
         }
     }
 
+    #if canImport(Security)
     public static var defaultDirectory: URL {
         URL.applicationSupportDirectory.appending(path: "Polly", directoryHint: .isDirectory)
     }
@@ -35,6 +36,8 @@ public final class ServerStore: @unchecked Sendable {
         }
         return store
     }
+
+    #endif
 
     /// Applies `change` to a copy of the settings, writes the file, and only then commits the copy.
     private func withSettings<T>(_ change: (inout PollySettings) throws -> T) throws -> T {

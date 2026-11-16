@@ -157,8 +157,9 @@ POLLY_NETWORK_TESTS=1 swift test --package-path Packages/PollyKit --filter URLMo
 
 CI runs the unit tests and builds the macOS app ([.github/workflows/build.yml](.github/workflows/build.yml),
 see "Continuous integration" in the README), and checks that the iOS app compiles
-([.github/workflows/build-ios.yml](.github/workflows/build-ios.yml)). It doesn't run the mock integration tests
-or the network tests, so run those locally when you change the client.
+([.github/workflows/build-ios.yml](.github/workflows/build-ios.yml)). Linux amd64 CI runs the full portable
+suite and real HTTP mock integration with `scripts/test-linux.py`. Run the native mock integration and
+external network tests locally when you change the client; those are not enabled in macOS CI.
 
 ### Changing the mock
 
@@ -167,6 +168,57 @@ change the mock to match, watch the integration tests fail, and then fix the cli
 server sends, turn on `debugLog` (see "Debugging" in the README) and compare its requests and responses with
 the mock's. [doc/nagios-protocol.md](doc/nagios-protocol.md) describes what Polly sends and expects; update it
 too.
+
+### Linux tests
+
+With Docker and Python 3 installed, run this from any directory (replace the checkout path):
+
+```sh
+python3 /absolute/path/to/polly/scripts/test-linux.py
+```
+
+The runner uses `swift:6.4.2-noble` and `node:22.14.0-bookworm-slim`, starts its own mock on an isolated
+container network, waits for readiness, and runs the entire PollyKit suite with `POLLY_MOCK_URL` set. It
+fails if the real HTTP integration suite did not pass, even if Swift exits successfully. No host port is
+published. Its containers and network are removed in `finally`; on macOS it starts OrbStack only if stopped
+and stops it again afterwards. Build artifacts remain in `.build/linux`.
+
+Verified on Linux arm64 with Swift 6.4.2: 100 tests, none skipped, including all 12 real HTTP mock tests.
+Swift 6.2.4 hit the upstream [concurrent cancellation deadlock](https://github.com/swiftlang/swift-corelibs-foundation/issues/5412);
+6.4.2 includes the fix. The Apple builds remain on Swift 6.2. Linux's per-task redirect delegate is also
+ignored, so Polly uses a short-lived session delegate there, retaining the supplied configuration and
+cookie storage. This costs connection reuse; revisit it if polling becomes frequent.
+
+Nagios parsing, credentials in requests, redirects, refused connections, commands, settings, polling,
+summaries and certificate-date parsing are tested on both platforms. The concurrency stress test uses
+real HTTP: Linux's custom URLProtocol implementation cannot reliably simulate concurrent delayed
+callbacks or redirect callbacks.
+
+Only these 14 tests require Apple APIs and are absent on Linux:
+
+- `CertificateTests.untrustedCertificateIsInvalid`
+- `URLKindTests.statusCountsOneHostWithAServicePerCheck` and `httpStatusCodes`
+- `TransportTests.urlMonitorReportsAHealthySite`, `urlMonitorReportsServerErrorsAndSendsCredentials`,
+  `urlMonitorDoesNotFollowRedirects` and `urlMonitorSkipsTheRestWhenDNSFails`
+- `DNSResolverTests.resolvesLiteralAddressesWithoutANetwork` and `failsForAnInvalidName`
+- All four `URLMonitorNetworkTests`: `healthySite`, `readsTheExpiryOfARealChain`,
+  `brokenCertificatesStillShowWhetherTheServerAnswers` and `unresolvableHost`
+- `ServerStoreTests.realKeychainRoundTrip`
+
+Linux adds `BackendPlatformTests.unsupportedURLBackendFailsThroughEveryCaller`, which verifies the
+explicit unsupported error in the factory, monitor and server form. Apple-only code also includes
+Keychain storage, `ServerStore.makeDefault()` and the long localized duration formatter; Linux callers
+must provide their own store configuration and use the portable compact duration format.
+
+Native verification used macOS arm64, Swift 6.2 / Xcode 26.0.1: 109 tests executed with mock integration and
+Keychain enabled, plus the four external URL checks separately. Both the universal macOS Release build
+and iOS Simulator Release build pass. CI also verifies all 100 portable tests on Linux amd64 with Swift
+6.4.2, including real HTTP mock integration. Physical iOS devices have not been verified.
+The opt-in Keychain test uses a unique temporary service and deletes its own credentials:
+
+```sh
+POLLY_KEYCHAIN_TESTS=1 swift test --package-path /absolute/path/to/polly/Packages/PollyKit --filter realKeychainRoundTrip
+```
 
 ## Versions, changelog and distribution
 
