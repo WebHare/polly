@@ -50,6 +50,9 @@ private struct PopoverContent: View {
     @Environment(\.pollyTheme) private var theme
     @State private var listContentHeight: CGFloat = 0
     @State private var selectedID: String?
+    /// What the selected problem's server supports, resolved before the detail appears so its buttons are part
+    /// of the slide-in instead of popping in after it.
+    @State private var selectedCapabilities: Result<BackendCapabilities, any Error> = .success([])
 
     /// Auto-sized list grows with its content up to about a quarter of the screen.
     private var autoListHeight: CGFloat {
@@ -62,10 +65,11 @@ private struct PopoverContent: View {
         let entries = summary.entries
         ZStack {
             if let index = entries.firstIndex(where: { $0.id == selectedID }) {
-                ProblemDetailView(entry: entries[index], position: index + 1, total: entries.count) {
-                    selectedID = nil
+                ProblemDetailView(entry: entries[index], position: index + 1, total: entries.count,
+                                  capabilities: selectedCapabilities) {
+                    select(nil)
                 } step: { offset in
-                    selectedID = entries[(index + offset + entries.count) % entries.count].id
+                    select(entries[(index + offset + entries.count) % entries.count])
                 }
                 // A new identity per problem, so stepping resets the form and the fetched capabilities.
                 .id(entries[index].id)
@@ -78,6 +82,14 @@ private struct PopoverContent: View {
         .animation(.easeInOut(duration: 0.22), value: selectedID == nil)
         .background(theme.panel)
         .clipped()
+    }
+
+    /// Creating a backend reads the password, so only do that for a problem that is actually opened.
+    private func select(_ entry: ProblemEntry?) {
+        if let entry {
+            selectedCapabilities = Result { try monitor.backend(for: entry.server).capabilities }
+        }
+        selectedID = entry?.id
     }
 
     private func overview(_ summary: MonitorSummary) -> some View {
@@ -129,7 +141,7 @@ private struct PopoverContent: View {
                 .textCase(.uppercase)
                 .padding(EdgeInsets(top: 8, leading: 8, bottom: 4, trailing: 8))
                 ForEach(group.entries) { entry in
-                    ProblemRow(entry: entry) { selectedID = entry.id }
+                    ProblemRow(entry: entry) { select(entry) }
                 }
             }
         }
