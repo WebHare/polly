@@ -30,6 +30,10 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
     - Nagios: the `statusjson.cgi` URL that will be read.
     - URL: that the host resolves, that the URL answers and (https only) that the certificate is valid for at
       least two more weeks.
+  - The URL comes first in the form, before **Name**.
+    - Why: the name, username and password are derived from the URL, so filling it in first fills the rest.
+  - Example URLs in the URL field are shown as plain placeholder text, not as links.
+    - Why: a link-colored placeholder looks like a URL that is already filled in.
   - **Name** is optional; it defaults to the URL's host name.
   - Username and password are never required. For a URL they are only needed for a page behind HTTP Basic
     authentication.
@@ -48,9 +52,30 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
     - Why: the server may be temporarily down or only reachable from another network.
   - For a URL, the test only fails on a critical problem; a certificate that expires soon doesn't block adding
     it.
+- The user can edit a server: its type, name, URL, username and password.
+  - macOS: double-click the server or choose **Edit…** in its context menu; the form opens as the "Edit monitoring
+    server" modal.
+  - iOS: tap the server (not its bell or switch), swipe left and choose **Edit**, or **Edit…** in its context menu;
+    the form opens as a sheet titled "Edit Nagios Server" or "Edit URL".
+  - The form is the add form, prefilled, with **Save** instead of **Add**; the password field shows the current
+    password.
+  - The server keeps its place in the list, its switch and its bell.
+  - Saving tests the connection first, like adding, with **Save anyway** when the test fails. When only the name
+    changed, it saves without a test.
+    - Why: renaming a server that is down must not need an override.
+  - A name that equals the URL's host is shown empty, so it keeps following the URL when that changes.
+  - After a change of URL or type the server's old state is forgotten and it is checked again right away; the
+    first answer doesn't notify.
+    - Why: it is a different system now; its problems are not changes of the old one's.
+  - **Edit server…** on the Unreachable screen opens this form for the unreachable server (macOS: in the
+    Settings window, on the Servers pane; iOS: on the Servers tab).
+- The user can duplicate a server to add a similar one without typing everything again.
+  - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
+  - Opens the add form prefilled with the server's type, URL, username, password and bell; the name gets
+    " copy" appended (or stays empty when it was just the host). The copy is a new server, switched on.
 - New servers are added at the end of the list. The list order is the order in `polly.yaml`; reordering is done
   by editing the file.
-- The user can delete a server (context menu; swipe to delete on iOS).
+- The user can delete a server (context menu; swipe left on iOS).
 - The user can refresh one server (context menu) or all servers (menu bar panel, pull to refresh on iOS).
 - Each server has an on/off switch to pause monitoring without deleting it.
   - A paused server shows "Monitoring paused", is not polled and doesn't count towards the overall status.
@@ -113,7 +138,7 @@ servers.
     problems without going back.
   - Why in the panel, not a window: the menu bar panel closes as soon as it loses focus.
 - The Settings window has a sidebar with Servers, Alerts, Team, Account and About Polly.
-  - **Servers**: the server list (switch, bell, refresh, delete), the Add button and the advanced
+  - **Servers**: the server list (switch, bell, edit, duplicate, refresh, delete), the Add button and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
   - **About Polly**: version and build number and **What's New**.
 
@@ -126,7 +151,8 @@ servers.
   - A button in the toolbar shows the number of servers and switches to the Servers tab.
   - Tapping a problem opens its detail; pull to refresh refreshes that problem's server.
     - When the server no longer reports the problem, the detail says "Problem resolved".
-- **Servers** lists the servers with their state, switch and bell; add, refresh and delete them there.
+- **Servers** lists the servers with their state, switch and bell; add, edit, duplicate, refresh and delete them
+  there.
 - **Settings** has the password storage and debug log settings, the version and build number, and **What's New**.
 - Polly only polls while the app is in the foreground.
   - It refreshes immediately when it becomes active again, without waiting for the polling interval.

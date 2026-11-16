@@ -156,7 +156,10 @@ private struct PopoverContent: View {
                     } else {
                         Button("Retry now") { Task { await monitor.refreshAll() } }
                             .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
-                        Button("Edit server…") { showSettings() }
+                        Button("Edit server…") {
+                            monitor.editRequest = summary.unreachable?.server.id
+                            showSettings()
+                        }
                             .buttonStyle(PollyButtonStyle(radius: 6))
                     }
                 }

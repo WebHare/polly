@@ -10,7 +10,6 @@
 		009A692083ED214116788927 /* Notifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD4D1F79D872FF93F82D4C8E /* Notifier.swift */; };
 		03AA38C54BED6D3098AD8167 /* PhoneDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81B90C0EAC47CF7AA6F82576 /* PhoneDesign.swift */; platformFilters = (ios, ); };
 		07544597FBA8919B3B28279D /* PhoneProblemDetail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1788649AD8663118B787D349 /* PhoneProblemDetail.swift */; platformFilters = (ios, ); };
-		138716DBAE90348599108DEB /* AddServerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3D0C93277B9F2C7C0298FAAB /* AddServerView.swift */; platformFilters = (ios, ); };
 		175018B607ADEF1E5864CF7D /* PollyDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4F9EC63E3847380F178FB586 /* PollyDesign.swift */; };
 		182B1B26C7FF9C520CC07A6A /* PollyKit in Frameworks */ = {isa = PBXBuildFile; productRef = D6BBC4E333290FCE32CC89E3 /* PollyKit */; };
 		3795C88B3DFC5ED95812685E /* DockIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D1A3900AF7542B852886F12 /* DockIcon.swift */; platformFilters = (macos, ); };
@@ -26,6 +25,7 @@
 		C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */; platformFilters = (macos, ); };
 		D010D679D247C02694A7B3EE /* PollyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FC2FAB90B0B60484B906A00 /* PollyApp.swift */; };
 		EC5F3F0EC120BBEC4B69F976 /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922DC996571A754701F1C24C /* MenuBarIcon.swift */; platformFilters = (macos, ); };
+		FAAFAE346268B1B7809C42D6 /* ServerFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */; platformFilters = (ios, ); };
 		FC49AAEDAFDC426CB7CF5190 /* ProblemsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080314FCE6787B83F66412F2 /* ProblemsScreen.swift */; platformFilters = (ios, ); };
 /* End PBXBuildFile section */
 
@@ -38,7 +38,6 @@
 		1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		206F8CFFD8766B27EB430DBF /* ServersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersScreen.swift; sourceTree = "<group>"; };
 		276A57CF036E82890AFB589D /* PollyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PollyKit; path = Packages/PollyKit; sourceTree = SOURCE_ROOT; };
-		3D0C93277B9F2C7C0298FAAB /* AddServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddServerView.swift; sourceTree = "<group>"; };
 		4D179A8AB00DD1663451D08C /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		4F9EC63E3847380F178FB586 /* PollyDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyDesign.swift; sourceTree = "<group>"; };
 		4FC2FAB90B0B60484B906A00 /* PollyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyApp.swift; sourceTree = "<group>"; };
@@ -46,6 +45,7 @@
 		81B90C0EAC47CF7AA6F82576 /* PhoneDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneDesign.swift; sourceTree = "<group>"; };
 		922DC996571A754701F1C24C /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
 		99236F4F65BD9D0C4256A359 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormView.swift; sourceTree = "<group>"; };
 		AE8AB70010188E67953BAD61 /* PhoneRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneRootView.swift; sourceTree = "<group>"; };
 		D20C4E8D81E51B30896155BF /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		DD4D1F79D872FF93F82D4C8E /* Notifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Notifier.swift; sourceTree = "<group>"; };
@@ -79,11 +79,11 @@
 		364582DBFD03DB98ABD6EADD /* iOS */ = {
 			isa = PBXGroup;
 			children = (
-				3D0C93277B9F2C7C0298FAAB /* AddServerView.swift */,
 				81B90C0EAC47CF7AA6F82576 /* PhoneDesign.swift */,
 				1788649AD8663118B787D349 /* PhoneProblemDetail.swift */,
 				AE8AB70010188E67953BAD61 /* PhoneRootView.swift */,
 				080314FCE6787B83F66412F2 /* ProblemsScreen.swift */,
+				A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */,
 				206F8CFFD8766B27EB430DBF /* ServersScreen.swift */,
 			);
 			path = iOS;
@@ -219,7 +219,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				138716DBAE90348599108DEB /* AddServerView.swift in Sources */,
 				829E409BF4448BA863387845 /* CommandFormView.swift in Sources */,
 				3795C88B3DFC5ED95812685E /* DockIcon.swift in Sources */,
 				C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */,
@@ -232,6 +231,7 @@
 				175018B607ADEF1E5864CF7D /* PollyDesign.swift in Sources */,
 				5B1AD4CF86B4979272808B90 /* ProblemDetailView.swift in Sources */,
 				FC49AAEDAFDC426CB7CF5190 /* ProblemsScreen.swift in Sources */,
+				FAAFAE346268B1B7809C42D6 /* ServerFormView.swift in Sources */,
 				59B7E80AAD09DC1FF335AF26 /* ServersScreen.swift in Sources */,
 				5CEE84D1A6B0F44DCBD6B762 /* SettingsView.swift in Sources */,
 				7A5B5BBF2361CDB91D8C644C /* SeverityStyle.swift in Sources */,

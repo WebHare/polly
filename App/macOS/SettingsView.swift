@@ -24,6 +24,7 @@ struct SettingsView: View {
         }
     }
 
+    @Environment(MonitorModel.self) private var monitor
     @State private var pane = Pane.servers
 
     var body: some View {
@@ -48,6 +49,9 @@ struct SettingsView: View {
         .frame(minWidth: 800, minHeight: 560)
         .modifier(WindowBackground())
         .pollyThemed()
+        .onChange(of: monitor.editRequest, initial: true) {
+            if monitor.editRequest != nil { pane = .servers }
+        }
     }
 }
 
@@ -165,8 +169,9 @@ extension SwitchRow where Accessory == EmptyView {
 private struct ServersPane: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
-    @State private var model = AddServerModel()
-    @State private var addingServer = false
+    @State private var model = ServerFormModel()
+    /// Whether the add/edit form is open; `model` says what it is for.
+    @State private var showingForm = false
     @State private var errorMessage: String?
 
     private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
@@ -177,23 +182,22 @@ private struct ServersPane: View {
                        subtitle: "Polly polls these straight from this Mac. Nothing goes through our servers.")
             HStack {
                 Spacer()
-                Button("Add", systemImage: "plus") { addingServer = true }
+                Button("Add", systemImage: "plus") { openForm(ServerFormModel(kind: model.kind)) }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
             }
             serverList
             advanced
         }
-        .sheet(isPresented: $addingServer, onDismiss: resetForm) {
-            addServerCard
+        .sheet(isPresented: $showingForm) {
+            serverFormCard
                 .frame(width: 720)
                 .interactiveDismissDisabled(model.checkState == .checking)
                 .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
                     Button("OK") { errorMessage = nil }
                 } message: { Text($0) }
         }
-        .onAppear { syncWireLog() }
-        .onChange(of: monitor.debugLog) { syncWireLog() }
-        .alert("Error", isPresented: .constant(errorMessage != nil && !addingServer), presenting: errorMessage) { _ in
+        .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
+        .alert("Error", isPresented: .constant(errorMessage != nil && !showingForm), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
     }
@@ -243,17 +247,21 @@ private struct ServersPane: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
+        .onTapGesture(count: 2) { edit(server) }
         .contextMenu {
+            Button("Edit…") { edit(server) }
+            Button("Duplicate…") { duplicate(server) }
+            Divider()
             Button("Refresh") { Task { await monitor.refresh(server) } }
             Button("Delete", role: .destructive) { delete(server) }
         }
     }
 
-    // MARK: Add server
+    // MARK: Server form
 
-    private var addServerCard: some View {
+    private var serverFormCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Add a monitoring server").font(.system(size: 15, weight: .bold))
+            Text(model.isEditing ? "Edit monitoring server" : "Add a monitoring server").font(.system(size: 15, weight: .bold))
             Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 10) {
                 GridRow {
                     label("Type")
@@ -263,14 +271,9 @@ private struct ServersPane: View {
                     }
                 }
                 GridRow {
-                    label("Name")
-                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
-                        .pollyField()
-                }
-                GridRow {
                     label("URL")
                     TextField("URL", text: $model.urlText,
-                              prompt: Text(model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
+                              prompt: Text(verbatim: model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
                         .pollyField()
@@ -285,6 +288,11 @@ private struct ServersPane: View {
                         .font(.system(size: 12))
                         .foregroundStyle(theme.faint)
                         .padding(.top, -4)
+                }
+                GridRow {
+                    label("Name")
+                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
+                        .pollyField()
                 }
                 GridRow {
                     label("Username")
@@ -329,13 +337,13 @@ private struct ServersPane: View {
                 }
                 .disabled(!model.canSubmit)
                 if case .failed = model.checkState {
-                    Button("Add anyway") { save() }
+                    Button(model.isEditing ? "Save anyway" : "Add anyway") { save() }
                 }
                 Spacer()
-                Button("Cancel") { addingServer = false }
+                Button("Cancel") { showingForm = false }
                     .keyboardShortcut(.cancelAction)
                     .disabled(model.checkState == .checking)
-                Button("Add server") { Task { await testAndAdd() } }
+                Button(model.isEditing ? "Save" : "Add server") { Task { await testAndSave() } }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
                     .disabled(!model.canSubmit)
             }
@@ -411,33 +419,50 @@ private struct ServersPane: View {
 
     // MARK: Actions
 
-    private func syncWireLog() {
-        model.wireLog = monitor.debugLog ? monitor.wireLog : nil
+    private func openForm(_ form: ServerFormModel) {
+        form.wireLog = monitor.debugLog ? monitor.wireLog : nil
+        model = form
+        showingForm = true
     }
 
-    private func resetForm() {
-        model = AddServerModel(kind: model.kind)
-        syncWireLog()
+    private func edit(_ server: NagiosServer) {
+        do { openForm(try monitor.editForm(for: server)) } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func duplicate(_ server: NagiosServer) {
+        do { openForm(try monitor.duplicateForm(for: server)) } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func openRequestedEdit() {
+        guard let id = monitor.editRequest else { return }
+        monitor.editRequest = nil
+        guard !showingForm, let server = monitor.servers.first(where: { $0.id == id }) else { return }
+        edit(server)
     }
 
     private func test() async {
         await model.testConnection()
     }
 
-    private func testAndAdd() async {
-        if model.checkState == .succeeded {
+    private func testAndSave() async {
+        if model.checkState == .succeeded || !model.needsConnectionTest {
             save()
         } else if await model.testConnection() {
             save()
         }
-        // On failure the banner shows the error and "Add anyway" appears.
+        // On failure the banner shows the error and "Add anyway" / "Save anyway" appears.
     }
 
     private func save() {
         guard let server = model.makeServer() else { return }
+        let password = model.password.isEmpty ? nil : model.password
         do {
-            try monitor.add(server, password: model.password.isEmpty ? nil : model.password)
-            addingServer = false
+            if model.isEditing {
+                try monitor.update(server, password: password)
+            } else {
+                try monitor.add(server, password: password)
+            }
+            showingForm = false
         } catch {
             errorMessage = "Could not save server: \(error.localizedDescription)"
         }

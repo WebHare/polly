@@ -16,7 +16,7 @@ Packages/PollyKit/          Platform-independent logic + unit tests
   Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
   URLCheck/                 URLMonitor: checks a URL's DNS, HTTP answer and certificate from the device
   Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
-                            NotificationPolicy, AddServerModel (add-server form logic)
+                            NotificationPolicy, ServerFormModel (add/edit-server form logic)
 .mcp.json                   Enables XcodeBuildMCP for Claude Code in this project
 mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
 ```

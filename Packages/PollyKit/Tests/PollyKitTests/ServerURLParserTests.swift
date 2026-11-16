@@ -45,7 +45,7 @@ struct ServerURLParserTests {
     }
 
     @MainActor @Test func addServerModelMovesCredentialsOutOfURL() {
-        let model = AddServerModel()
+        let model = ServerFormModel()
         model.urlText = "https://alice:s3cret@monitor.example.com/nagios/"
         #expect(model.urlText == "https://monitor.example.com")
         #expect(model.username == "alice")

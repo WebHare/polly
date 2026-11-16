@@ -4,11 +4,18 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ## [Unreleased]
 
+### Added
+
+- Edit a server: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
+- Duplicate a server to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
+- **Edit server…** on the "Polly can't reach" screen opens the form for that server.
+
 ### Changed
 
 - Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
 
 - Open the macOS add-server form in a modal using Add above the server list.
+- The server form asks for the URL before the name, and the example URL no longer looks filled in.
 
 ### Fixed
 

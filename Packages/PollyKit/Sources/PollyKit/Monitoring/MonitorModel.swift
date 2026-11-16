@@ -20,6 +20,9 @@ public final class MonitorModel {
     public var pollInterval: Duration = .seconds(60)
     /// When the poll loop refreshes all servers again; nil while it isn't running.
     public private(set) var nextPollAt: Date?
+    /// A server whose edit form the server list should open ("Edit server…" on the Unreachable screen).
+    /// The server list clears it once the form is open.
+    public var editRequest: UUID?
 
     @ObservationIgnored public let store: ServerStore
     /// `polly-debug.log` next to polly.yaml; nil for an in-memory store. Only passed to backends while
@@ -100,6 +103,36 @@ public final class MonitorModel {
         try store.add(server, password: password)
         reload()
         Task { await refresh(server) }
+    }
+
+    /// Saves an edited server in place. A changed URL or type is a different system: its old status and
+    /// notification baseline are dropped. An answer still in flight for the old settings is discarded.
+    public func update(_ server: NagiosServer, password: String?) throws {
+        let old = servers.first { $0.id == server.id }
+        try store.update(server, password: password)
+        lastRefresh[server.id, default: 0] += 1
+        if old?.baseURL != server.baseURL || old?.kind != server.kind {
+            states[server.id] = nil
+            baselines[server.id] = nil
+        }
+        reload()
+        if let updated = enabledServer(server.id) {
+            Task { await refresh(updated) }
+        }
+    }
+
+    /// The form for editing a server, prefilled with its settings and password.
+    public func editForm(for server: NagiosServer) throws -> ServerFormModel {
+        let form = ServerFormModel(editing: server, password: try store.password(for: server.id), session: session)
+        form.wireLog = debugLog ? wireLog : nil
+        return form
+    }
+
+    /// The add form, prefilled with a copy of a server's settings and password.
+    public func duplicateForm(for server: NagiosServer) throws -> ServerFormModel {
+        let form = ServerFormModel(duplicating: server, password: try store.password(for: server.id), session: session)
+        form.wireLog = debugLog ? wireLog : nil
+        return form
     }
 
     /// Temporarily turns monitoring of a server on or off.
