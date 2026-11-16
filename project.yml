@@ -36,6 +36,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        NSHumanReadableCopyright: Copyright © 2026 WebHare b.v. GNU GPL version 2.
         # Nagios servers are often internal and plain http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

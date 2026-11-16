@@ -36,6 +36,12 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
   TestFlight and the App Store; the app has no updater of its own.
 - The bell next to a server turns local notifications for that server on or off (off by default).
 
+## Contributing
+
+Found a bug or have an idea? Anyone is welcome to [file an issue](../../issues). If you'd like to contribute
+code, please read [CONTRIBUTING.md](CONTRIBUTING.md) first. See [CHANGELOG.md](CHANGELOG.md) for what changed
+per version.
+
 ## Development
 
 See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Nagios server and the tests.
@@ -52,16 +58,17 @@ open it once via System Settings → Privacy & Security → **Open Anyway**, or 
 `xattr -dr com.apple.quarantine /Applications/Polly.app`. Each build also counts as a new app for the keychain,
 so expect keychain prompts after updating (or set `passwordStorage: file`).
 
-With these repository secrets the app and DMG are signed with a **Developer ID** and notarized, so they open
-without warnings:
+With these repository secrets and variables the app and DMG are signed with a **Developer ID** and notarized,
+so they open without warnings. WebHare's portal (`webhare_portal`, `data/github-projects.yaml`) maintains them
+for `WebHare/polly`, the same way as for `WebHare/agent-radar`; set them by hand only on a fork.
 
-| Secret                       | Contents                                                                |
-| ---------------------------- | ----------------------------------------------------------------------- |
-| `MACOS_CERTIFICATE_P12`      | base64 of the exported "Developer ID Application" certificate + key (.p12) |
-| `MACOS_CERTIFICATE_PASSWORD` | password of that .p12                                                   |
-| `NOTARY_API_KEY`             | base64 of an App Store Connect API key (.p8) with the Developer role    |
-| `NOTARY_API_KEY_ID`          | that key's Key ID                                                       |
-| `NOTARY_API_ISSUER_ID`       | the Issuer ID shown above the App Store Connect API keys list           |
+| Name                         | Kind     | Contents                                                                   |
+| ---------------------------- | -------- | -------------------------------------------------------------------------- |
+| `MACOS_CERTIFICATE_P12`      | secret   | base64 of the exported "Developer ID Application" certificate + key (.p12) |
+| `MACOS_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                      |
+| `NOTARY_API_KEY`             | secret   | base64 of an App Store Connect API key (.p8) with the Developer role       |
+| `NOTARY_API_KEY_ID`          | variable | that key's Key ID                                                          |
+| `NOTARY_API_ISSUER_ID`       | variable | the Issuer ID shown above the App Store Connect API keys list              |
 
 Only the team's Account Holder can create a Developer ID Application certificate.
 
@@ -219,3 +226,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is
   suggested for VS Code users.
+
+## License
+
+Copyright © 2026 WebHare b.v. Licensed under the GNU General Public License version 2. See [LICENSE](LICENSE).
