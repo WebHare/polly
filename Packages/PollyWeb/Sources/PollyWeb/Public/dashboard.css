@@ -75,7 +75,7 @@ pre:empty { display: none; }
 .empty-message { text-align: center; color: var(--muted); padding: 2.5rem 1rem; border: 1px dashed var(--line); border-radius: 1rem; }
 [data-state="ok"] .overview { background: var(--quiet-surface); min-height: 23rem; grid-template-columns: 20rem minmax(0,1fr) 29rem; }
 [data-state="ok"] .empty-message { padding: 4rem 1rem; }
-.sources-section { margin-top: auto; padding-top: 1rem; }
+.sources-section { margin-top: auto; padding-top: .6rem; }
 #sources { list-style: none; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,20rem),1fr)); gap: .65rem; padding: 0; margin: 0; }
 .source { display: grid; grid-template-columns: 1.3rem minmax(0,1fr); align-items: center; gap: .25rem .6rem; background: var(--surface); border: 1px solid var(--line); border-radius: .8rem; padding: .7rem 1rem; }
 .source-title { overflow-wrap: anywhere; }
@@ -85,7 +85,7 @@ pre:empty { display: none; }
 .skip-link:focus { top: .5rem; }
 [data-motion="off"] #mascot * { animation-play-state: paused !important; }
 @media (prefers-reduced-motion: reduce) { #mascot * { animation: none !important; } }
-@media (max-height: 800px) and (min-width: 1100px) {
+@media (max-height: 900px) and (min-width: 1100px) {
   .topbar { padding: .7rem 1.5rem; }
   main { margin: .8rem 1.5rem; }
   .overview { grid-template-columns: 9rem minmax(0,1fr) 24rem; min-height: 10rem; gap: 1rem; }
@@ -128,3 +128,18 @@ pre:empty { display: none; }
 
 .problem-summary::after { content: "+"; position: absolute; right: .65rem; color: var(--muted); }
 .problem[open] > summary::after { content: "−"; }
+
+#pagination { display: flex; align-items: center; gap: .45rem; margin-left: auto; }
+#pagination button { padding: .35rem .65rem; }
+#page-number { color: var(--muted); white-space: nowrap; }
+.problem[hidden] + .problem { border-top: 0; }
+@media (min-width: 1100px) {
+  #problems > .section-heading { min-height: 44px; margin-block: .35rem; }
+}
+@media (max-height: 900px) and (min-width: 1100px) {
+  .sources-section { padding-top: .2rem; }
+  .sources-section .section-heading { margin-block: .4rem; }
+  .overview-copy #coverage { margin-top: .5rem; }
+  .eyebrow { margin-bottom: .4rem; }
+  .overview { grid-template-columns: 8rem minmax(0,1fr) 24rem; }
+}

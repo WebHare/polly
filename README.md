@@ -115,8 +115,13 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **The dashboard is plain HTML/CSS/JavaScript.** Local fonts, original animated SVG poses and status shapes
   come from [the archived design exports](doc/design/polly-web/README.md). No frontend framework, Node
   runtime or external assets are needed in production. Source strings are inserted as text, and native
-  disclosure rows preserve open details and keyboard focus on refresh. TV pagination and robust long-running
-  browser recovery follow in the next stage.
+  disclosure rows preserve open details and keyboard focus on refresh, including reordered rows. TV pages
+  follow server order, rotate every 15 seconds and pause for interaction, open details or reduced motion.
+  Five rows fit compact screens; eight fit 1080p/4K. Phones/tablets use a normal list.
+- **The browser fails visibly and recovers automatically.** One request at a time, a ten-second timeout,
+  five seconds between attempts, and immediate revalidation on resume. Source age advances with a
+  monotonic clock; receiving the same measurement again cannot make it fresh. Old values remain clearly
+  marked during connection failures. No snapshot is stored persistently on the display.
 - **Vapor stays outside the native dependency graph.** PollyWeb pins Vapor 4.122.3 and its own lockfile.
   swift-log is constrained to 1.8.0 because newer releases use a compiler attribute unavailable in Apple
   Swift 6.2. Linux uses the Swift 6.4.2 toolchain established by the core tests.

@@ -34,7 +34,7 @@ try {
     assert.ok(size.scrollWidth <= size.width, "Horizontal overflow");
     if (vertical) assert.ok(size.bottom <= size.height, "Source strip outside TV viewport");
   };
-  for (const [width,height,state] of [[1920,1080,"eight"],[1280,720,"five"],[3840,2160,"eight"],[1024,1366,"critical"],[390,844,"long"]]) {
+  for (const [width,height,state] of [[1920,1080,"many"],[1280,720,"many"],[1728,873,"many"],[3840,2160,"many"],[1024,1366,"critical"],[390,844,"long"]]) {
     await page.setViewportSize({width,height});
     for (const reducedMotion of ["no-preference","reduce"]) {
       await page.emulateMedia({reducedMotion});
@@ -81,7 +81,7 @@ try {
   await page.waitForFunction(()=>document.documentElement.dataset.motion === "off");
   assert.deepEqual(external,[],"External asset requests");
   assert.deepEqual(failures,[],"Browser errors");
-  console.log(`✅ Browser suite passed (${browser.version()}): viewport/theme/reduced-motion matrix, 12 fixtures, keyboard, XSS, moving and offscreen animations, no external requests.`);
+  console.log(`✅ Browser suite passed (${browser.version()}): viewport/theme/reduced-motion matrix, ${Object.keys(fixtures).length} fixtures, keyboard, XSS, moving and offscreen animations, no external requests.`);
 } finally {
   await browser?.close();
   if (server.exitCode === null) { server.kill("SIGINT"); await once(server,"exit"); }

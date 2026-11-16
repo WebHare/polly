@@ -305,14 +305,28 @@ servers.
     and long output. ACK and DOWNTIME are informational markers, not actions.
     - Long names and output wrap in details. Refreshing an unchanged row preserves focus and open details.
   - The layout scales for 1080p and 4K, becomes compact at 720p, and uses a vertical list on tablets/phones.
-    - Eight collapsed rows fit at 1080p/4K and five at 720p. Larger lists currently scroll; automatic
-      pagination and unattended-display recovery are still being built.
+    - Eight collapsed rows fit at 1080p/4K; five are shown on compact screens up to 900 pixels high,
+      including 720p. Wider screens show pages in the server-provided order, changing every 15 seconds.
+    - A page counter and Previous, Next and Pause/Resume controls keep every problem reachable.
+    - Pointer or keyboard interaction pauses automatic pages until Resume; open details, hidden tabs,
+      paused motion and reduced-motion preferences also prevent automatic page changes.
+    - Dataset changes keep the page valid. A new critical problem or one becoming critical brings the first page back
+      on the next update, unless a focused/open row must be preserved; it is shown when that interaction ends.
+    - Phones and tablets show the full vertical list, with no automatic page changes.
+    - Use the browser/device fullscreen or kiosk mode for unattended displays; there is no app-specific
+      fullscreen control or smart-TV API.
   - A viewer can pause mascot motion. System reduced-motion preferences stop the loops, as do a hidden
     browser tab or a mascot outside the viewport. Status remains understandable without motion.
   - The page reads current status every five seconds without triggering an upstream poll. A failed read
     immediately marks retained values as old data and shows a disconnected pose while retrying.
-    - Browser-side monotonic freshness and resume handling are not yet complete; this stage is not the
-      final unattended-TV release.
+    - Only one request may run at a time; it times out after ten seconds, then retries after five seconds.
+    - Hidden tabs stop polling. Returning to the tab or restoring the network requests new data immediately;
+      retained data cannot give a healthy confirmation until a new, valid answer has been evaluated.
+    - The browser counts source age using elapsed monotonic time, independent of its wall clock. A new
+      API response carrying the same old source measurement never resets that age.
+    - Malformed JSON or invalid display data is a connection failure; it cannot replace known data.
+    - API failure, source failure and old source measurements stay visibly distinct. Partial coverage and
+      source age remain visible alongside critical problems from other sources.
   - It has no acknowledgements, downtime actions, rechecks, configuration writes or arbitrary-URL proxy.
 - The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
   - The file is read once at startup and never rewritten. Restart to apply changes.

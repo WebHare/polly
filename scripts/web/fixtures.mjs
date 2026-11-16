@@ -18,3 +18,6 @@ export const fixtures = {
 fixtures.long = {...fixtures.critical,problems:[{...problem,host:"very-long-host-name-".repeat(12),service:"long-service-name-".repeat(12),serverName:"long-source-name-".repeat(10),output:'<img src=x onerror="alert(1)"> & <script>alert(2)</script> '+"literal-output-".repeat(50),longOutput:"line\n".repeat(40)},...fixtures.critical.problems.slice(1)]};
 fixtures.eight = {...fixtures.critical,counts:{...counts,critical:8},headline:"Polly is squawking: 8 critical",problems:Array.from({length:8},(_,i)=>({...problem,id:`p-${i}`,host:`web-${i+1}.example.com`}))};
 fixtures.five = {...fixtures.eight,counts:{...counts,critical:5},headline:"Polly is squawking: 5 critical",problems:fixtures.eight.problems.slice(0,5)};
+
+fixtures.nine = {...fixtures.eight,headline:"Polly is squawking: 9 critical",counts:{...counts,critical:9},problems:Array.from({length:9},(_,i)=>({...problem,id:`p-${i}`,host:`web-${i+1}.example.com`}))};
+fixtures.many = {...fixtures.eight,headline:"Polly has checks that need attention",counts:{...counts,critical:3,warning:67,unknown:37},problems:Array.from({length:107},(_,i)=>({...problem,id:`p-${i}`,host:`web-${i+1}.example.com`,severity:i<3?"critical":i<70?"warning":"unknown"}))};

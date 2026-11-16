@@ -225,7 +225,14 @@ POLLY_KEYCHAIN_TESTS=1 swift test --package-path /absolute/path/to/polly/Package
 `Packages/PollyWeb` is a separate executable package. It uses Vapor 4.122.3 and its committed lockfile;
 native apps still depend only on PollyKit. Build with Apple Swift 6.2 or Linux Swift 6.4.2. The bundled
 HTML/CSS/JavaScript dashboard uses the same-origin status API. Its fonts and artwork require no internet
-connection. Browser pagination and the final unattended-TV recovery cycle are a subsequent stage.
+connection. The browser uses one request at a time, a ten-second timeout and a five-second retry interval.
+Hidden tabs stop polling and revalidate immediately on return. Source age advances monotonically between
+answers and across repeated measurements; the display clock does not need to match the server clock.
+
+TV pages contain eight rows (five at viewport heights up to 900px), preserve server order, and rotate every
+15 seconds. Pointer/keyboard interaction pauses rotation until Resume. Open details, motion off, system
+reduced motion and hidden tabs pause it too; Previous/Next remain available. Tablet/phone widths below
+1100px show the full list. Use native browser fullscreen/kiosk controls on the chosen display device.
 
 Copy [examples/polly-web.yaml](examples/polly-web.yaml) to a private location outside the checkout. Set its
 Nagios URLs and credentials, use file permissions `600`, and leave `passwordStorage: file`. The service
@@ -340,7 +347,7 @@ Use absolute checkout paths in these commands:
 
 ```sh
 python3 /absolute/path/to/polly/scripts/generate-web-design.py --check
-node --test /absolute/path/to/polly/scripts/web/design.test.mjs /absolute/path/to/polly/scripts/web/presentation.test.mjs
+node --test /absolute/path/to/polly/scripts/web/*.test.mjs
 ```
 
 Omit `--check` to regenerate. The five original export hashes are verified before generation, and the
@@ -354,7 +361,7 @@ python3 /absolute/path/to/polly/scripts/preview-web.py
 ```
 
 The printed URL supports `?state=quiet`, `warning`, `critical`, `unknown`, `unreachable`, `empty`, `paused`,
-`waiting`, `partial`, `long`, `five` and `eight`. `/__test__/dom.html` runs the actual DOM suite; the page must
+`waiting`, `partial`, `long`, `five`, `eight`, `nine` and `many` (107 problems). `/__test__/dom.html` runs the actual DOM suite; the page must
 say PASS. `/__test__/reference.html` shows the original animation SVG and CSS without executing the design
 runtime. Only that development reference permits inline styles. These routes do not exist in PollyWeb.
 
@@ -367,7 +374,34 @@ POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/p
 
 It starts/stops its own preview, exercises the real DOM, keyboard focus, literal XSS output, motion controls,
 reduced motion and offscreen pausing, and rejects external asset requests. The viewport matrix is
-1920×1080, 1280×720, 3840×2160, 1024×1366 and 390×844 in both themes and motion preferences. Screenshots
+1920×1080, 1280×720, 1728×873, 3840×2160, 1024×1366 and 390×844 in both themes and motion preferences. Screenshots
 are saved to `/tmp/polly-browser-screens`, or `POLLY_SCREENSHOTS`. Local verification used Chromium
-158.0.8127.18 via Playwright 1.66.0-alpha-2026-11-09 and the internal desktop browser. A stable CI browser
+158.0.8127.18 via Playwright 1.66.0-alpha-2026-11-09. Manual inspection also used desktop Chrome;
+the internal desktop browser was unavailable for the recovery/pagination phase. A stable CI browser
 installation is part of the container/CI phase; this is a development-only dependency.
+
+Recovery and long-running checks (each runner owns and stops its mock/service/browser in `finally`):
+
+```sh
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-reliability.mjs
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-lifecycle.mjs
+python3 /absolute/path/to/polly/scripts/test-web-upstream-faults.py
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-soak.mjs
+```
+
+The browser fault runner uses a real loopback HTTP status mock, not request interception: 401, 503,
+redirect, malformed JSON/schema, slow/hanging replies, listener restart and browser offline/online.
+It checks rendered status after recovery, manual/automatic pages, reduced motion and deterministic
+visibility events. The lifecycle runner also checks unchanged screenreader announcements and restored-page
+revalidation. The upstream runner uses the real Swift service and two Nagios mocks, including
+source recovery after a real polling interval, service restarts and unchanged read-only configuration.
+`GET /mock/config?fault=none|auth|503|redirect|invalid-json|slow|hang` changes only status responses;
+control endpoints stay reachable, and `/mock/reset` clears the fault.
+
+The soak takes at least 60 real minutes in three tabs (1080p, 720p and 4K/reduced motion). It changes
+HTTP modes every two minutes, samples active/max timers and requests, DOM size and Chromium heap after
+garbage collection, and fails on overlaps, timer growth, more than 10 MB retained heap growth, a failed
+rendered-state assertion or an asset change during the run. The JSON report defaults to
+`/tmp/polly-phase4-soak.json` (`POLLY_SOAK_REPORT` overrides it). On macOS it prevents idle sleep only
+while the runner is alive. An interrupted or short run is not acceptance evidence. These are browser
+and software measurements; they do not certify a physical TV, Safari or Firefox.

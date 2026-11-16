@@ -179,11 +179,13 @@ def main():
             for method in ["POST", "PUT", "PATCH", "DELETE"]:
                 assert request(base + "/api/status", password=PASSWORD, method=method)[0] == 405
             for path, mime in [("/app.mjs", "javascript"), ("/dashboard.mjs", "javascript"),
+                               ("/reliability.mjs", "javascript"),
                                ("/dashboard.css", "text/css"), ("/design.mjs", "javascript"),
                                ("/fonts/83ddc2f0-8211-487f-a86b-c3e677e1d298.woff2", "font/woff2")]:
                 assert request(base + path)[0] == 401
                 status, headers, body = request(base + path, password=PASSWORD)
                 assert status == 200 and mime in headers["Content-Type"] and body
+                assert body == (ROOT / "Packages/PollyWeb/Sources/PollyWeb/Public" / path.lstrip("/")).read_bytes(), "Served asset differs from the tested checkout"
                 assert headers["Cache-Control"] == "no-store"
             for path in ["/__test__/fixtures.mjs", "/doc/design/polly-web/source/Polly%20Animations.html"]:
                 assert request(base + path, password=PASSWORD)[0] == 404

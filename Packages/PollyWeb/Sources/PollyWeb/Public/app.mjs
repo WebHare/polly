@@ -1,5 +1,6 @@
 import { createDashboard } from "./dashboard.mjs";
 import { motionAllowed } from "./presentation.mjs";
+import { createPoller } from "./reliability.mjs";
 
 export function initializeControls(document) {
   const root = document.documentElement;
@@ -19,6 +20,7 @@ export function initializeControls(document) {
     motion.textContent = reduced.matches ? "Reduced motion" : enabled ? "Motion on" : "Motion off";
     motion.setAttribute("aria-pressed", String(enabled && !reduced.matches));
     motion.disabled = reduced.matches;
+    document.dispatchEvent(new Event("pollymotionchange"));
   };
   motion.addEventListener("click", () => { enabled = !enabled; updateMotion(); });
   reduced.addEventListener("change", updateMotion);
@@ -28,21 +30,17 @@ export function initializeControls(document) {
   updateMotion();
 }
 
-export async function startDashboard() {
+export function startDashboard() {
   const dashboard = createDashboard(document);
   initializeControls(document);
-  async function refresh() {
-    try {
-      const response = await fetch("/api/status", {cache:"no-store", redirect:"error", signal:AbortSignal.timeout(10000)});
-      if (!response.ok) throw new Error("Status unavailable");
-      dashboard.render(await response.json());
-    } catch {
-      dashboard.disconnected();
-    } finally {
-      setTimeout(refresh, 5000);
-    }
-  }
-  await refresh();
+  const poller = createPoller({onSnapshot:dashboard.render, onUnavailable:dashboard.disconnected});
+  document.addEventListener("visibilitychange", () => poller.setVisible(!document.hidden));
+  window.addEventListener("online", () => poller.retry());
+  window.addEventListener("offline", () => poller.retry());
+  window.addEventListener("pagehide", () => poller.stop());
+  window.addEventListener("pageshow", () => poller.start());
+  poller.setVisible(!document.hidden);
+  poller.start();
 }
 
 // The preview imports the same controls; only the production entry point starts network polling.

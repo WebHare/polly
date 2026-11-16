@@ -38,7 +38,14 @@
     </section>
     <p id="notice" class="notice">Waiting for the first answer.</p>
     <section id="problems" tabindex="-1" aria-labelledby="problems-heading">
-      <div class="section-heading"><h2 id="problems-heading">Needs attention</h2><span id="problem-total">Waiting</span></div>
+      <div class="section-heading"><h2 id="problems-heading">Needs attention</h2><span id="problem-total">Waiting</span>
+        <nav id="pagination" aria-label="Problem pages" hidden>
+          <span id="page-number" aria-live="polite"></span>
+          <button id="previous-page" type="button" aria-label="Previous problem page">Previous</button>
+          <button id="pause-pages" type="button" aria-pressed="false">Pause pages</button>
+          <button id="next-page" type="button" aria-label="Next problem page">Next</button>
+        </nav>
+      </div>
       <div id="problem-list"></div>
       <div id="empty-message" class="empty-message">Waiting for monitoring data.</div>
     </section>

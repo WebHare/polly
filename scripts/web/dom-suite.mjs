@@ -25,6 +25,11 @@ try {
   assert(details === document.querySelector(".problem") && details.open, "Open details replaced");
   assert(document.activeElement === summary, "Keyboard focus lost on refresh");
   assert(details.querySelector(".output-preview").textContent === "Changed output", "Output did not update");
+  dashboard.render({...fixtures.long,problems:[fixtures.long.problems[1],fixtures.long.problems[0],...fixtures.long.problems.slice(2)]});
+  console.log("Reordered focus", document.activeElement?.tagName);
+  assert(document.activeElement === summary, "Keyboard focus lost on reordered refresh");
+  dashboard.render(fixtures.long);
+  assert(document.activeElement === summary, "Keyboard focus lost when row moves earlier");
   dashboard.render({...fixtures.critical,coverage:{active:2,fresh:1},servers:fixtures.partial.servers});
   assert(document.querySelector("#notice").textContent.includes("1 of 2"), "Critical hides partial coverage");
   assert(document.querySelector("#sources").textContent.includes("Unreachable"), "Critical hides failed source");
@@ -32,6 +37,18 @@ try {
   assert(document.querySelector("#connection").textContent.includes("Connection lost"), "Missing connection warning");
   assert(document.querySelectorAll(".problem").length === 4, "Lost last known problems");
   assert(document.querySelector("#mascot").dataset.mood !== "ok", "Disconnected healthy mascot");
+  const many = {...fixtures.critical, problems:Array.from({length:107},(_,i)=>({...fixtures.critical.problems[0],id:`many-${i}`}))};
+  dashboard.render(many);
+  const pageSize = innerWidth < 1100 ? 107 : innerHeight <= 900 ? 5 : 8;
+  console.log("TV pagination", {visible:document.querySelectorAll(".problem:not([hidden])").length, expected:pageSize});
+  assert(document.querySelectorAll(".problem:not([hidden])").length === pageSize, "TV page size");
+  if (innerWidth >= 1100) {
+    assert(!document.querySelector("#pagination").hidden, "Missing page controls");
+    document.querySelector("#next-page").click();
+    assert(document.querySelector(".problem:not([hidden])").dataset.id === `many-${pageSize}`, "Next page skips or reorders problems");
+    document.querySelector("#previous-page").click();
+    assert(document.querySelector(".problem:not([hidden])").dataset.id === "many-0", "Previous page");
+  } else assert(document.querySelector("#pagination").hidden, "Mobile must show a normal list");
   results.textContent = `PASS: ${checked} states; literal XSS; detail/focus preservation; partial critical; connection failure.`;
   results.dataset.result = "pass";
 } catch (error) {

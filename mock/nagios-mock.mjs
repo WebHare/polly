@@ -125,6 +125,7 @@ const state = {
   offline: false, // respond with 503
   auth: !opts["no-auth"],
   requests: 0,
+  fault: "none",
   // Both variants exist in the wild: monitor.webhare.net (4.5.11 or older) sends no nagFormId at all and uses ISO dates.
   csrf: true,
   dateFormat: "us",
@@ -608,11 +609,15 @@ function handleControl(url) {
     }
     for (const name of hosts.keys()) setHost(name, HOST.up);
     downtimes.length = 0;
+    state.fault = "none";
     state.csrf = true;
     state.dateFormat = "us";
     return [200, { ok: true }];
   }
   if (url.pathname === "/mock/config") {
+    const fault = url.searchParams.get("fault");
+    if (fault && !["none", "auth", "503", "redirect", "invalid-json", "slow", "hang"].includes(fault)) return [400, { error: "Unknown fault" }];
+    if (fault) state.fault = fault;
     const csrf = url.searchParams.get("csrf");
     const dateFormat = url.searchParams.get("dateFormat");
     if ((csrf && !["on", "off"].includes(csrf)) || (dateFormat && !DATE_FORMATS.includes(dateFormat))) {
@@ -620,7 +625,7 @@ function handleControl(url) {
     }
     if (csrf) state.csrf = csrf === "on";
     if (dateFormat) state.dateFormat = dateFormat;
-    return [200, { ok: true, csrf: state.csrf, dateFormat: state.dateFormat }];
+    return [200, { ok: true, csrf: state.csrf, dateFormat: state.dateFormat, fault: state.fault }];
   }
   if (url.pathname === "/mock/set") {
     const p = url.searchParams;
@@ -662,7 +667,19 @@ const server = http.createServer(async (req, res) => {
   if (!["statusjson.cgi", "extinfo.cgi", "cmd.cgi"].includes(cgi)) return send(404, '{"error":"not found"}');
   if (!checkAuth(req)) return send(401, '{"error":"unauthorized"}', { "WWW-Authenticate": 'Basic realm="Nagios Access"' });
 
-  if (cgi === "statusjson.cgi") return send(200, handleQuery(url.searchParams));
+  if (cgi === "statusjson.cgi") {
+    if (state.fault === "auth") return send(401, '{"error":"unauthorized"}');
+    if (state.fault === "503") return send(503, '{"error":"unavailable"}');
+    if (state.fault === "redirect") return send(302, '{"redirect":true}', { Location: "/redirect-target" });
+    if (state.fault === "invalid-json") return send(200, "{broken");
+    if (state.fault === "hang") return;
+    if (state.fault === "slow") {
+      const timer = setTimeout(() => send(200, handleQuery(url.searchParams)), 2000);
+      res.once("close", () => clearTimeout(timer));
+      return;
+    }
+    return send(200, handleQuery(url.searchParams));
+  }
   if (cgi === "extinfo.cgi") return sendHTML(extinfoPage(url.searchParams));
   // cmd.cgi reads its variables from the query and from a POST body alike (getcgi.c).
   const cookies = parseCookies(req.headers.cookie);
