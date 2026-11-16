@@ -81,6 +81,20 @@ for `WebHare/polly`, the same way as for `WebHare/agent-radar`; set them by hand
 
 Only the team's Account Holder can create a Developer ID Application certificate.
 
+The **TestFlight** workflow (started by hand, see DEVELOPERS.md) uploads the iOS and macOS builds and uses:
+
+| Name                            | Kind     | Value                                                                                             |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `APPSTORE_CERTIFICATE_P12`      | secret   | base64 of one .p12 with the Apple Distribution and Mac Installer Distribution certificates + keys |
+| `APPSTORE_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                                             |
+| `APPSTORE_PROFILE_IOS`          | secret   | base64 of the "App Store Connect" profile for `nl.webhare.polly` (.mobileprovision)               |
+| `APPSTORE_PROFILE_MACOS`        | secret   | base64 of the "Mac App Store Connect" profile for `nl.webhare.polly` (.provisionprofile)          |
+| `APPSTORE_API_KEY`              | secret   | base64 of an App Store Connect API key (.p8) with the App Manager role                            |
+| `APPSTORE_API_KEY_ID`           | variable | that key's Key ID                                                                                 |
+| `APPSTORE_API_ISSUER_ID`        | variable | the Issuer ID (the same as `NOTARY_API_ISSUER_ID`)                                                |
+
+The certificates and profiles expire after a year and have to be renewed by hand.
+
 ## Design decisions
 
 Why things are the way they are, so they can be revisited deliberately rather than by accident.
