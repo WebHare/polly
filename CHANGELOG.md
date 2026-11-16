@@ -21,6 +21,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 - Refresh immediately when returning to Polly on iPhone or iPad, and pause polling while inactive.
 - Disable downtime presets when an edited start time does not match every possible server date format.
+- A URL pasted with a username and password no longer keeps showing them in the URL field on macOS.
+- **Add server** on macOS stayed disabled after entering a URL.
 
 ## [0.2.0] - 2026-11-15
 

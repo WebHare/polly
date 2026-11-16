@@ -169,9 +169,10 @@ extension SwitchRow where Accessory == EmptyView {
 private struct ServersPane: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
-    @State private var model = ServerFormModel()
-    /// Whether the add/edit form is open; `model` says what it is for.
-    @State private var showingForm = false
+    /// The open add/edit form, if any; it says what it is for.
+    @State private var form: ServerFormModel?
+    /// The type last used in the add form, so the next one starts with it.
+    @State private var lastKind = BackendKind.nagios
     @State private var errorMessage: String?
 
     private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
@@ -182,22 +183,20 @@ private struct ServersPane: View {
                        subtitle: "Polly polls these straight from this Mac. Nothing goes through our servers.")
             HStack {
                 Spacer()
-                Button("Add", systemImage: "plus") { openForm(ServerFormModel(kind: model.kind)) }
+                Button("Add", systemImage: "plus") { openForm(ServerFormModel(kind: lastKind)) }
                     .buttonStyle(PollyButtonStyle(kind: .primary, horizontal: 12, vertical: 4, radius: 6))
             }
             serverList
             advanced
         }
-        .sheet(isPresented: $showingForm) {
-            serverFormCard
-                .frame(width: 720)
-                .interactiveDismissDisabled(model.checkState == .checking)
-                .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
-                    Button("OK") { errorMessage = nil }
-                } message: { Text($0) }
+        .sheet(item: $form) { form in
+            ServerFormSheet(model: form) {
+                if !form.isEditing { lastKind = form.kind }
+                self.form = nil
+            }
         }
         .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
-        .alert("Error", isPresented: .constant(errorMessage != nil && !showingForm), presenting: errorMessage) { _ in
+        .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
     }
@@ -257,7 +256,134 @@ private struct ServersPane: View {
         }
     }
 
-    // MARK: Server form
+    // MARK: Advanced
+
+    private var advanced: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Advanced").font(.system(size: 15, weight: .bold))
+                .padding(.top, 16)
+                .padding(.horizontal, 18)
+                .padding(.bottom, 4)
+            SwitchRow(title: "Store passwords in Keychain",
+                      subtitle: monitor.passwordStorage == .keychain
+                          ? "Passwords are stored in the system keychain."
+                          : "Passwords are stored unencrypted in polly.yaml; the keychain is not used.",
+                      isOn: keychainBinding)
+            RowDivider()
+            SwitchRow(title: "Show Dock icon", subtitle: "Show Polly in the Dock and the app switcher.",
+                      isOn: dockIconBinding)
+            RowDivider()
+            SwitchRow(title: "Log server traffic",
+                      subtitle: "For debugging: writes every request and response, without credentials, to polly-debug.log next to polly.yaml.",
+                      isOn: debugLogBinding) {
+                if let wireLog = monitor.wireLog, monitor.debugLog {
+                    Button("Show Log in Finder") { NSWorkspace.shared.activateFileViewerSelecting([wireLog.fileURL]) }
+                        .buttonStyle(PollyLinkStyle())
+                        .font(.system(size: 12))
+                        .padding(.top, 3)
+                }
+            }
+        }
+        .settingsCard()
+    }
+
+    // MARK: Actions
+
+    private func openForm(_ form: ServerFormModel) {
+        form.wireLog = monitor.debugLog ? monitor.wireLog : nil
+        self.form = form
+    }
+
+    private func edit(_ server: NagiosServer) {
+        do { openForm(try monitor.editForm(for: server)) } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func duplicate(_ server: NagiosServer) {
+        do { openForm(try monitor.duplicateForm(for: server)) } catch { errorMessage = error.localizedDescription }
+    }
+
+    private func openRequestedEdit() {
+        guard let id = monitor.editRequest else { return }
+        monitor.editRequest = nil
+        guard form == nil, let server = monitor.servers.first(where: { $0.id == id }) else { return }
+        edit(server)
+    }
+
+    private var keychainBinding: Binding<Bool> {
+        Binding {
+            monitor.passwordStorage == .keychain
+        } set: { useKeychain in
+            do {
+                try monitor.setPasswordStorage(useKeychain ? .keychain : .file)
+            } catch {
+                errorMessage = "Could not move passwords: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private var dockIconBinding: Binding<Bool> {
+        Binding {
+            monitor.showDockIcon
+        } set: { show in
+            do {
+                try monitor.setShowDockIcon(show)
+                DockIcon.apply(show)
+            } catch {
+                errorMessage = "Could not save setting: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private var debugLogBinding: Binding<Bool> {
+        Binding {
+            monitor.debugLog
+        } set: { enabled in
+            do { try monitor.setDebugLog(enabled) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
+        }
+    }
+
+    private func setNotifications(_ enabled: Bool, for server: NagiosServer) {
+        Task {
+            if enabled, await !Notifier.shared.requestAuthorization() {
+                errorMessage = "Notifications are not allowed for Polly. Allow them in the system settings first."
+                return
+            }
+            do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func enabledBinding(for server: NagiosServer) -> Binding<Bool> {
+        Binding {
+            server.enabled
+        } set: { enabled in
+            do { try monitor.setEnabled(enabled, for: server) } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
+    private func delete(_ server: NagiosServer) {
+        do { try monitor.delete(server) } catch { errorMessage = error.localizedDescription }
+    }
+}
+
+/// The add/edit server form, shown as a sheet. It gets the form model directly, so the fields and the
+/// buttons always work on the same model and this view updates as it changes.
+private struct ServerFormSheet: View {
+    @Bindable var model: ServerFormModel
+    let close: () -> Void
+    @Environment(MonitorModel.self) private var monitor
+    @Environment(\.pollyTheme) private var theme
+    @State private var errorMessage: String?
+
+    private var pollSeconds: Int64 { monitor.pollInterval.components.seconds }
+
+    var body: some View {
+        serverFormCard
+            .frame(width: 720)
+            .interactiveDismissDisabled(model.checkState == .checking)
+            .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
+                Button("OK") { errorMessage = nil }
+            } message: { Text($0) }
+    }
 
     private var serverFormCard: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -272,7 +398,7 @@ private struct ServersPane: View {
                 }
                 GridRow {
                     label("URL")
-                    TextField("URL", text: $model.urlText,
+                    TextField("URL", text: $model.urlFieldText,
                               prompt: Text(verbatim: model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
@@ -340,7 +466,7 @@ private struct ServersPane: View {
                     Button(model.isEditing ? "Save anyway" : "Add anyway") { save() }
                 }
                 Spacer()
-                Button("Cancel") { showingForm = false }
+                Button("Cancel") { close() }
                     .keyboardShortcut(.cancelAction)
                     .disabled(model.checkState == .checking)
                 Button(model.isEditing ? "Save" : "Add server") { Task { await testAndSave() } }
@@ -386,59 +512,7 @@ private struct ServersPane: View {
         .background(background, in: RoundedRectangle(cornerRadius: 8))
     }
 
-    // MARK: Advanced
-
-    private var advanced: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Advanced").font(.system(size: 15, weight: .bold))
-                .padding(.top, 16)
-                .padding(.horizontal, 18)
-                .padding(.bottom, 4)
-            SwitchRow(title: "Store passwords in Keychain",
-                      subtitle: monitor.passwordStorage == .keychain
-                          ? "Passwords are stored in the system keychain."
-                          : "Passwords are stored unencrypted in polly.yaml; the keychain is not used.",
-                      isOn: keychainBinding)
-            RowDivider()
-            SwitchRow(title: "Show Dock icon", subtitle: "Show Polly in the Dock and the app switcher.",
-                      isOn: dockIconBinding)
-            RowDivider()
-            SwitchRow(title: "Log server traffic",
-                      subtitle: "For debugging: writes every request and response, without credentials, to polly-debug.log next to polly.yaml.",
-                      isOn: debugLogBinding) {
-                if let wireLog = monitor.wireLog, monitor.debugLog {
-                    Button("Show Log in Finder") { NSWorkspace.shared.activateFileViewerSelecting([wireLog.fileURL]) }
-                        .buttonStyle(PollyLinkStyle())
-                        .font(.system(size: 12))
-                        .padding(.top, 3)
-                }
-            }
-        }
-        .settingsCard()
-    }
-
     // MARK: Actions
-
-    private func openForm(_ form: ServerFormModel) {
-        form.wireLog = monitor.debugLog ? monitor.wireLog : nil
-        model = form
-        showingForm = true
-    }
-
-    private func edit(_ server: NagiosServer) {
-        do { openForm(try monitor.editForm(for: server)) } catch { errorMessage = error.localizedDescription }
-    }
-
-    private func duplicate(_ server: NagiosServer) {
-        do { openForm(try monitor.duplicateForm(for: server)) } catch { errorMessage = error.localizedDescription }
-    }
-
-    private func openRequestedEdit() {
-        guard let id = monitor.editRequest else { return }
-        monitor.editRequest = nil
-        guard !showingForm, let server = monitor.servers.first(where: { $0.id == id }) else { return }
-        edit(server)
-    }
 
     private func test() async {
         await model.testConnection()
@@ -462,67 +536,13 @@ private struct ServersPane: View {
             } else {
                 try monitor.add(server, password: password)
             }
-            showingForm = false
+            close()
         } catch {
             errorMessage = "Could not save server: \(error.localizedDescription)"
         }
     }
-
-    private var keychainBinding: Binding<Bool> {
-        Binding {
-            monitor.passwordStorage == .keychain
-        } set: { useKeychain in
-            do {
-                try monitor.setPasswordStorage(useKeychain ? .keychain : .file)
-            } catch {
-                errorMessage = "Could not move passwords: \(error.localizedDescription)"
-            }
-        }
-    }
-
-    private var dockIconBinding: Binding<Bool> {
-        Binding {
-            monitor.showDockIcon
-        } set: { show in
-            do {
-                try monitor.setShowDockIcon(show)
-                DockIcon.apply(show)
-            } catch {
-                errorMessage = "Could not save setting: \(error.localizedDescription)"
-            }
-        }
-    }
-
-    private var debugLogBinding: Binding<Bool> {
-        Binding {
-            monitor.debugLog
-        } set: { enabled in
-            do { try monitor.setDebugLog(enabled) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
-        }
-    }
-
-    private func setNotifications(_ enabled: Bool, for server: NagiosServer) {
-        Task {
-            if enabled, await !Notifier.shared.requestAuthorization() {
-                errorMessage = "Notifications are not allowed for Polly. Allow them in the system settings first."
-                return
-            }
-            do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }
-        }
-    }
-
-    private func enabledBinding(for server: NagiosServer) -> Binding<Bool> {
-        Binding {
-            server.enabled
-        } set: { enabled in
-            do { try monitor.setEnabled(enabled, for: server) } catch { errorMessage = error.localizedDescription }
-        }
-    }
-
-    private func delete(_ server: NagiosServer) {
-        do { try monitor.delete(server) } catch { errorMessage = error.localizedDescription }
-    }
 }
+
 
 /// The type segmented control: Nagios and URL work, the other systems are drawn from the design.
 private struct TypePicker: View {

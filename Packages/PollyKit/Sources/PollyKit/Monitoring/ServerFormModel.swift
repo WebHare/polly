@@ -42,7 +42,24 @@ public final class ServerFormModel {
         didSet {
             guard urlText != oldValue else { return }
             checkState = .idle
-            extractCredentials()
+            if !deferringExtraction { extractCredentials() }
+        }
+    }
+
+    /// `urlText` for the URL text field to bind to. A text field ignores a value that is rewritten while it
+    /// sets it, which left pasted credentials visible in the field. So this keeps the text as entered for
+    /// now and moves the credentials out on the next turn of the main actor, when the field does update.
+    public var urlFieldText: String {
+        get { urlText }
+        set {
+            deferringExtraction = true
+            urlText = newValue
+            deferringExtraction = false
+            guard newValue.contains("@") else { return }
+            Task { @MainActor [weak self] in
+                guard let self, self.urlText == newValue else { return }
+                self.extractCredentials()
+            }
         }
     }
 
@@ -51,6 +68,7 @@ public final class ServerFormModel {
     @ObservationIgnored private let session: URLSession
     /// The password the edited server had, to tell whether the connection changed.
     @ObservationIgnored private let originalPassword: String
+    @ObservationIgnored private var deferringExtraction = false
 
     public init(kind: BackendKind = .nagios, session: URLSession = .shared) {
         purpose = .add

@@ -21,7 +21,7 @@ struct ServerFormView: View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("URL", text: $model.urlText,
+                    TextField("URL", text: $model.urlFieldText,
                               prompt: Text(verbatim: isURLMonitor ? "https://www.example.com/" : "https://nagios.example.com"))
                         .textContentType(.URL)
                         .autocorrectionDisabled()

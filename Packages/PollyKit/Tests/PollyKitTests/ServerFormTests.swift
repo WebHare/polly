@@ -85,3 +85,43 @@ struct ServerFormTests {
         #expect(duplicate.urlText == "https://other.example.com")
     }
 }
+
+@MainActor
+struct ServerFormObservationTests {
+    /// The form's buttons follow `canSubmit`; pasting a whole URL at once must notify them too.
+    @Test(arguments: ["https://nagios.example.com", "https://alice:pw@nagios.example.com/nagios/"])
+    func pastingAURLNotifiesObservers(pasted: String) {
+        let model = ServerFormModel()
+        final class Flag: @unchecked Sendable { var value = false }
+        let changed = Flag()
+        withObservationTracking { _ = model.canSubmit } onChange: { changed.value = true }
+        model.urlText = pasted
+        #expect(changed.value)
+        #expect(model.canSubmit)
+    }
+}
+
+@MainActor
+struct ServerFormFieldTests {
+    /// A text field ignores a value rewritten while it is setting it, so the field binding keeps the pasted
+    /// text for this update and strips the credentials on the next turn of the main actor.
+    @Test func theURLFieldStripsPastedCredentialsOnTheNextTurn() async throws {
+        let model = ServerFormModel()
+        model.urlFieldText = "https://alice:pw@nagios.example.com/nagios/"
+        #expect(model.urlFieldText == "https://alice:pw@nagios.example.com/nagios/")
+        #expect(model.canSubmit)
+        for _ in 0..<10 where model.urlText.contains("@") { await Task.yield() }
+        #expect(model.urlText == "https://nagios.example.com")
+        #expect(model.username == "alice")
+        #expect(model.password == "pw")
+    }
+
+    @Test func typingOnAfterAPasteWinsOverTheDelayedRewrite() async {
+        let model = ServerFormModel()
+        model.urlFieldText = "https://alice:pw@nagios.example.com"
+        model.urlFieldText = "https://bob@other.example.com"
+        for _ in 0..<10 { await Task.yield() }
+        #expect(model.urlText == "https://other.example.com")
+        #expect(model.username == "bob")
+    }
+}
