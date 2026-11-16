@@ -7,6 +7,7 @@ Requires Docker and Python 3. Starts/stops OrbStack on macOS if it was stopped.
 
 from pathlib import Path
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -63,7 +64,9 @@ def main():
                 raise RuntimeError("Mock did not become ready.")
         print(f"Testing with {SWIFT_IMAGE}; POLLY_MOCK_URL=http://{mock}:8080", flush=True)
         print(run("docker", "run", "--rm", SWIFT_IMAGE, "swift", "--version"), flush=True)
-        output = run("docker", "run", "--rm", "--name", tests, "--network", name,
+        # Swift caches must remain readable by the host's subsequent Docker context check.
+        compiler_user = ["--user", f"{os.getuid()}:{os.getgid()}", "--env", "HOME=/tmp"]
+        output = run("docker", "run", "--rm", "--name", tests, "--network", name, *compiler_user,
             "--mount", f"type=bind,source={ROOT},target=/workspace",
             "--env", f"POLLY_MOCK_URL=http://{mock}:8080", SWIFT_IMAGE,
             "swift", "test", "--package-path", "/workspace/Packages/PollyKit",
@@ -75,7 +78,8 @@ def main():
         container = ["docker", "run", "--rm", "--name", tests, "--network", name,
                      "--mount", f"type=bind,source={ROOT},target=/workspace",
                      "--env", "POLLY_TEST_MOCK_URLS=" + json.dumps([f"http://{value}:8080" for value in mocks]), SWIFT_IMAGE]
-        output = run(*container, "swift", "test", "--package-path", "/workspace/Packages/PollyWeb",
+        output = run(*container[:-1], *compiler_user, container[-1],
+                     "swift", "test", "--package-path", "/workspace/Packages/PollyWeb",
                      "--scratch-path", "/workspace/.build/linux-web", "--force-resolved-versions", "-j", "8")
         print(output, flush=True)
         if "✔ Suite HTTPTests passed" not in output or "✔ Suite ConfigurationTests passed" not in output:
