@@ -215,9 +215,7 @@ private struct PopoverContent: View {
                         .padding(.top, 1)
                     VStack(alignment: .leading, spacing: 1) {
                         Text(server.name).fontWeight(.semibold) + Text("  \(server.kind.displayName)").foregroundStyle(theme.faint)
-                        Text(ServerStateIcon.line(for: server, state: monitor.states[server.id]))
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.muted)
+                        ServerLineText(server: server, state: monitor.states[server.id])
                             .lineLimit(2)
                     }
                 }

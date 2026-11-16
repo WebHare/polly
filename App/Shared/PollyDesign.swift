@@ -145,6 +145,14 @@ struct StatusIcon: View {
         .accessibilityLabel(severity.label)
     }
 
+    /// The icon as an image, to put inside a `Text`.
+    static func image(_ severity: Severity, size: CGFloat, dark: Bool) -> Image {
+        Image(size: CGSize(width: size, height: size), label: Text(severity.label)) { context in
+            context.scaleBy(x: size / 20, y: size / 20)
+            draw(severity, dark: dark, in: &context)
+        }
+    }
+
     private static func draw(_ severity: Severity, dark: Bool, in context: inout GraphicsContext) {
         let round = StrokeStyle(lineWidth: 2.2, lineCap: .round, lineJoin: .round)
         switch severity {
@@ -177,7 +185,7 @@ struct StatusIcon: View {
     }
 }
 
-/// The status icon of a server, and the one line that says how it is doing.
+/// The status icon of a server: whether Polly can reach it, not how the hosts it monitors are doing.
 struct ServerStateIcon: View {
     let server: NagiosServer
     let state: MonitorModel.ServerState?
@@ -185,25 +193,36 @@ struct ServerStateIcon: View {
     @Environment(\.pollyTheme) private var theme
 
     var body: some View {
-        if !server.enabled {
+        switch ServerLine(server: server, state: state).icon {
+        case .paused:
             Image(systemName: "pause.circle").font(.system(size: size - 2)).foregroundStyle(theme.faint)
                 .frame(width: size, height: size)
-        } else {
-            switch state {
-            case .ok(let status): StatusIcon(severity: status.severity, size: size)
-            case .failed: StatusIcon(severity: .unknown, size: size)
-            case .loading, nil: ProgressView().controlSize(.small).frame(width: size, height: size)
-            }
+        case .reachable: StatusIcon(severity: .ok, size: size)
+        case .unreachable: StatusIcon(severity: .critical, size: size)
+        case .loading: ProgressView().controlSize(.small).frame(width: size, height: size)
         }
     }
+}
 
-    static func line(for server: NagiosServer, state: MonitorModel.ServerState?) -> String {
-        guard server.enabled else { return "Monitoring paused" }
-        switch state {
-        case .ok(let status): return status.summaryLine
-        case .failed(let message): return "Unreachable · \(message)"
-        case .loading, nil: return server.baseURL.absoluteString
+/// The one line that says how a server is doing, with a small status icon in front of each problem count.
+struct ServerLineText: View {
+    let server: NagiosServer
+    let state: MonitorModel.ServerState?
+    var fontSize: CGFloat = 12
+    /// Color of the text around the problem counts; nil is the theme's muted text.
+    var plainColor: Color?
+    @Environment(\.pollyTheme) private var theme
+
+    var body: some View {
+        let line = ServerLine(server: server, state: state)
+        line.parts.reduce(Text("")) { text, part in
+            guard let severity = part.severity else { return text + Text(part.text) }
+            let icon = StatusIcon.image(severity, size: (fontSize * 0.92).rounded(), dark: theme.dark)
+            return text + Text(icon).baselineOffset(-fontSize * 0.12)
+                + Text("\u{2009}" + part.text).foregroundStyle(theme.severityText(severity))
         }
+        .font(.system(size: fontSize))
+        .foregroundStyle(line.tint.map { theme.severityText($0) } ?? plainColor ?? theme.muted)
     }
 }
 

@@ -82,7 +82,13 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 - Each server has a bell to turn notifications on or off (see [Notifications](#notifications)).
 - Each server shows a one-line state:
   - "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
-  - "Unreachable · <error>" when it can't be read; its URL while it is loading for the first time.
+    - Each problem count ("1 down", "1 crit", "3 warn", "2 unknown") has a small status icon in front of it
+      and is written in its status color.
+  - "Unreachable · <error>" in red when it can't be read; its URL while it is loading for the first time.
+- The icon in front of a server only says whether Polly can reach that monitor: a green check when it answers,
+  a red error icon when it can't be reached, a pause icon when it is paused, a spinner while loading.
+  - Problems on the hosts and services it monitors never change that icon; they show in the state line.
+    *Why:* a red icon for one critical service made healthy monitors look unreachable.
 
 ## Overview
 
