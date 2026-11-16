@@ -23,6 +23,10 @@ public final class MonitorModel {
     public var pollInterval: Duration = .seconds(60)
     /// When the poll loop refreshes all servers again; nil while it isn't running.
     public private(set) var nextPollAt: Date?
+    /// Completed attempts, including failures; a started or canceled request is not a measurement.
+    public private(set) var lastAttempts: [UUID: Date] = [:]
+    public private(set) var lastSuccesses: [UUID: Date] = [:]
+    public private(set) var lastPollCompletedAt: Date?
     /// A server whose edit form the server list should open ("Edit server…" on the Unreachable screen).
     /// The server list clears it once the form is open.
     public var editRequest: UUID?
@@ -79,6 +83,8 @@ public final class MonitorModel {
         let active = Set(servers.filter(\.enabled).map(\.id))
         states = states.filter { active.contains($0.key) }
         baselines = baselines.filter { active.contains($0.key) }
+        lastAttempts = lastAttempts.filter { active.contains($0.key) }
+        lastSuccesses = lastSuccesses.filter { active.contains($0.key) }
     }
 
     public func setShowDockIcon(_ show: Bool) throws {
@@ -117,6 +123,8 @@ public final class MonitorModel {
         if old?.baseURL != server.baseURL || old?.kind != server.kind {
             states[server.id] = nil
             baselines[server.id] = nil
+            lastAttempts[server.id] = nil
+            lastSuccesses[server.id] = nil
         }
         reload()
         if let updated = enabledServer(server.id) {
@@ -194,6 +202,19 @@ public final class MonitorModel {
                 group.addTask { await self.refresh(server) }
             }
         }
+        if !Task.isCancelled { lastPollCompletedAt = .now }
+    }
+
+    /// Server shutdown waits until the canceled poll has unwound its network requests.
+    public func stopPollingAndWait() async {
+        let task = pollTask
+        stopPolling()
+        await task?.value
+    }
+
+    public func webSnapshot(now: Date = .now, redactions: [String] = []) -> WebSnapshot {
+        WebSnapshot(servers: servers, states: states, lastAttempts: lastAttempts, lastSuccesses: lastSuccesses,
+                    nextPollAt: nextPollAt, now: now, redactions: redactions)
     }
 
     public func refresh(_ server: NagiosServer) async {
@@ -211,7 +232,9 @@ public final class MonitorModel {
         // that started later has taken over: its answer is the newer one, whichever arrives first.
         guard !Task.isCancelled, let current = enabledServer(server.id), lastRefresh[server.id] == number else { return }
         states[server.id] = result
+        lastAttempts[server.id] = .now
         guard case .ok(let status) = result else { return }
+        lastSuccesses[server.id] = status.fetchedAt
         let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems)
         baselines[server.id] = status.problems
         if current.notifications, !changes.isEmpty { onProblemChanges?(current, changes) }

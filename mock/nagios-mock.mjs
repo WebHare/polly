@@ -600,6 +600,7 @@ async function readBody(req) {
 // Mock-only control endpoints (no auth)
 
 function handleControl(url) {
+  if (url.pathname === "/mock/requests") return [200, { requests: state.requests }];
   if (url.pathname === "/mock/reset") {
     for (const s of services) {
       setService(s, SERVICE.ok, " (mock/reset)");

@@ -48,8 +48,8 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 ## Continuous integration
 
-`.github/workflows/build.yml` runs the PollyKit tests on macOS and Linux amd64, including real HTTP mock
-integration on Linux, and builds a universal (arm64 + x86_64) Release build of the macOS app on every push
+`.github/workflows/build.yml` runs the PollyKit and PollyWeb tests on macOS and Linux amd64, including real HTTP mock
+integration and a two-source webservice test on Linux, and builds a universal (arm64 + x86_64) Release build of the macOS app on every push
 to `main` and every pull request. The required macOS check also fails if the Linux tests fail, preventing
 auto-merge without Linux coverage. The result is attached to the run as a
 `Polly-<version>-<run>.dmg` artifact for testing; it is not a distribution channel. Polly is distributed
@@ -95,7 +95,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Linux core
 
 - **PollyKit's Nagios path also runs on Linux**: parsing, HTTP transport, polling, summaries, settings and
-  file/in-memory credential storage are shared with the native apps. The web service is not built yet.
+  file/in-memory credential storage are shared with the native apps.
 - **Apple-only functionality stays native**: URL monitoring (DNS/HTTP/certificate checks), Keychain,
   default Application Support storage and the long tooltip duration formatter. `makeBackend` throws for
   a URL server on Linux; it never substitutes a healthy result or a different backend.
@@ -107,6 +107,25 @@ Why things are the way they are, so they can be revisited deliberately rather th
   shared; redirects, credentials, cookies and cancellation are checked over real HTTP.
 - Run the reproducible Docker test command in [DEVELOPERS.md](DEVELOPERS.md#linux-tests) for the proven
   platform matrix and real HTTP integration.
+
+### Web service
+
+- **`Packages/PollyWeb` runs independently** on macOS and Linux. It serves a small start page, `/api/status`
+  and `/healthz`; the designed dashboard follows in a later phase. It has no write or proxy routes.
+- **Vapor stays outside the native dependency graph.** PollyWeb pins Vapor 4.122.3 and its own lockfile.
+  swift-log is constrained to 1.8.0 because newer releases use a compiler attribute unavailable in Apple
+  Swift 6.2. Linux uses the Swift 6.4.2 toolchain established by the core tests.
+- **One `MonitorModel` polls for every viewer.** API reads only project its current state into a whitelisted
+  `WebSnapshot` on the same actor. Completed attempt times, last successes and per-source age expose partial
+  coverage; pending or 150-second-old data cannot produce an all-quiet result. Native summary behavior stays
+  unchanged. Shutdown cancels and awaits polling.
+- **Configuration is separate and read-only.** `POLLY_CONFIG` must name an explicit file with Nagios sources
+  and `passwordStorage: file`. The service creates an in-memory store, disables traffic logging and
+  notifications, and never opens the native default store or Keychain.
+- **Loopback is the default.** Other binds require independent viewer Basic authentication using a bcrypt
+  hash file; a validating server wrapper checks Vapor's final CLI address before opening the socket. The
+  authenticator is paired with a guard over HTML, API and health, with a bounded failed-login budget.
+- See [DEVELOPERS.md](DEVELOPERS.md#web-service) for startup, password hashing, runtime limits and real HTTP tests.
 
 ### Backends
 

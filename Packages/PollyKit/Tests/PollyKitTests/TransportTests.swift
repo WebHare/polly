@@ -279,6 +279,40 @@ struct TransportTests {
         #expect(model.states[server.id] == previous)
     }
 
+    @MainActor @Test func webPollTimesAreRecordedOnlyAfterCompletionAndShutdownWaits() async throws {
+        let started = Box(false)
+        let hold = Box(true)
+        let unauthorized = Box(false)
+        StubProtocol.handler = { request in
+            started.value = true
+            var response = statusJSON(for: request)
+            response.waitsForCancellation = hold.value
+            if unauthorized.value { response.status = 401 }
+            return response
+        }
+        defer { StubProtocol.handler = nil }
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: nil)
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        model.startPolling()
+        let deadline = ContinuousClock.now + .seconds(2)
+        while !started.value, ContinuousClock.now < deadline { await Task.yield() }
+        try #require(started.value)
+        #expect(model.lastAttempts.isEmpty)
+        #expect(model.lastPollCompletedAt == nil)
+        await model.stopPollingAndWait()
+        #expect(model.lastAttempts.isEmpty)
+        hold.value = false
+        await model.refreshAll()
+        let success = try #require(model.lastSuccesses[server.id])
+        #expect(model.lastAttempts[server.id] != nil)
+        #expect(model.lastPollCompletedAt != nil)
+        unauthorized.value = true
+        await model.refreshAll()
+        #expect(model.lastSuccesses[server.id] == success)
+        #expect(model.lastAttempts[server.id]! >= success)
+    }
+
     @MainActor @Test func foregroundPollingRefreshesImmediatelyAndPreservesTheBaseline() async throws {
         let critical = Box(true)
         let requests = Box(0)

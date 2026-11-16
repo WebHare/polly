@@ -20,7 +20,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Test PollyKit with real HTTP on Linux
+      - name: Test PollyKit and PollyWeb with real HTTP on Linux
         run: python3 scripts/test-linux.py
 
   macos:
@@ -47,6 +47,9 @@ jobs:
 
       - name: Test PollyKit
         run: swift test --package-path Packages/PollyKit
+
+      - name: Test PollyWeb
+        run: swift test --package-path Packages/PollyWeb
 
       - name: Import the Developer ID certificate
         if: env.HAS_SIGNING == 'true'

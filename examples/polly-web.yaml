@@ -1,0 +1,10 @@
+# Copy this to a private file outside the repository and set POLLY_CONFIG to its absolute path.
+# The service reads this once and never writes it. Restart after editing.
+passwordStorage: file
+servers:
+  - name: Local mock
+    type: nagios
+    url: http://127.0.0.1:8089
+    username: nagiosadmin
+    password: nagios
+    enabled: true

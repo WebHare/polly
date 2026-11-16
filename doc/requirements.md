@@ -292,6 +292,42 @@ servers.
     - At 5 MB the log is moved to `polly-debug.log.1` and started anew.
 - The menu bar panel size is window state, not a setting, and is not stored in `polly.yaml`.
 
+## Web service
+
+- A standalone web service can monitor Nagios on macOS and Linux without running the native app.
+  - This stage provides a small start page and a status API. The designed dashboard is not included yet.
+  - It has no acknowledgements, downtime actions, rechecks, configuration writes or arbitrary-URL proxy.
+- The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
+  - The file is read once at startup and never rewritten. Restart to apply changes.
+  - Only `passwordStorage: file` and Nagios sources are accepted, including paused entries.
+  - HTTP(S) addresses must have a host and contain no embedded credentials or fragment. Pasted Nagios UI
+    paths are normalized using the same endpoint rules as the native form.
+  - Missing or invalid files, duplicate server IDs and unsupported settings prevent startup with a message
+    that does not quote the file's contents or passwords. An empty server list is allowed.
+  - The service does not read native app settings or Keychain, send notifications or write traffic logs.
+- Every viewer shares one poll loop, with about 60 seconds between completed rounds. Reading status never
+  starts a new poll. Shutdown cancels and waits for the poll to stop.
+- The public status includes names, states, counts, problems, acknowledgement/downtime markers and completed
+  attempt/success times. It excludes upstream URLs, usernames, passwords, hashes and raw transport errors.
+  - Known configured credentials are also removed from source-provided display text.
+  - A server is loading, OK, unreachable or paused, with its last successful data's age and staleness.
+  - Data is stale from 150 seconds onward. A fresh API response does not refresh its source measurement.
+  - Healthy requires fresh data from every enabled source and no pending checks. Empty, paused, waiting,
+    partial coverage and unreachable states cannot appear as healthy.
+  - Problems from reachable sources stay visible when another source fails; coverage remains visible too.
+- The default listener is `127.0.0.1:8088`. Listening outside loopback requires separate viewer credentials.
+  - `POLLY_VIEWER_USERNAME` and `POLLY_VIEWER_PASSWORD_HASH_FILE` must be provided together. The secret file
+    holds a bcrypt hash with cost 10 through 14. The password-hashing command accepts 12 through 72 UTF-8
+    bytes through stdin, never a password argument.
+  - When configured, authentication protects the start page, status API and health endpoint, including on
+    loopback. Use HTTPS at a reverse proxy before network access and keep the internal HTTP port private.
+  - The single viewer account has a shared budget of ten failed/in-flight login attempts per 60-second
+    window and at most eight simultaneous password checks. Excess attempts receive HTTP 429 with Retry-After.
+  - Only GET and HEAD are served. Configuration/secret files are not public assets. Responses are not cached,
+    no cross-origin access is enabled, and HTTP errors do not echo request or upstream details.
+- The health endpoint reveals only whether the process and poll loop are alive. Failed Nagios requests do
+  not make the service unhealthy; no completed poll for 180 seconds does.
+
 ## Not built yet
 
 Drawn from the design and tagged as such, but without function:

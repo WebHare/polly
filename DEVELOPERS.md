@@ -220,6 +220,88 @@ The opt-in Keychain test uses a unique temporary service and deletes its own cre
 POLLY_KEYCHAIN_TESTS=1 swift test --package-path /absolute/path/to/polly/Packages/PollyKit --filter realKeychainRoundTrip
 ```
 
+## Web service
+
+`Packages/PollyWeb` is a separate executable package. It uses Vapor 4.122.3 and its committed lockfile;
+native apps still depend only on PollyKit. Build with Apple Swift 6.2 or Linux Swift 6.4.2. The start page is
+intentionally small at this stage; the status API is ready for the dashboard.
+
+Copy [examples/polly-web.yaml](examples/polly-web.yaml) to a private location outside the checkout. Set its
+Nagios URLs and credentials, use file permissions `600`, and leave `passwordStorage: file`. The service
+reads the file at startup without rewriting it. Even paused sources must use `type: nagios`; URL monitoring
+and Keychain are unavailable to the service. Native traffic logging and notification settings are ignored.
+
+Start on loopback from any directory, replacing the absolute paths:
+
+```sh
+POLLY_CONFIG=/absolute/path/to/polly.yaml swift run --package-path /absolute/path/to/polly/Packages/PollyWeb polly-web serve --hostname 127.0.0.1 --port 8088
+```
+
+Open `http://127.0.0.1:8088/`. `/api/status` returns display-only JSON; all timestamps are ISO 8601. It
+distinguishes empty, paused, waiting, partial, unreachable, problems and OK. Per-server age increases
+without changing the last source measurement. Data becomes stale at 150 seconds; pending checks and
+incomplete coverage cannot produce OK. `/healthz` returns only a process/poller status; an upstream outage
+does not fail liveness, but a poll loop without a completed round for 180 seconds does. Ctrl-C or SIGTERM
+stops the listener and awaits cancellation of the poll loop.
+
+### Viewer authentication
+
+Create a bcrypt hash through stdin, with no password in shell history or process arguments. Build first,
+then use Python's hidden terminal prompt (replace both paths). `pipefail` prevents a failed prompt or hash
+command from being mistaken for a valid secret file:
+
+```sh
+swift build --package-path /absolute/path/to/polly/Packages/PollyWeb
+set -o pipefail
+umask 077
+python3 -c 'import getpass; print(getpass.getpass("Viewer password: "))' | /absolute/path/to/polly/Packages/PollyWeb/.build/debug/polly-web hash-password > /absolute/path/to/viewer.hash
+```
+
+Passwords must contain 12 through 72 UTF-8 bytes without newlines. The command produces cost-12 bcrypt;
+the service accepts costs 10 through 14. Extra command arguments and oversized stdin are rejected without
+echoing the input. Set both authentication variables even for local testing:
+
+```sh
+POLLY_CONFIG=/absolute/path/to/polly.yaml POLLY_VIEWER_USERNAME=viewer POLLY_VIEWER_PASSWORD_HASH_FILE=/absolute/path/to/viewer.hash /absolute/path/to/polly/Packages/PollyWeb/.build/debug/polly-web serve --hostname 127.0.0.1 --port 8088
+```
+
+The browser asks for the viewer credentials, which are separate from the Nagios credentials. The same guard
+protects HTML, API and health. Network binds (including `--bind` and `-H`) are refused without authentication.
+For a network deployment, terminate HTTPS at a reverse proxy and keep Polly's internal HTTP port private;
+the deployment/container examples follow in the distribution phase. Do not place passwords in URLs.
+
+The single viewer account has a global budget of ten failures/in-flight attempts per 60 seconds and eight
+concurrent password checks, avoiding unbounded tracking of spoofable client IPs. A burst can return 429
+with `Retry-After: 60`. This also applies to health clients using the viewer credentials.
+
+### Service tests
+
+```sh
+swift test --package-path /absolute/path/to/polly/Packages/PollyWeb
+python3 /absolute/path/to/polly/scripts/test-web.py
+python3 /absolute/path/to/polly/scripts/test-linux.py
+```
+
+`test-web.py` builds the server, starts two mocks on free loopback ports and checks real authenticated
+requests, source aggregation, private paths, refused writes, final CLI bind validation and graceful shutdown.
+It also checks password-input rejection, sanitized YAML errors and an unreachable source alongside a critical
+source while process health stays OK.
+The mock's `/mock/requests` endpoint proves that additional viewers do not cause additional Nagios requests.
+The fixtures are read-only files; their contents are checked after running. Every process is stopped in
+`finally`. Linux runs the same check inside the Swift container against two isolated Node containers,
+installs Python only in that disposable test container and uses the committed dependency versions.
+No production monitor is used.
+
+The service stage was verified on macOS arm64 (Apple Swift 6.2) and Linux arm64 (Swift 6.4.2): 12 web
+contract tests and the real HTTP/CLI checks on each. The shared core passed 115 native tests with mock and
+Keychain enabled (four external URL checks skipped), and 106 Linux tests with mock integration. Universal
+macOS Release and iOS Simulator Release builds also passed. The new service has not yet run in amd64 CI;
+the earlier core-only amd64 result above remains the proven coverage for that platform.
+
+The local CI workflow now runs PollyWeb tests on macOS and Linux plus the real HTTP tests on Linux. It will
+be published with the single PR after the remaining local phases. The designed dashboard, physical-device
+testing and production deployment are outside this stage.
+
 ## Versions, changelog and distribution
 
 `project.yml` owns `MARKETING_VERSION` (currently 0.2.0) and `CURRENT_PROJECT_VERSION` (2).
