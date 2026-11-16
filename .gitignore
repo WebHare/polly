@@ -22,3 +22,6 @@ fastlane/*.pkg
 fastlane/*.dSYM.zip
 /build/
 *.p8
+
+node_modules/
+.env

@@ -2,9 +2,9 @@
 # The service reads this once and never writes it. Restart after editing.
 passwordStorage: file
 servers:
-  - name: Local mock
+  - name: My Nagios
     type: nagios
-    url: http://127.0.0.1:8089
-    username: nagiosadmin
-    password: nagios
+    url: https://nagios.example.com
+    username: replace-with-nagios-user
+    password: replace-with-nagios-password
     enabled: true

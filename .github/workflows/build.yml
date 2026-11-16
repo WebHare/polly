@@ -15,16 +15,45 @@ concurrency:
 
 jobs:
   linux:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
 
       - name: Test PollyKit and PollyWeb with real HTTP on Linux
         run: python3 scripts/test-linux.py
 
+      - name: Build and test the distributable image through Compose
+        run: python3 scripts/test-container.py
+
+  web:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: python3 scripts/generate-web-design.py --check
+      - run: npm test
+      - run: npm run test:browser
+
   macos:
-    needs: linux
+    needs: [linux, web]
     if: ${{ always() }}
     runs-on: macos-26
     env:
@@ -35,10 +64,11 @@ jobs:
       TEAM_ID: MF6WPNPK5H
     steps:
       # A skipped required job can permit merging; explicitly fail when Linux did not pass.
-      - name: Require passing Linux tests
+      - name: Require passing Linux and browser tests
         env:
           LINUX_RESULT: ${{ needs.linux.result }}
-        run: test "$LINUX_RESULT" = success
+          WEB_RESULT: ${{ needs.web.result }}
+        run: test "$LINUX_RESULT" = success && test "$WEB_RESULT" = success
 
       - uses: actions/checkout@v7
 
@@ -50,6 +80,17 @@ jobs:
 
       - name: Test PollyWeb
         run: swift test --package-path Packages/PollyWeb
+
+      - name: Test real HTTP and upstream recovery on macOS
+        run: |
+          python3 scripts/test-web.py
+          python3 scripts/test-web-upstream-faults.py
+
+      - name: Build Polly for iOS Simulator
+        run: |
+          xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release \
+            -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/DerivedData-iOS" \
+            CODE_SIGNING_ALLOWED=NO build
 
       - name: Import the Developer ID certificate
         if: env.HAS_SIGNING == 'true'

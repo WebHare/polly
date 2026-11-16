@@ -1,0 +1,5 @@
+# Run Caddy on the same host as Compose. Replace this hostname with your own.
+# Only Caddy's HTTPS port is public; Polly stays on the host's loopback port.
+polly.example.com {
+	reverse_proxy 127.0.0.1:8088
+}

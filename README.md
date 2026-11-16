@@ -3,6 +3,10 @@
 A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI. It can also check
 websites itself, without a monitoring system behind them.
 
+For a TV, browser or tablet, the standalone read-only **Polly web dashboard** runs on macOS or Linux.
+Build it locally with Docker Compose or Swift; see [installation and upgrades](DEVELOPERS.md#linux-container-installation).
+It monitors Nagios only, with separate viewer authentication and no command or configuration actions.
+
 ## Layout
 
 ```
@@ -48,12 +52,15 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 ## Continuous integration
 
-`.github/workflows/build.yml` runs the PollyKit and PollyWeb tests on macOS and Linux amd64, including real HTTP mock
-integration and a two-source webservice test on Linux, and builds a universal (arm64 + x86_64) Release build of the macOS app on every push
-to `main` and every pull request. The required macOS check also fails if the Linux tests fail, preventing
-auto-merge without Linux coverage. The result is attached to the run as a
-`Polly-<version>-<run>.dmg` artifact for testing; it is not a distribution channel. Polly is distributed
-through TestFlight and the App Store (see "Versions, changelog and distribution" in DEVELOPERS.md).
+`.github/workflows/build.yml` tests PollyKit and PollyWeb on Linux amd64 and arm64 runners, including
+real Nagios HTTP integration and a build/start/restart test of the production container. A pinned
+Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The required
+macOS job fails if either Linux architecture or the browser job fails. It also tests both Swift packages,
+real HTTP/source recovery, the iOS Simulator build and a universal macOS Release build.
+The separate iOS workflow still builds for devices without signing.
+
+The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
+through TestFlight and the App Store. CI does not publish web images or deploy the dashboard.
 
 Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
 open it once via System Settings → Privacy & Security → **Open Anyway**, or run
@@ -135,6 +142,10 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Loopback is the default.** Other binds require independent viewer Basic authentication using a bcrypt
   hash file; a validating server wrapper checks Vapor's final CLI address before opening the socket. The
   authenticator is paired with a guard over HTML, API and health, with a bounded failed-login budget.
+- **The Linux image contains the executable, public resources and OS runtime libraries.** It runs as a
+  non-root user with CA certificates, without Swift or Node. Compose mounts config and the viewer hash
+  read-only, publishes only on host loopback and restarts unless explicitly stopped. A separate mock
+  override is for testing; normal Compose runs Polly alone. No registry image is published.
 - See [DEVELOPERS.md](DEVELOPERS.md#web-service) for startup, password hashing, runtime limits and real HTTP tests.
 
 ### Backends

@@ -6,6 +6,9 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Added
 
+- A locally buildable Linux container and Docker Compose setup for the web dashboard, with private
+  configuration, non-root operation, HTTPS proxy examples and documented upgrades/rollback. The web
+  version is Nagios-only and read-only; native URL checks, commands and notifications remain in the apps.
 - A standalone read-only Nagios web service for macOS and Linux, with viewer authentication, a status API,
   source freshness and coverage checks, and a separate configuration file.
 - A Polly web dashboard with light/dark themes, the four animated mascot poses, accessible problem details,

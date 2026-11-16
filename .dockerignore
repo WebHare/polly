@@ -1,0 +1,29 @@
+# Only compiled source and public resources enter the build context.
+**
+!Packages/
+!Packages/PollyKit/
+!Packages/PollyWeb/
+!Packages/*/Package.swift
+!Packages/*/Package.resolved
+!Packages/*/Sources/
+!Packages/*/Sources/**/
+!Packages/*/Sources/**/*.swift
+!Packages/*/Tests/
+!Packages/*/Tests/**
+!Packages/PollyWeb/Sources/PollyWeb/Public/**/*.html
+!Packages/PollyWeb/Sources/PollyWeb/Public/**/*.css
+!Packages/PollyWeb/Sources/PollyWeb/Public/**/*.mjs
+!Packages/PollyWeb/Sources/PollyWeb/Public/**/*.woff2
+!Packages/PollyWeb/Sources/PollyWeb/Public/**/*.txt
+
+# Parent directory exceptions must never bring dependency caches or private files back.
+**/.build
+**/.swiftpm
+**/.git
+**/node_modules
+**/*.yaml
+**/*.yml
+**/*.hash
+**/*.pem
+**/*.key
+**/.env*

@@ -294,6 +294,15 @@ servers.
 
 ## Web service
 
+- Operators can build and run a Linux container with Docker Compose, or start the service with Swift on macOS.
+  - The container runs without root, a compiler or Node; public CA certificates are included.
+  - Normal Compose runs only Polly, publishes on host loopback, mounts configuration and the viewer hash
+    read-only, and restarts after a process or host restart unless explicitly stopped.
+  - Other devices connect through an HTTPS reverse proxy; the internal HTTP port remains private.
+  - Config and credentials stay outside the image. An upgrade or rollback replaces the image without
+    changing configuration. Recreate the container after editing configuration or replacing secret files.
+  - A separate mock setup is available for testing, with no published mock port or production credentials.
+  - Images are built locally; no automatic updates, registry publication or production deployment are provided.
 - A standalone web service can monitor Nagios on macOS and Linux without running the native app.
   - The dashboard uses Polly's own status shapes, fonts and four animated mascot poses, with dark as the
     default and a light-theme button. All artwork and fonts load locally; no CDN is required.

@@ -1,0 +1,9 @@
+# Only for compose.mock.yaml. "mock" is the container service, not localhost.
+passwordStorage: file
+servers:
+  - name: Container mock
+    type: nagios
+    url: http://mock:8080
+    username: nagiosadmin
+    password: nagios
+    enabled: true
