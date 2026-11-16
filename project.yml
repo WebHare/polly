@@ -8,9 +8,6 @@ options:
   createIntermediateGroups: true
 
 packages:
-  Sparkle:
-    url: https://github.com/sparkle-project/Sparkle
-    exactVersion: "2.10.1"
   PollyKit:
     path: Packages/PollyKit
 
@@ -34,18 +31,11 @@ targets:
         destinationFilters: [iOS]
     dependencies:
       - package: PollyKit
-      - package: Sparkle
-        destinationFilters: [macOS]
     info:
       path: App/Info.plist
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        SUFeedURL: https://github.com/unilynx/polly/releases/latest/download/appcast.xml
-        SUPublicEDKey: GrZ98ctK1NSaV5xWJknpg4/mvrvzK+CHbszkWAjg7us=
-        SUEnableInstallerLauncherService: true
-        SUEnableAutomaticChecks: true
-        SUScheduledCheckInterval: 21600
         # Nagios servers are often internal and plain http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

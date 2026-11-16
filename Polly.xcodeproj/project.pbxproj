@@ -26,8 +26,6 @@
 		C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */; platformFilters = (macos, ); };
 		D010D679D247C02694A7B3EE /* PollyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FC2FAB90B0B60484B906A00 /* PollyApp.swift */; };
 		EC5F3F0EC120BBEC4B69F976 /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922DC996571A754701F1C24C /* MenuBarIcon.swift */; platformFilters = (macos, ); };
-		F64DAE315CBA313626FD4DF7 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; platformFilters = (macos, ); productRef = D4F0AB93E80D7A591A643311 /* Sparkle */; };
-		FC3652594EC96E6A0A3E2016 /* CheckForUpdatesButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3ED123E4CBFB8011D48DF5BE /* CheckForUpdatesButton.swift */; platformFilters = (macos, ); };
 		FC49AAEDAFDC426CB7CF5190 /* ProblemsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 080314FCE6787B83F66412F2 /* ProblemsScreen.swift */; platformFilters = (ios, ); };
 /* End PBXBuildFile section */
 
@@ -41,7 +39,6 @@
 		206F8CFFD8766B27EB430DBF /* ServersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersScreen.swift; sourceTree = "<group>"; };
 		276A57CF036E82890AFB589D /* PollyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PollyKit; path = Packages/PollyKit; sourceTree = SOURCE_ROOT; };
 		3D0C93277B9F2C7C0298FAAB /* AddServerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddServerView.swift; sourceTree = "<group>"; };
-		3ED123E4CBFB8011D48DF5BE /* CheckForUpdatesButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CheckForUpdatesButton.swift; sourceTree = "<group>"; };
 		4D179A8AB00DD1663451D08C /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		4F9EC63E3847380F178FB586 /* PollyDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyDesign.swift; sourceTree = "<group>"; };
 		4FC2FAB90B0B60484B906A00 /* PollyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyApp.swift; sourceTree = "<group>"; };
@@ -63,7 +60,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				182B1B26C7FF9C520CC07A6A /* PollyKit in Frameworks */,
-				F64DAE315CBA313626FD4DF7 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -110,7 +106,6 @@
 		A1D681F81E1A9E7605BBD992 /* macOS */ = {
 			isa = PBXGroup;
 			children = (
-				3ED123E4CBFB8011D48DF5BE /* CheckForUpdatesButton.swift */,
 				1D1A3900AF7542B852886F12 /* DockIcon.swift */,
 				1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */,
 				922DC996571A754701F1C24C /* MenuBarIcon.swift */,
@@ -165,7 +160,6 @@
 			name = Polly;
 			packageProductDependencies = (
 				D6BBC4E333290FCE32CC89E3 /* PollyKit */,
-				D4F0AB93E80D7A591A643311 /* Sparkle */,
 			);
 			productName = Polly;
 			productReference = F6AD3120BD8F3F5A5F437C92 /* Polly.app */;
@@ -196,7 +190,6 @@
 			mainGroup = 2A7596B39DDEAF6D112B0A32;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				FE16249E40423D7301FD6D58 /* XCRemoteSwiftPackageReference "Sparkle" */,
 				ED81DB1E03F8F750DD685406 /* XCLocalSwiftPackageReference "Packages/PollyKit" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -227,7 +220,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				138716DBAE90348599108DEB /* AddServerView.swift in Sources */,
-				FC3652594EC96E6A0A3E2016 /* CheckForUpdatesButton.swift in Sources */,
 				829E409BF4448BA863387845 /* CommandFormView.swift in Sources */,
 				3795C88B3DFC5ED95812685E /* DockIcon.swift in Sources */,
 				C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */,
@@ -469,23 +461,7 @@
 		};
 /* End XCLocalSwiftPackageReference section */
 
-/* Begin XCRemoteSwiftPackageReference section */
-		FE16249E40423D7301FD6D58 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/sparkle-project/Sparkle";
-			requirement = {
-				kind = exactVersion;
-				version = 2.10.1;
-			};
-		};
-/* End XCRemoteSwiftPackageReference section */
-
 /* Begin XCSwiftPackageProductDependency section */
-		D4F0AB93E80D7A591A643311 /* Sparkle */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = FE16249E40423D7301FD6D58 /* XCRemoteSwiftPackageReference "Sparkle" */;
-			productName = Sparkle;
-		};
 		D6BBC4E333290FCE32CC89E3 /* PollyKit */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = PollyKit;
