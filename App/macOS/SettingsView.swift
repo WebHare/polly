@@ -172,6 +172,7 @@ private struct ServersPane: View {
     @Environment(\.pollyTheme) private var theme
     /// The open add/edit form, if any; it says what it is for.
     @State private var form: ServerFormModel?
+    @State private var selectedSource: NagiosServer?
     /// The type last used in the add form, so the next one starts with it.
     @State private var lastKind = BackendKind.nagios
     @State private var errorMessage: String?
@@ -195,6 +196,9 @@ private struct ServersPane: View {
                 if !form.isEditing { lastKind = form.kind }
                 self.form = nil
             }
+        }
+        .sheet(item: $selectedSource) { server in
+            SourceStatusView(server: server)
         }
         .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
         .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
@@ -223,14 +227,32 @@ private struct ServersPane: View {
 
     private func serverRow(_ server: NagiosServer) -> some View {
         HStack(spacing: 10) {
-            ServerStateIcon(server: server, state: monitor.states[server.id], size: 16)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(server.name).fontWeight(.semibold)
-                    + Text(" · \(server.kind.displayName)").foregroundStyle(theme.faint)
-                Text(server.baseURL.absoluteString).font(.system(size: 12)).foregroundStyle(theme.faint)
+            Button {
+                selectedSource = server
+            } label: {
+                HStack(spacing: 10) {
+                    ServerStateIcon(server: server, state: monitor.states[server.id], size: 16)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(server.name).fontWeight(.semibold)
+                            + Text(" · \(server.kind.displayName)").foregroundStyle(theme.faint)
+                        ServerLineText(server: server, state: monitor.states[server.id])
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.right").foregroundStyle(theme.faint)
+                }
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .help("Show status and problems for this source")
+            .accessibilityIdentifier("source-status-\(server.id)")
             Text("every \(pollSeconds) s").font(.system(size: 12)).foregroundStyle(theme.faint)
+            Button("Edit source", systemImage: "pencil") { edit(server) }
+                .labelStyle(.iconOnly)
+                .buttonStyle(.borderless)
+                .foregroundStyle(theme.faint)
+                .help("Edit this source")
             Button(server.notifications ? "Turn off notifications" : "Turn on notifications",
                    systemImage: server.notifications ? "bell.fill" : "bell.slash") {
                 setNotifications(!server.notifications, for: server)
@@ -247,8 +269,8 @@ private struct ServersPane: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2) { edit(server) }
         .contextMenu {
+            Button("Show status…") { selectedSource = server }
             Button("Edit…") { edit(server) }
             Button("Duplicate…") { duplicate(server) }
             Divider()
