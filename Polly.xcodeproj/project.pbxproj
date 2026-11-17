@@ -23,6 +23,7 @@
 		7CB444DDC61700762B1CB3A3 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 1557307A982CF826FC5F3E02 /* CHANGELOG.md */; };
 		829E409BF4448BA863387845 /* CommandFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D2DE609BD15437DBD40E43 /* CommandFormView.swift */; };
 		C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */; platformFilters = (macos, ); };
+		C3AE79B7153D0E460269CCAF /* SourceStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */; platformFilters = (macos, ); };
 		D010D679D247C02694A7B3EE /* PollyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FC2FAB90B0B60484B906A00 /* PollyApp.swift */; };
 		EC5F3F0EC120BBEC4B69F976 /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922DC996571A754701F1C24C /* MenuBarIcon.swift */; platformFilters = (macos, ); };
 		FAAFAE346268B1B7809C42D6 /* ServerFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */; platformFilters = (ios, ); };
@@ -53,6 +54,7 @@
 		E9D2DE609BD15437DBD40E43 /* CommandFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandFormView.swift; sourceTree = "<group>"; };
 		F6AD3120BD8F3F5A5F437C92 /* Polly.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Polly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAB995832DBAC6866F111D6A /* SeverityStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeverityStyle.swift; sourceTree = "<group>"; };
+		FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceStatusView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -114,6 +116,7 @@
 				4D179A8AB00DD1663451D08C /* Polly.entitlements */,
 				5F30EFE40D0F1FACB5272BA4 /* ProblemDetailView.swift */,
 				D20C4E8D81E51B30896155BF /* SettingsView.swift */,
+				FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */,
 			);
 			path = macOS;
 			sourceTree = "<group>";
@@ -245,6 +248,7 @@
 				59B7E80AAD09DC1FF335AF26 /* ServersScreen.swift in Sources */,
 				5CEE84D1A6B0F44DCBD6B762 /* SettingsView.swift in Sources */,
 				7A5B5BBF2361CDB91D8C644C /* SeverityStyle.swift in Sources */,
+				C3AE79B7153D0E460269CCAF /* SourceStatusView.swift in Sources */,
 				3E6BC76B15FF76998B49DE9C /* WhatsNewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -115,6 +115,46 @@ struct TransportTests {
     private let form = "<input name='cmd_typ' value='34'><input name='cmd_mod' value='2'><input name='host' value='web1'>"
         + "<input name='service' value='HTTP'><input name='com_author' value='Alice Admin'><input name='nagFormId' value='test-token'"
 
+    @MainActor @Test func sourceSummaryStaysScopedAsItsStatusChanges() async throws {
+        let other = NagiosServer(name: "Other", baseURL: URL(string: "https://other.test")!, username: "")
+        let unavailable = Box(false)
+        StubProtocol.handler = { request in
+            if request.url?.host == "other.test" {
+                return statusJSON(for: request, problems: #"{"other-host":{"HTTP":{"status":16}}}"#, hostsUp: 9)
+            }
+            if unavailable.value { return .init(status: 401) }
+            return statusJSON(for: request, problems: #"{"web1":{"Disk":{"status":4}}}"#, hostsUp: 3)
+        }
+        defer { StubProtocol.handler = nil }
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "test-password")
+        try store.add(other, password: nil)
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+
+        #expect(model.summary(for: server.id).screen == .waiting)
+        await model.refreshAll()
+        let summary = model.summary(for: server.id)
+        #expect(summary.hosts == 3)
+        #expect(summary.entries.map(\.problem.host) == ["web1"])
+        #expect(summary.mood == .warning)
+        #expect(summary.answeredServers == 1)
+        #expect(summary.lastFetched != nil)
+
+        unavailable.value = true
+        await model.refresh(server)
+        let failed = model.summary(for: server.id)
+        #expect(failed.screen == .unreachable)
+        #expect(failed.unreachable?.server.id == server.id)
+        #expect(failed.entries.isEmpty)
+        #expect(failed.lastFetched == nil)
+
+        try model.setEnabled(false, for: server)
+        #expect(model.summary(for: server.id).isPaused)
+        #expect(model.summary(for: server.id).screen == .waiting)
+        try model.delete(server)
+        #expect(model.summary(for: server.id).screen == .empty)
+    }
+
     @Test func preparingOnlyReadsAndSubmittingPostsOnce() async throws {
         let requests = Box<[URLRequest]>([])
         let bodies = Box<[String]>([])

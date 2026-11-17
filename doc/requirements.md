@@ -54,7 +54,7 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - For a URL, the test only fails on a critical problem; a certificate that expires soon doesn't block adding
     it.
 - The user can edit a source: its type, name, URL, username and password.
-  - macOS: double-click the source or choose **Edit…** in its context menu; the form opens as
+  - macOS: click the pencil next to the source or choose **Edit…** in its context menu; the form opens as
     the "Edit source" modal.
   - iOS: tap the source (not its bell or switch), swipe left and choose **Edit**, or **Edit…** in its context menu;
     the form opens as a sheet titled "Edit Nagios Server" or "Edit URL".
@@ -70,6 +70,11 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
     - Why: it is a different system now; its problems are not changes of the old one's.
   - **Edit source…** on the Unreachable screen opens this form for the unreachable source (macOS: in the
     Settings window, on the Sources pane; iOS: on the Sources tab).
+- On macOS, clicking a source in Settings opens its live status and problems without needing the menu bar icon.
+  - The source list also shows the latest status or connection error.
+  - The detail shows only this source, with host and service totals, problems grouped by severity, and the time of its last successful check.
+  - Clicking a problem opens its check output and existing actions; **Refresh** checks this source again.
+  - Loading, paused and unreachable sources are distinguished from a source with no problems.
 - The user can duplicate a source to add a similar one without typing everything again.
   - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
   - Opens the add form prefilled with the source's type, URL, username, password and bell; the name gets
