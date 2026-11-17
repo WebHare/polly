@@ -273,8 +273,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Signing and sandbox
 
 - **App Sandbox with only `network.client`** on macOS.
-- **Signed with the WebHare bv team** rather than ad-hoc. Ad-hoc signatures change on every build, which
-  makes macOS treat each build as a new app and re-prompt for keychain access.
+- **WebHare bv signing by default**, with an optional ignored `Local.xcconfig` for stable local macOS signing in both Debug and Release; see [Signing](DEVELOPERS.md#signing). Ad-hoc signatures change on every build, which makes macOS treat each build as a new app and re-prompt for Keychain access.
 
 ### Tooling
 
