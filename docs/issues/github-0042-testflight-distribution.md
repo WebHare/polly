@@ -18,4 +18,14 @@ Keep the existing WebHare team, app record, bundle identifier and manual release
 
 Draft reply, not posted:
 
-> Ik zie Polly nu in App Store Connect. De [TestFlight-run](https://github.com/WebHare/polly/actions/runs/44095549948) stopte bij het importeren van het distributiecertificaat. Laat je weten zodra de macOS-build in TestFlight klaarstaat? Dan test ik de installatie en controleer ik of Polly start.
+> Ik zie Polly nu in App Store Connect. Ik kijk zelf in TestFlight en test de macOS-build zodra ik die kan installeren. De laatste GitHub-run stopte bij het importeren van het distributiecertificaat. [GitHub Actions-run](https://github.com/WebHare/polly/actions/runs/44095549948)
+
+## Deferred access verification
+
+Apple sign-in returned HTTP 502 during browser checks. Wouter subsequently reported that neither email nor passkey sign-in worked, with the message “The email or phone number you entered doesn’t match the account on your device.” The initial account-mismatch explanation was withdrawn because the cause was unverified. Other users reported contemporaneous Apple Account and App Store Connect failures. A service incident remained plausible despite the official status page showing availability. Later verification must reassess service health and the account before drawing conclusions.
+
+The follow-up was saved in TechNotes Inbox as “Handoff: Polly Apple-toegang en TestFlight controleren”, ID `cd8409bf-636a-447b-bb02-d63badcdd81c`, with the Polly working directory and a local handoff. It covers checking account rights, macOS TestFlight availability and whether the draft reply is still useful. No issue comment, Apple upload or release was performed.
+
+## Verification
+
+At session close, `swift test --package-path Packages/PollyKit` passed with 136 tests in 26 suites. The macOS build completed with ad-hoc signing. No application code changed. Authenticated Apple access and TestFlight installation remain unverified and are covered by the deferred note.
