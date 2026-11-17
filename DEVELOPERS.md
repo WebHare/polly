@@ -500,6 +500,33 @@ release or an update feed.
 The 0.2.0 build briefly carried a Sparkle updater; it was removed before any release was published. Its EdDSA
 key backup stays in 1Password but is not used; do not configure it as a GitHub secret.
 
+### TestFlight
+
+`scripts/testflight-macos.sh` and `scripts/testflight-ios.sh` build the current checkout with fastlane
+(`fastlane/Fastfile`, lanes `mac beta` and `ios beta`) and upload it to TestFlight. Run either with `--help`
+for the options. They install fastlane into `vendor/bundle` on first use and need a current Ruby
+(`brew install ruby`; macOS ships 2.6).
+
+- **Credentials**: an App Store Connect API key with the App Manager role, given as `ASC_KEY_ID`, `ASC_ISSUER_ID`
+  and `ASC_KEY_PATH` (the path to the `.p8` file; never commit it). Locally the builds are signed automatically
+  with the certificates of the Apple ID signed in to Xcode, and fastlane uses the key to upload. A `--dry-run`
+  without a key uses only the Apple ID and uploads nothing.
+- **Version and build number** come from `project.yml`. TestFlight refuses a build number it already has for
+  that platform, so bump `CURRENT_PROJECT_VERSION` first, or pass `--build-number auto` for an in-between
+  beta (the latest TestFlight build of that platform + 1; the repository is not changed).
+- **What to Test** is this version's dated `CHANGELOG.md` section, or `[Unreleased]` while the version is not
+  dated yet, as plain text. Override it with `--notes-file`.
+- **Testers**: `--groups` (or `POLLY_TESTFLIGHT_GROUPS`) adds the build to TestFlight groups; `--external`
+  also distributes it to their external testers, which submits it for beta review.
+- The builds are exported to `build/testflight/` (`Polly-osx.pkg` or `Polly-ios.ipa`, plus dSYMs).
+- iOS: automatic signing needs at least one iOS device registered in the team, even for an App Store build.
+- **From GitHub**: Actions → **TestFlight** → Run workflow (or `gh workflow run testflight.yml -f platform=both`)
+  builds the chosen branch and uploads it with `--build-number auto`. It signs manually with a fixed Apple
+  Distribution and Mac Installer Distribution certificate and the App Store profiles from the repository secrets
+  (see "Continuous integration" in the README), because automatic signing on a clean runner would create a new
+  development certificate in the team account on every run. Setting `POLLY_PROFILE_NAME` to the name of an
+  installed App Store profile does the same locally.
+
 Validate locally before a PR:
 
 ```sh
