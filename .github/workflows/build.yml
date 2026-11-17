@@ -24,12 +24,19 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v6
+      # The Swift image version is part of the cache key: build products of another compiler can't be reused.
+      - name: Read the Swift image version
+        id: swift
+        run: echo "image=$(sed -n 's/^SWIFT_IMAGE = \"swift:\(.*\)\"$/\1/p' scripts/test-linux.py)" >> "$GITHUB_OUTPUT"
+
+      # Compiling Vapor and its dependencies takes minutes; keep the debug builds of the Linux test containers.
+      - uses: actions/cache@v6
         with:
-          node-version: 22.14.0
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
+          path: |
+            .build/linux
+            .build/linux-web
+          key: swift-linux-${{ runner.arch }}-${{ steps.swift.outputs.image }}-${{ hashFiles('Packages/*/Package.resolved') }}
+          restore-keys: swift-linux-${{ runner.arch }}-${{ steps.swift.outputs.image }}-
 
       - name: Test PollyKit and PollyWeb with real HTTP on Linux
         run: python3 scripts/test-linux.py
@@ -52,9 +59,8 @@ jobs:
       - run: npm test
       - run: npm run test:browser
 
+  # Runs in parallel with linux and web; the build job below gates merging on all three.
   macos:
-    needs: [linux, web]
-    if: ${{ always() }}
     runs-on: macos-26
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
@@ -63,13 +69,6 @@ jobs:
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H
     steps:
-      # A skipped required job can permit merging; explicitly fail when Linux did not pass.
-      - name: Require passing Linux and browser tests
-        env:
-          LINUX_RESULT: ${{ needs.linux.result }}
-          WEB_RESULT: ${{ needs.web.result }}
-        run: test "$LINUX_RESULT" = success && test "$WEB_RESULT" = success
-
       - uses: actions/checkout@v7
 
       - name: Test release notes
@@ -163,3 +162,18 @@ jobs:
       - name: Remove the signing keychain
         if: always() && env.HAS_SIGNING == 'true'
         run: security delete-keychain "$RUNNER_TEMP/signing.keychain-db" || true
+
+  # The required check for merging. A skipped or cancelled job can permit merging, so this job always runs
+  # and fails unless every job above succeeded.
+  build:
+    needs: [linux, web, macos]
+    if: ${{ always() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require passing Linux, browser and macOS jobs
+        env:
+          LINUX_RESULT: ${{ needs.linux.result }}
+          WEB_RESULT: ${{ needs.web.result }}
+          MACOS_RESULT: ${{ needs.macos.result }}
+        run: test "$LINUX_RESULT" = success && test "$WEB_RESULT" = success && test "$MACOS_RESULT" = success
