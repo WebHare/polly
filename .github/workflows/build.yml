@@ -24,6 +24,14 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The container test checks the dashboard in Chromium (scripts/test-container-browser.mjs).
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22.14.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
       # The Swift image version is part of the cache key: build products of another compiler can't be reused.
       - name: Read the Swift image version
         id: swift
