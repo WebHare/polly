@@ -28,7 +28,7 @@ def main():
     name = "polly-smoke-" + uuid.uuid4().hex[:10]
     image = os.environ.get("POLLY_TEST_IMAGE", name)
     platform = os.environ.get("POLLY_TEST_PLATFORM")
-    build = ["docker", "build", "--tag", image]
+    build = ["docker", "buildx", "build", "--tag", image]
     if platform:
         build += ["--platform", platform]
     build += shlex.split(os.environ.get("POLLY_TEST_BUILD_FLAGS", ""))
