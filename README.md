@@ -58,6 +58,8 @@ Playwright/Chromium installation checks the dashboard, keyboard access, layouts 
 runs in parallel and tests both Swift packages, real HTTP/source recovery, the iOS Simulator build and a
 universal macOS Release build. The required `build` job fails unless the Linux, browser and macOS jobs all
 passed. The Linux jobs cache their Swift debug builds per architecture, Swift version and `Package.resolved`.
+The container build compiles the Swift dependencies in a separate layer, which CI keeps in the GitHub Actions
+cache (`--cache-from`/`--cache-to type=gha`), so only the Polly targets compile when the manifests are unchanged.
 The separate iOS workflow still builds for devices without signing.
 
 The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed

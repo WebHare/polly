@@ -3,10 +3,12 @@
 
 Builds and checks the actual Compose runtime. Requires a running Docker engine.
 POLLY_TEST_PLATFORM selects linux/arm64 or linux/amd64; default is the engine architecture.
+POLLY_TEST_BUILD_FLAGS adds flags to the image build, such as CI's --cache-from/--cache-to.
 """
 
 import json
 import os
+import shlex
 from pathlib import Path
 import subprocess
 import tempfile
@@ -29,6 +31,7 @@ def main():
     build = ["docker", "build", "--tag", image]
     if platform:
         build += ["--platform", platform]
+    build += shlex.split(os.environ.get("POLLY_TEST_BUILD_FLAGS", ""))
     # Exercise Docker's own ignore matcher, including a deliberately planted private file.
     with tempfile.NamedTemporaryFile(prefix="polly-secret-", suffix=".yaml", dir=ROOT) as canary:
         canary.write(b"password: must-not-enter-the-build-context\n")

@@ -41,7 +41,19 @@ jobs:
       - name: Test PollyKit and PollyWeb with real HTTP on Linux
         run: python3 scripts/test-linux.py
 
+      # The default Docker builder can't export a layer cache; a docker-container builder can.
+      - uses: docker/setup-buildx-action@v4
+      # Exposes the Actions cache token and URL that the type=gha cache backend needs to run steps.
+      - uses: crazy-max/ghaction-github-runtime@v4
+
       - name: Build and test the distributable image through Compose
+        env:
+          # mode=max also caches the build stage, whose dependency layer saves most of the release build.
+          # --load makes the image available to Compose, as the docker-container builder keeps it otherwise.
+          POLLY_TEST_BUILD_FLAGS: >-
+            --load
+            --cache-from type=gha,scope=container-${{ runner.arch }}
+            --cache-to type=gha,mode=max,scope=container-${{ runner.arch }}
         run: python3 scripts/test-container.py
 
   web:
