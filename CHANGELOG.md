@@ -21,6 +21,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Changed
 
+- Local macOS Debug builds are named **Polly DEV** and carry a yellow **DEV** ribbon on their app icon.
+
 - Explain the ideas for shared on-call duties, escalation and billing in the macOS Team placeholder.
 - The Nagios servers and URLs Polly watches are now called sources, so they can't be mistaken for the
   servers they monitor. `polly.yaml` lists them under `sources:`; an existing native-app file is converted at startup. The web service never rewrites its file.

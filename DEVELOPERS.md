@@ -73,6 +73,18 @@ Keyboard controls only work when the mock runs in a terminal, not when it is sta
 
 ### macOS
 
+Debug builds produce **Polly DEV.app**, with a yellow DEV ribbon on the Dock/Finder icon. Release builds
+remain **Polly.app**; iOS is unchanged. Both macOS builds retain the same bundle identifier, settings and
+Keychain entries, so this visual distinction does not create a separate monitoring configuration.
+
+The development icon is generated from the existing exported release icons, with the same yellow ribbon
+as Office42 and Application42. After regenerating the original design icons, run (requires `rsvg-convert`):
+
+```sh
+python3 /absolute/path/to/polly/scripts/generate-dev-icon.py
+python3 /absolute/path/to/polly/scripts/generate-dev-icon.py --check
+```
+
 In Xcode: open `Polly.xcodeproj`, choose the **Polly** scheme with **My Mac** as destination, and press Run.
 In VS Code, use SweetPad.
 

@@ -127,6 +127,9 @@ sources.
 
 ## macOS menu bar
 
+- Local macOS development builds are named **Polly DEV** and have a yellow **DEV** ribbon on their app icon, so they can be distinguished from the installed release.
+  - They keep the same source settings; the label does not create a separate monitoring setup.
+  - Release builds and iPhone/iPad builds keep the ordinary name and icon.
 - Polly is a menu bar app with no Dock icon by default.
   - A Dock icon can be turned on in Settings; clicking it opens the Settings window.
 - The menu bar icon is Polly's head plus a count when there is something to read.
