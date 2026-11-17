@@ -301,6 +301,83 @@ sources.
     - At 5 MB the log is moved to `polly-debug.log.1` and started anew.
 - The menu bar panel size is window state, not a setting, and is not stored in `polly.yaml`.
 
+## Web service
+
+- Operators can build and run a Linux container with Docker Compose, or start the service with Swift on macOS.
+  - The container runs without root, a compiler or Node; public CA certificates are included.
+  - Normal Compose runs only Polly, publishes on host loopback, mounts configuration and the viewer hash
+    read-only, and restarts after a process or host restart unless explicitly stopped.
+  - Other devices connect through an HTTPS reverse proxy; the internal HTTP port remains private.
+  - Config and credentials stay outside the image. An upgrade or rollback replaces the image without
+    changing configuration. Recreate the container after editing configuration or replacing secret files.
+  - A separate mock setup is available for testing, with no published mock port or production credentials.
+  - Images are built locally; no automatic updates, registry publication or production deployment are provided.
+- A standalone web service can monitor Nagios on macOS and Linux without running the native app.
+  - The dashboard uses Polly's own status shapes, fonts and four animated mascot poses, with dark as the
+    default and a light-theme button. All artwork and fonts load locally; no CDN is required.
+  - Separate figures show hosts down and critical, warning and unknown services. Source coverage and
+    reachability remain visible alongside problems, including when another source is critical.
+  - Empty configuration, all paused, waiting, unknown, partial coverage and unreachable sources have
+    explicit messages and never use the healthy pose.
+  - A viewer can expand any problem with a click, Enter or Space to read the full, literal Nagios output
+    and long output. ACK and DOWNTIME are informational markers, not actions.
+    - Long names and output wrap in details. Refreshing an unchanged row preserves focus and open details.
+  - The layout scales for 1080p and 4K, becomes compact at 720p, and uses a vertical list on tablets/phones.
+    - Eight collapsed rows fit at 1080p/4K; five are shown on compact screens up to 900 pixels high,
+      including 720p. Wider screens show pages in the server-provided order, changing every 15 seconds.
+    - A page counter and Previous, Next and Pause/Resume controls keep every problem reachable.
+    - Pointer or keyboard interaction pauses automatic pages until Resume; open details, hidden tabs,
+      paused motion and reduced-motion preferences also prevent automatic page changes.
+    - Dataset changes keep the page valid. A new critical problem or one becoming critical brings the first page back
+      on the next update, unless a focused/open row must be preserved; it is shown when that interaction ends.
+    - Phones and tablets show the full vertical list, with no automatic page changes.
+    - Use the browser/device fullscreen or kiosk mode for unattended displays; there is no app-specific
+      fullscreen control or smart-TV API.
+  - A viewer can pause mascot motion. System reduced-motion preferences stop the loops, as do a hidden
+    browser tab or a mascot outside the viewport. Status remains understandable without motion.
+  - The page reads current status every five seconds without triggering an upstream poll. A failed read
+    immediately marks retained values as old data and shows a disconnected pose while retrying.
+    - Only one request may run at a time; it times out after ten seconds, then retries after five seconds.
+    - Hidden tabs stop polling. Returning to the tab or restoring the network requests new data immediately;
+      retained data cannot give a healthy confirmation until a new, valid answer has been evaluated.
+    - The browser counts source age using elapsed monotonic time, independent of its wall clock. A new
+      API response carrying the same old source measurement never resets that age.
+    - Malformed JSON or invalid display data is a connection failure; it cannot replace known data.
+    - API failure, source failure and old source measurements stay visibly distinct. Partial coverage and
+      source age remain visible alongside critical problems from other sources.
+  - It has no acknowledgements, downtime actions, rechecks, configuration writes or arbitrary-URL proxy.
+- The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
+  - The file is read once at startup and never rewritten. Restart to apply changes.
+  - The list uses `sources:`. Legacy `servers:` is accepted without rewriting; combining both is an error.
+  - Only `passwordStorage: file` and Nagios sources are accepted, including paused entries.
+  - HTTP(S) addresses must have a host and contain no embedded credentials or fragment. Pasted Nagios UI
+    paths are normalized using the same endpoint rules as the native form.
+  - Missing or invalid files, duplicate server IDs and unsupported settings prevent startup with a message
+    that does not quote the file's contents or passwords. An empty server list is allowed.
+  - The service does not read native app settings or Keychain, send notifications or write traffic logs.
+- Every viewer shares one poll loop, with about 60 seconds between completed rounds. Reading status never
+  starts a new poll. Shutdown cancels and waits for the poll to stop.
+- The public status includes names, states, counts, problems, acknowledgement/downtime markers and completed
+  attempt/success times. It excludes upstream URLs, usernames, passwords, hashes and raw transport errors.
+  - Known configured credentials are also removed from source-provided display text.
+  - A server is loading, OK, unreachable or paused, with its last successful data's age and staleness.
+  - Data is stale from 150 seconds onward. A fresh API response does not refresh its source measurement.
+  - Healthy requires fresh data from every enabled source and no pending checks. Empty, paused, waiting,
+    partial coverage and unreachable states cannot appear as healthy.
+  - Problems from reachable sources stay visible when another source fails; coverage remains visible too.
+- The default listener is `127.0.0.1:8088`. Listening outside loopback requires separate viewer credentials.
+  - `POLLY_VIEWER_USERNAME` and `POLLY_VIEWER_PASSWORD_HASH_FILE` must be provided together. The secret file
+    holds a bcrypt hash with cost 10 through 14. The password-hashing command accepts 12 through 72 UTF-8
+    bytes through stdin, never a password argument.
+  - When configured, authentication protects the start page, status API and health endpoint, including on
+    loopback. Use HTTPS at a reverse proxy before network access and keep the internal HTTP port private.
+  - The single viewer account has a shared budget of ten failed/in-flight login attempts per 60-second
+    window and at most eight simultaneous password checks. Excess attempts receive HTTP 429 with Retry-After.
+  - Only GET and HEAD are served. Configuration/secret files are not public assets. Responses are not cached,
+    no cross-origin access is enabled, and HTTP errors do not echo request or upstream details.
+- The health endpoint reveals only whether the process and poll loop are alive. Failed Nagios requests do
+  not make the service unhealthy; no completed poll for 180 seconds does.
+
 ## Not built yet
 
 Drawn from the design and tagged as such, but without function:

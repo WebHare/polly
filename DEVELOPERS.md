@@ -220,6 +220,247 @@ The opt-in Keychain test uses a unique temporary service and deletes its own cre
 POLLY_KEYCHAIN_TESTS=1 swift test --package-path /absolute/path/to/polly/Packages/PollyKit --filter realKeychainRoundTrip
 ```
 
+## Web service
+
+`Packages/PollyWeb` is a separate executable package. It uses Vapor 4.122.3 and its committed lockfile;
+native apps still depend only on PollyKit. Build with Apple Swift 6.2 or Linux Swift 6.4.2. The bundled
+HTML/CSS/JavaScript dashboard uses the same-origin status API. Its fonts and artwork require no internet
+connection. The browser uses one request at a time, a ten-second timeout and a five-second retry interval.
+Hidden tabs stop polling and revalidate immediately on return. Source age advances monotonically between
+answers and across repeated measurements; the display clock does not need to match the server clock.
+
+TV pages contain eight rows (five at viewport heights up to 900px), preserve server order, and rotate every
+15 seconds. Pointer/keyboard interaction pauses rotation until Resume. Open details, motion off, system
+reduced motion and hidden tabs pause it too; Previous/Next remain available. Tablet/phone widths below
+1100px show the full list. Use native browser fullscreen/kiosk controls on the chosen display device.
+
+Copy [examples/polly-web.yaml](examples/polly-web.yaml) to a private location outside the checkout. Set its
+Nagios URLs and credentials, use file permissions `600`, and leave `passwordStorage: file`. The service
+reads the file at startup without rewriting it. Use `sources:` for the source list; the legacy `servers:`
+key is accepted without rewriting, but do not combine both keys. Even paused sources must use `type: nagios`; URL monitoring
+and Keychain are unavailable to the service. Native traffic logging and notification settings are ignored.
+
+Start on loopback from any directory, replacing the absolute paths:
+
+```sh
+POLLY_CONFIG=/absolute/path/to/polly.yaml swift run --package-path /absolute/path/to/polly/Packages/PollyWeb polly-web serve --hostname 127.0.0.1 --port 8088
+```
+
+Open `http://127.0.0.1:8088/`. `/api/status` returns display-only JSON; all timestamps are ISO 8601. It
+distinguishes empty, paused, waiting, partial, unreachable, problems and OK. Per-server age increases
+without changing the last source measurement. Data becomes stale at 150 seconds; pending checks and
+incomplete coverage cannot produce OK. `/healthz` returns only a process/poller status; an upstream outage
+does not fail liveness, but a poll loop without a completed round for 180 seconds does. Ctrl-C or SIGTERM
+stops the listener and awaits cancellation of the poll loop.
+
+### Viewer authentication
+
+Create a bcrypt hash through stdin, with no password in shell history or process arguments. Build first,
+then use Python's hidden terminal prompt (replace both paths). `pipefail` prevents a failed prompt or hash
+command from being mistaken for a valid secret file:
+
+```sh
+swift build --package-path /absolute/path/to/polly/Packages/PollyWeb
+set -o pipefail
+umask 077
+python3 -c 'import getpass; print(getpass.getpass("Viewer password: "))' | /absolute/path/to/polly/Packages/PollyWeb/.build/debug/polly-web hash-password > /absolute/path/to/viewer.hash
+```
+
+Passwords must contain 12 through 72 UTF-8 bytes without newlines. The command produces cost-12 bcrypt;
+the service accepts costs 10 through 14. Extra command arguments and oversized stdin are rejected without
+echoing the input. Set both authentication variables even for local testing:
+
+```sh
+POLLY_CONFIG=/absolute/path/to/polly.yaml POLLY_VIEWER_USERNAME=viewer POLLY_VIEWER_PASSWORD_HASH_FILE=/absolute/path/to/viewer.hash /absolute/path/to/polly/Packages/PollyWeb/.build/debug/polly-web serve --hostname 127.0.0.1 --port 8088
+```
+
+The browser asks for the viewer credentials, which are separate from the Nagios credentials. The same guard
+protects HTML, API and health. Network binds (including `--bind` and `-H`) are refused without authentication.
+For a network deployment, terminate HTTPS at a reverse proxy and keep Polly's internal HTTP port private;
+use the container and reverse-proxy examples below. Do not place passwords in URLs.
+
+The single viewer account has a global budget of ten failures/in-flight attempts per 60 seconds and eight
+concurrent password checks, avoiding unbounded tracking of spoofable client IPs. A burst can return 429
+with `Retry-After: 60`. This also applies to health clients using the viewer credentials.
+
+### Service tests
+
+```sh
+swift test --package-path /absolute/path/to/polly/Packages/PollyWeb
+python3 /absolute/path/to/polly/scripts/test-web.py
+python3 /absolute/path/to/polly/scripts/test-linux.py
+```
+
+`test-web.py` builds the server, starts two mocks on free loopback ports and checks real authenticated
+requests, source aggregation, private paths, refused writes, final CLI bind validation and graceful shutdown.
+It also checks password-input rejection, sanitized YAML errors and an unreachable source alongside a critical
+source while process health stays OK.
+The mock's `/mock/requests` endpoint proves that additional viewers do not cause additional Nagios requests.
+The fixtures are read-only files; their contents are checked after running. Every process is stopped in
+`finally`. Linux runs the same check inside the Swift container against two isolated Node containers,
+installs Python only in that disposable test container and uses the committed dependency versions.
+No production monitor is used.
+
+The final tested architecture/browser matrix is recorded under [Container verification](#container-verification).
+The earlier core-only results above are historical. CI runs the service and image on native Linux amd64
+and arm64 runners; it also guards the native macOS and iOS Simulator builds. Physical-device testing and
+production deployment are separate from these software checks.
+
+## Linux container installation
+
+Requirements: Docker Engine with Compose v2 or later, Git, and an ordinary non-root operator account
+that can run Docker. The runtime uses Swift 6.4.2 on Ubuntu 24.04. The Swift standard library is statically
+linked; the compiler is absent from the final image, and Node is only a test dependency.
+Build on the architecture you intend to run. Cross-compiling alone is not runtime verification.
+
+Clone the source and build a commit-tagged local image (substitute your checkout path):
+
+```sh
+git clone https://github.com/unilynx/maggie.git /absolute/path/to/polly
+```
+
+```sh
+export POLLY_REVISION=$(git -C /absolute/path/to/polly rev-parse HEAD)
+export POLLY_IMAGE=polly-web:$POLLY_REVISION
+docker build --build-arg REVISION="$POLLY_REVISION" --tag "$POLLY_IMAGE" /absolute/path/to/polly
+```
+
+The image label records the source revision. Build from a clean checkout; a revision label cannot describe
+uncommitted changes. Base images and Swift dependencies are pinned; Ubuntu security packages are resolved
+at build time, so record the resulting image ID too. No registry or release is needed.
+
+Keep configuration and the viewer hash outside the checkout. Create a private directory, copy
+[the example](examples/polly-web.yaml), and edit the Nagios URL/account there. These are the upstream
+credentials, not the viewer account. Both files must be readable by the container UID. With an ordinary
+non-root operator, retain ownership and use that UID/GID as below; do not make the files world-readable.
+On a root-operated server, provision ownership for UID/GID 10001 instead.
+
+```sh
+umask 077
+mkdir -p /absolute/private/polly
+cp /absolute/path/to/polly/examples/polly-web.yaml /absolute/private/polly/polly.yaml
+chmod 600 /absolute/private/polly/polly.yaml
+```
+
+Generate a separate viewer password hash without placing the password in argv or history. Python runs
+on the operator's machine; it is not needed in the service image. Keep the same `POLLY_IMAGE` value from
+the build, or use the explicit image tag in a new shell:
+
+```sh
+set -o pipefail
+umask 077
+python3 -c 'import getpass; print(getpass.getpass("Viewer password: "))' | docker run --rm -i "$POLLY_IMAGE" hash-password > /absolute/private/polly/viewer.hash
+```
+
+Start the service with read-only mounts. These environment values are paths and a username, never the
+password or hash. Save them in a private operator shell file if desired; keep actual secret contents in
+the mounted files. Non-root UID/GID mapping is necessary on Linux bind mounts: Compose does not remap file
+ownership for you. Compose's required variables and `create_host_path: false` fail early on missing files.
+
+```sh
+export POLLY_CONFIG=/absolute/private/polly/polly.yaml
+export POLLY_VIEWER_USERNAME=viewer
+export POLLY_VIEWER_PASSWORD_HASH_FILE=/absolute/private/polly/viewer.hash
+export POLLY_UID=$(id -u)
+export POLLY_GID=$(id -g)
+docker compose --file /absolute/path/to/polly/compose.yaml up --detach --no-build
+```
+
+Open `http://127.0.0.1:8088/` on that host and enter the viewer credentials. The default publish address is
+host loopback even though Polly listens on `0.0.0.0` inside its isolated container. `localhost` inside the
+container is not your host or another container. Use a reachable Nagios DNS name; the mock fixture uses
+the Compose service name `mock`. Change the host port with `POLLY_PORT` when necessary.
+
+### HTTPS and restart behavior
+
+For another display on the LAN or internet, run a reverse proxy on the same host. The supplied
+[examples/Caddyfile](examples/Caddyfile) terminates HTTPS and proxies to `127.0.0.1:8088`; replace
+`polly.example.com` with your hostname, configure its DNS and permit the proxy's certificate/HTTPS ports.
+Only the proxy should be reachable from viewers. Keep port 8088 unpublished on external interfaces.
+Do not put the viewer password in the URL. A proxy in a different container requires its own shared
+network and `polly:8088` backend, not `127.0.0.1`; the supplied example deliberately runs on the host.
+Follow your proxy's service management for automatic restart. No host service is installed by this repo.
+
+Compose uses `restart: unless-stopped`, a read-only root filesystem, no Linux capabilities and a small
+writable temporary filesystem. Docker restarts the service after process exit or host restart unless an
+operator stopped it. A failed health request alone does not trigger Docker restart. `/healthz` requires
+viewer authentication; upstream Nagios failures do not fail process health, but a poll loop without a
+completed round for 180 seconds does. Existing external monitoring can check it over HTTPS.
+
+After a configuration or viewer-hash change, recreate the container so a file replaced atomically is
+mounted again. Config is read only at startup. The service never rewrites the file or migrates native
+application settings.
+
+```sh
+docker compose --file /absolute/path/to/polly/compose.yaml up --detach --no-build --force-recreate
+```
+
+### Upgrade and rollback
+
+Record the currently running image before upgrading:
+
+```sh
+docker compose --file /absolute/path/to/polly/compose.yaml images
+```
+
+Keep that old tag/image locally. Fetch the desired source revision in your checkout, build a **new**
+commit-tagged image with the earlier build command, set `POLLY_IMAGE` to it and recreate with the command
+above. Check the rendered dashboard and authenticated `/api/status` and `/healthz`. For rollback, set
+`POLLY_IMAGE` back to the recorded old tag and recreate again, with exactly the same config/hash mounts.
+There is no database or configuration conversion in the web service. Do not prune the previous image
+until the upgrade has been verified. No automatic update or registry publication is configured.
+
+### Diagnosis
+
+- **Startup exits or restarts repeatedly:** `docker compose --file /absolute/path/to/polly/compose.yaml logs --tail 50 polly` shows sanitized errors. Check absolute file paths, file ownership matching the configured non-root UID, valid YAML, `passwordStorage: file`, Nagios sources and the readable bcrypt hash. Do not paste raw configuration into tickets.
+- **401:** the browser needs the viewer account, not Nagios credentials. Both HTML/assets and API/health are protected. **429:** wait 60 seconds after a burst of failed logins; correct the credentials in automated clients too.
+- **Polly unreachable from another device:** loopback exposure is intentional. Check the HTTPS proxy, DNS and firewall. Never fix this by publishing plaintext Basic authentication on the LAN.
+- **A source is unreachable:** check DNS, routing, Nagios credentials and TLS trust from the container network. Container `localhost` is not your host. Public CA certificates are included; for an internal CA, build a derived image that installs your public CA certificate into the system trust store. Never disable certificate validation.
+- **Partial, stale or disconnected:** source failure and browser-to-Polly failure are distinct. Retained data is marked old; 150-second-old measurements cannot become healthy just because HTTP still answers. Check the source strip and the proxy/service logs. A proxy must not cache the status API.
+- **Config edits have no effect:** recreate the container; a bind-mounted file replaced by an editor may still refer to the old inode until recreation.
+- **Architecture or shared-library errors:** use a locally built image for your host architecture and the supplied runtime stage. Copying only the binary to an arbitrary Linux distribution omits required runtime libraries.
+
+### Container verification
+
+Local acceptance on 17 November 2026 used runtime source revision `2e8e14e`:
+
+| Environment | Executed verification |
+| --- | --- |
+| macOS arm64, Xcode 26.0.1 / Swift 6.2 | 119 core tests executed (123 registered, four opt-in external URL checks skipped), 14 web tests, real HTTP/source recovery and temporary Keychain |
+| macOS Release | Universal arm64 + x86_64 build |
+| iOS Simulator Release | arm64 + x86_64 build; no physical-device run |
+| Linux arm64, Swift 6.4.2, OrbStack VM | 110 core tests, 14 web tests, real HTTP integration and production Compose image |
+| Linux amd64, Swift 6.4.2, OrbStack emulation | Production image built and executed, authenticated HTTP, exact assets, restart, config preservation and CA trust; native CI covers the full package suites |
+| Chromium 159.0.8154.6, Playwright 1.65.1 on macOS arm64 | 14 fixtures, six viewports, light/dark, both motion settings, HTTP failures/lifecycle, plus both production images after render |
+
+Both binaries' ELF machine types were measured (arm64 183, amd64 62). The 60m22s three-tab soak from the
+previous phase remains valid for the unchanged production assets; its browser was Chromium 158.0.8127.18.
+No Safari, Firefox, physical TV or physical iOS device is claimed. The HTTPS proxy example was validated
+with Caddy 2.10.2; a public hostname/certificate deployment was not performed. CI uses native Linux runners
+for both architectures, plus macOS tests/builds and the iOS Simulator build.
+
+Install the pinned browser dependency with the commands in [Dashboard development and tests](#dashboard-development-and-tests), then run:
+
+```sh
+python3 /absolute/path/to/polly/scripts/test-container.py
+```
+
+The runner builds the final image, creates temporary private config/hash files, starts Compose with the
+separate mock override and checks real HTTP from another container. It compares every served asset byte
+with the checkout, checks auth/private routes/refused writes, non-root/read-only operation, real TLS CA
+trust, restart and config preservation, then renders the actual service in Chromium light/dark. Its own
+Compose containers/network are stopped in `finally`; the built image remains available for inspection.
+It requires a running Docker engine and never stops an engine another task might be using.
+`POLLY_TEST_IMAGE` sets the retained image tag; `POLLY_TEST_PLATFORM=linux/amd64` or `linux/arm64` selects the
+build platform. Record `docker image inspect <tag>`'s ID/architecture with the test result; emulation is
+reported as emulation, not native hardware coverage. No real monitor or production configuration is used.
+
+For a manually running demo, use the same start instructions with a private copy of
+[examples/polly-web.mock.yaml](examples/polly-web.mock.yaml) and add
+`--file /absolute/path/to/polly/compose.mock.yaml` after the normal Compose file. The mock has no host
+port and is absent from normal Compose. Stop your demo with `docker compose` using the same two files and
+`down`. On macOS without Docker, use the Swift start and hashing commands in [Web service](#web-service).
+
 ## Versions, changelog and distribution
 
 `project.yml` owns `MARKETING_VERSION` (currently 0.2.0) and `CURRENT_PROJECT_VERSION` (2).
@@ -245,3 +486,79 @@ xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destin
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
 ```
+
+### Dashboard development and tests
+
+The production public directory is `Packages/PollyWeb/Sources/PollyWeb/Public`. Keep test fixtures and
+original design exports outside it. The authenticated FileMiddleware serves only that bundled directory;
+WOFF2 gets an explicit MIME type because Vapor 4.122.3 does not define one. Inline script/style is not
+allowed by the production CSP. Generated SVG styles are external CSS classes, preserving the exact pivots.
+
+Use absolute checkout paths in these commands:
+
+```sh
+python3 /absolute/path/to/polly/scripts/generate-web-design.py --check
+node --test /absolute/path/to/polly/scripts/web/*.test.mjs
+```
+
+Omit `--check` to regenerate. The five original export hashes are verified before generation, and the
+Node tests compare SVG trees, origins and animation timings directly to the archived source. See
+[design provenance and fonts](doc/design/polly-web/README.md).
+
+For manual inspection, start the loopback-only preview (Ctrl-C stops it):
+
+```sh
+python3 /absolute/path/to/polly/scripts/preview-web.py
+```
+
+The printed URL supports `?state=quiet`, `warning`, `critical`, `unknown`, `unreachable`, `empty`, `paused`,
+`waiting`, `partial`, `long`, `five`, `eight`, `nine` and `many` (107 problems). `/__test__/dom.html` runs the actual DOM suite; the page must
+say PASS. `/__test__/reference.html` shows the original animation SVG and CSS without executing the design
+runtime. Only that development reference permits inline styles. These routes do not exist in PollyWeb.
+
+The development-only npm lockfile pins Playwright 1.65.1 and its matching Chromium. Install from any
+working directory (Linux CI adds `--with-deps` to the browser install for system packages):
+
+```sh
+npm --prefix /absolute/path/to/polly ci
+node /absolute/path/to/polly/node_modules/playwright/cli.js install chromium
+npm --prefix /absolute/path/to/polly test
+npm --prefix /absolute/path/to/polly run test:browser
+```
+
+Individual runners also accept `POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs` when using an
+explicit external installation. CI uses the committed lockfile, never a floating `npx` package version.
+
+It starts/stops its own preview, exercises the real DOM, keyboard focus, literal XSS output, motion controls,
+reduced motion and offscreen pausing, and rejects external asset requests. The viewport matrix is
+1920×1080, 1280×720, 1728×873, 3840×2160, 1024×1366 and 390×844 in both themes and motion preferences. Screenshots
+are saved to `/tmp/polly-browser-screens`, or `POLLY_SCREENSHOTS`. Final distribution verification uses
+Chromium 159.0.8154.6 via stable Playwright 1.65.1. The earlier 60-minute recovery soak used Chromium
+158.0.8127.18 via Playwright 1.66.0-alpha-2026-11-09; it remains evidence for unchanged dashboard assets,
+not a claim that the new browser completed that soak. Manual inspection also used desktop Chrome.
+
+Recovery and long-running checks (each runner owns and stops its mock/service/browser in `finally`):
+
+```sh
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-reliability.mjs
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-lifecycle.mjs
+python3 /absolute/path/to/polly/scripts/test-web-upstream-faults.py
+POLLY_PLAYWRIGHT=/absolute/path/to/playwright/index.mjs node /absolute/path/to/polly/scripts/test-web-soak.mjs
+```
+
+The browser fault runner uses a real loopback HTTP status mock, not request interception: 401, 503,
+redirect, malformed JSON/schema, slow/hanging replies, listener restart and browser offline/online.
+It checks rendered status after recovery, manual/automatic pages, reduced motion and deterministic
+visibility events. The lifecycle runner also checks unchanged screenreader announcements and restored-page
+revalidation. The upstream runner uses the real Swift service and two Nagios mocks, including
+source recovery after a real polling interval, service restarts and unchanged read-only configuration.
+`GET /mock/config?fault=none|auth|503|redirect|invalid-json|slow|hang` changes only status responses;
+control endpoints stay reachable, and `/mock/reset` clears the fault.
+
+The soak takes at least 60 real minutes in three tabs (1080p, 720p and 4K/reduced motion). It changes
+HTTP modes every two minutes, samples active/max timers and requests, DOM size and Chromium heap after
+garbage collection, and fails on overlaps, timer growth, more than 10 MB retained heap growth, a failed
+rendered-state assertion or an asset change during the run. The JSON report defaults to
+`/tmp/polly-phase4-soak.json` (`POLLY_SOAK_REPORT` overrides it). On macOS it prevents idle sleep only
+while the runner is alive. An interrupted or short run is not acceptance evidence. These are browser
+and software measurements; they do not certify a physical TV, Safari or Firefox.

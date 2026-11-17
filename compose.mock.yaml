@@ -1,0 +1,20 @@
+# Test-only override. Use with compose.yaml and examples/polly-web.mock.yaml.
+services:
+  polly:
+    depends_on:
+      mock:
+        condition: service_healthy
+  mock:
+    image: node:22.14.0-bookworm-slim
+    user: node
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    command: [node, /mock/nagios-mock.mjs, --no-rotate]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:8080/mock/requests').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - ./mock:/mock:ro

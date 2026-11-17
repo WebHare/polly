@@ -3,6 +3,10 @@
 A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI. It can also check
 websites itself, without a monitoring system behind them.
 
+For a TV, browser or tablet, the standalone read-only **Polly web dashboard** runs on macOS or Linux.
+Build it locally with Docker Compose or Swift; see [installation and upgrades](DEVELOPERS.md#linux-container-installation).
+It monitors Nagios only, with separate viewer authentication and no command or configuration actions.
+
 ## Layout
 
 ```
@@ -48,12 +52,15 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 ## Continuous integration
 
-`.github/workflows/build.yml` runs the PollyKit tests on macOS and Linux amd64, including real HTTP mock
-integration on Linux, and builds a universal (arm64 + x86_64) Release build of the macOS app on every push
-to `main` and every pull request. The required macOS check also fails if the Linux tests fail, preventing
-auto-merge without Linux coverage. The result is attached to the run as a
-`Polly-<version>-<run>.dmg` artifact for testing; it is not a distribution channel. Polly is distributed
-through TestFlight and the App Store (see "Versions, changelog and distribution" in DEVELOPERS.md).
+`.github/workflows/build.yml` tests PollyKit and PollyWeb on Linux amd64 and arm64 runners, including
+real Nagios HTTP integration and a build/start/restart test of the production container. A pinned
+Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The required
+macOS job fails if either Linux architecture or the browser job fails. It also tests both Swift packages,
+real HTTP/source recovery, the iOS Simulator build and a universal macOS Release build.
+The separate iOS workflow still builds for devices without signing.
+
+The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
+through TestFlight and the App Store. CI does not publish web images or deploy the dashboard.
 
 Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
 open it once via System Settings → Privacy & Security → **Open Anyway**, or run
@@ -95,7 +102,7 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Linux core
 
 - **PollyKit's Nagios path also runs on Linux**: parsing, HTTP transport, polling, summaries, settings and
-  file/in-memory credential storage are shared with the native apps. The web service is not built yet.
+  file/in-memory credential storage are shared with the native apps.
 - **Apple-only functionality stays native**: URL monitoring (DNS/HTTP/certificate checks), Keychain,
   default Application Support storage and the long tooltip duration formatter. `makeBackend` throws for
   a URL server on Linux; it never substitutes a healthy result or a different backend.
@@ -107,6 +114,39 @@ Why things are the way they are, so they can be revisited deliberately rather th
   shared; redirects, credentials, cookies and cancellation are checked over real HTTP.
 - Run the reproducible Docker test command in [DEVELOPERS.md](DEVELOPERS.md#linux-tests) for the proven
   platform matrix and real HTTP integration.
+
+### Web service
+
+- **`Packages/PollyWeb` runs independently** on macOS and Linux. It serves the Polly dashboard, `/api/status`
+  and `/healthz`. It has no write or proxy routes.
+- **The dashboard is plain HTML/CSS/JavaScript.** Local fonts, original animated SVG poses and status shapes
+  come from [the archived design exports](doc/design/polly-web/README.md). No frontend framework, Node
+  runtime or external assets are needed in production. Source strings are inserted as text, and native
+  disclosure rows preserve open details and keyboard focus on refresh, including reordered rows. TV pages
+  follow server order, rotate every 15 seconds and pause for interaction, open details or reduced motion.
+  Five rows fit compact screens; eight fit 1080p/4K. Phones/tablets use a normal list.
+- **The browser fails visibly and recovers automatically.** One request at a time, a ten-second timeout,
+  five seconds between attempts, and immediate revalidation on resume. Source age advances with a
+  monotonic clock; receiving the same measurement again cannot make it fresh. Old values remain clearly
+  marked during connection failures. No snapshot is stored persistently on the display.
+- **Vapor stays outside the native dependency graph.** PollyWeb pins Vapor 4.122.3 and its own lockfile.
+  swift-log is constrained to 1.8.0 because newer releases use a compiler attribute unavailable in Apple
+  Swift 6.2. Linux uses the Swift 6.4.2 toolchain established by the core tests.
+- **One `MonitorModel` polls for every viewer.** API reads only project its current state into a whitelisted
+  `WebSnapshot` on the same actor. Completed attempt times, last successes and per-source age expose partial
+  coverage; pending or 150-second-old data cannot produce an all-quiet result. Native summary behavior stays
+  unchanged. Shutdown cancels and awaits polling.
+- **Configuration is separate and read-only.** `POLLY_CONFIG` must name an explicit file with Nagios sources
+  and `passwordStorage: file`. The service creates an in-memory store, disables traffic logging and
+  notifications, and never opens the native default store or Keychain.
+- **Loopback is the default.** Other binds require independent viewer Basic authentication using a bcrypt
+  hash file; a validating server wrapper checks Vapor's final CLI address before opening the socket. The
+  authenticator is paired with a guard over HTML, API and health, with a bounded failed-login budget.
+- **The Linux image contains the executable, public resources and OS runtime libraries.** It runs as a
+  non-root user with CA certificates, without Swift or Node. Compose mounts config and the viewer hash
+  read-only, publishes only on host loopback and restarts unless explicitly stopped. A separate mock
+  override is for testing; normal Compose runs Polly alone. No registry image is published.
+- See [DEVELOPERS.md](DEVELOPERS.md#web-service) for startup, password hashing, runtime limits and real HTTP tests.
 
 ### Backends
 

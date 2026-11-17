@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark light">
+  <title>Polly · monitoring companion</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/fonts.css">
+  <link rel="stylesheet" href="/design.css">
+  <link rel="stylesheet" href="/dashboard.css">
+  <script type="module" src="/app.mjs"></script>
+</head>
+<body>
+  <a class="skip-link" href="#problems">Skip to problems</a>
+  <header class="topbar">
+    <div class="brand">polly<span class="brand-dot">.</span><span class="brand-label">Your monitoring companion</span></div>
+    <div class="toolbar">
+      <span id="connection">Connecting to Polly...</span>
+      <button id="theme" type="button" aria-pressed="false">Light theme</button>
+      <button id="motion" type="button" aria-pressed="true">Motion on</button>
+    </div>
+  </header>
+  <main id="dashboard">
+    <section class="overview" aria-labelledby="headline">
+      <div id="mascot" aria-hidden="true" data-mood="unreachable"></div>
+      <div class="overview-copy">
+        <p class="eyebrow">NAGIOS OVERVIEW</p>
+        <h1 id="headline">Polly is connecting</h1>
+        <p id="coverage">Waiting for monitoring data</p>
+      </div>
+      <dl class="counts" aria-label="Current problems">
+        <div class="count critical"><dt><span data-icon="critical"></span>Hosts down</dt><dd id="hostsDown">?</dd></div>
+        <div class="count critical"><dt><span data-icon="critical"></span>Critical services</dt><dd id="critical">?</dd></div>
+        <div class="count warning"><dt><span data-icon="warning"></span>Warning services</dt><dd id="warning">?</dd></div>
+        <div class="count unknown"><dt><span data-icon="unknown"></span>Unknown services</dt><dd id="unknown">?</dd></div>
+      </dl>
+    </section>
+    <p id="notice" class="notice">Waiting for the first answer.</p>
+    <section id="problems" tabindex="-1" aria-labelledby="problems-heading">
+      <div class="section-heading"><h2 id="problems-heading">Needs attention</h2><span id="problem-total">Waiting</span>
+        <nav id="pagination" aria-label="Problem pages" hidden>
+          <span id="page-number" aria-live="polite"></span>
+          <button id="previous-page" type="button" aria-label="Previous problem page">Previous</button>
+          <button id="pause-pages" type="button" aria-pressed="false">Pause pages</button>
+          <button id="next-page" type="button" aria-label="Next problem page">Next</button>
+        </nav>
+      </div>
+      <div id="problem-list"></div>
+      <div id="empty-message" class="empty-message">Waiting for monitoring data.</div>
+    </section>
+    <section class="sources-section" aria-labelledby="sources-heading">
+      <div class="section-heading"><h2 id="sources-heading">Monitoring sources</h2><span>Read-only · checks every 60 s</span></div>
+      <ul id="sources"></ul>
+    </section>
+  </main>
+  <p id="announcement" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+  <noscript><p class="notice">JavaScript is required to display monitoring status.</p></noscript>
+</body>
+</html>
