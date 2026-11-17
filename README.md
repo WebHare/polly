@@ -54,9 +54,10 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 `.github/workflows/build.yml` tests PollyKit and PollyWeb on Linux amd64 and arm64 runners, including
 real Nagios HTTP integration and a build/start/restart test of the production container. A pinned
-Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The required
-macOS job fails if either Linux architecture or the browser job fails. It also tests both Swift packages,
-real HTTP/source recovery, the iOS Simulator build and a universal macOS Release build.
+Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The macOS job
+runs in parallel and tests both Swift packages, real HTTP/source recovery, the iOS Simulator build and a
+universal macOS Release build. The required `build` job fails unless the Linux, browser and macOS jobs all
+passed. The Linux jobs cache their Swift debug builds per architecture, Swift version and `Package.resolved`.
 The separate iOS workflow still builds for devices without signing.
 
 The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
