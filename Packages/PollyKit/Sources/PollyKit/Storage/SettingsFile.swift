@@ -26,6 +26,8 @@ public struct PollySettings: Equatable, Sendable {
     public var showDockIcon = false
     /// Write `polly-debug.log` (see `WireLog`) next to the settings file.
     public var debugLog = false
+    /// List a host that is down as one problem, without the problems of the services on it.
+    public var hideServicesOnDownHosts = true
     public var servers: [Server] = []
 
     public init(passwordStorage: PasswordStorage = .keychain, showDockIcon: Bool = false, debugLog: Bool = false,
@@ -79,6 +81,7 @@ public enum SettingsFile {
         }
         settings.showDockIcon = raw.showDockIcon ?? false
         settings.debugLog = raw.debugLog ?? false
+        settings.hideServicesOnDownHosts = raw.hideServicesOnDownHosts ?? true
         if raw.sources != nil, raw.servers != nil {
             throw SettingsFileError(message: "polly.yaml: has both 'sources' and the old 'servers'; merge them into 'sources'")
         }
@@ -123,6 +126,7 @@ public enum SettingsFile {
         var passwordStorage: String?
         var showDockIcon: Bool?
         var debugLog: Bool?
+        var hideServicesOnDownHosts: Bool?
         var sources: [RawServer]?
         /// The old name of `sources`; read once and rewritten as `sources`.
         var servers: [RawServer]?
@@ -155,6 +159,9 @@ public enum SettingsFile {
             # Write polly-debug.log next to this file: every request to and response from the sources,
             # without credentials. For troubleshooting only.
             debugLog: \(settings.debugLog)
+
+            # Show a host that is down as one problem and leave out the problems of the services on it.
+            hideServicesOnDownHosts: \(settings.hideServicesOnDownHosts)
 
 
             """

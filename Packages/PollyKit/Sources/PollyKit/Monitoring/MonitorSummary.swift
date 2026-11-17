@@ -41,7 +41,7 @@ public struct MonitorSummary: Sendable {
     private var checked = 0
 
     @MainActor
-    public init(servers: [NagiosServer], states: [UUID: MonitorModel.ServerState]) {
+    public init(servers: [NagiosServer], states: [UUID: MonitorModel.ServerState], hideServicesOnDownHosts: Bool = true) {
         hasServers = !servers.isEmpty
         var entries: [ProblemEntry] = []
         for server in servers where server.enabled {
@@ -54,7 +54,8 @@ public struct MonitorSummary: Sendable {
                 services += status.services.total
                 answeredServers += 1
                 lastFetched = max(lastFetched ?? status.fetchedAt, status.fetchedAt)
-                entries += status.problems.map { ProblemEntry(server: server, problem: $0) }
+                let shown = hideServicesOnDownHosts ? status.problems.hidingServicesOnDownHosts : status.problems
+                entries += shown.map { ProblemEntry(server: server, problem: $0) }
             case .failed(let message):
                 if unreachable == nil { unreachable = (server, message) }
             case .loading, nil:

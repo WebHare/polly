@@ -601,11 +601,12 @@ private struct AlertsPane: View {
     }
 
     @Environment(\.pollyTheme) private var theme
+    @Environment(MonitorModel.self) private var monitor
+    @State private var errorMessage: String?
     @State private var filters = [
         Filter(name: "Hide acknowledged problems", sub: "They stay in the list, collapsed under “Acknowledged”.", on: true),
         Filter(name: "Hide soft states", sub: "Wait until the last retry confirms a problem.", on: true),
         Filter(name: "Hide hosts and services in downtime", sub: "Scheduled maintenance is not news.", on: true),
-        Filter(name: "Hide services on hosts that are down", sub: "One dead host, one line.", on: false),
     ]
     @State private var quietHours = true
     @State private var letCriticalsThrough = true
@@ -626,13 +627,16 @@ private struct AlertsPane: View {
                 PaneHeader(title: "Alerts", subtitle: "What Polly shows, and when it is allowed to wake you.")
                 HStack(spacing: 8) {
                     PlaceholderTag(text: "PROTOTYPE")
-                    Text("Nothing on this screen is saved or applied yet.").foregroundStyle(theme.muted)
+                    Text("Only hiding services on hosts that are down works; the rest is not saved or applied yet.")
+                        .foregroundStyle(theme.muted)
                 }
             }
             section("Filters") {
                 VStack(spacing: 0) {
+                    SwitchRow(title: "Hide services on hosts that are down", subtitle: "One dead host, one line.",
+                              isOn: hideServicesBinding)
                     ForEach(filters.indices, id: \.self) { index in
-                        if index > 0 { RowDivider() }
+                        RowDivider()
                         SwitchRow(title: filters[index].name, subtitle: filters[index].sub, isOn: $filters[index].on)
                     }
                 }
@@ -658,6 +662,17 @@ private struct AlertsPane: View {
                     .foregroundStyle(theme.faint)
             }
             section("Quiet hours") { quietHoursCard }
+        }
+        .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
+            Button("OK") { errorMessage = nil }
+        } message: { Text($0) }
+    }
+
+    private var hideServicesBinding: Binding<Bool> {
+        Binding {
+            monitor.hideServicesOnDownHosts
+        } set: { hide in
+            do { try monitor.setHideServicesOnDownHosts(hide) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
         }
     }
 

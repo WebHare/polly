@@ -15,7 +15,7 @@ struct ProblemsScreen: View {
     @State private var adding: BackendKind?
 
     var body: some View {
-        let summary = MonitorSummary(servers: monitor.servers, states: monitor.states)
+        let summary = monitor.summary
         ScrollView {
             if isWaitingForFirstAnswer {
                 ProgressView().padding(.top, 160)
@@ -223,7 +223,7 @@ struct PhoneProblemRow: View {
         TimelineView(.everyMinute) { context in
             PhoneRow(severity: problem.severity, title: problem.host,
                      trailing: problem.since.map { "\(DurationFormatting.short(context.date.timeIntervalSince($0)))  ›" } ?? "›",
-                     subtitle: problem.service + problem.stateNote, output: problem.output)
+                     subtitle: problem.title + problem.stateNote, output: problem.output)
         }
         .opacity(problem.acknowledged ? 0.55 : 1)
     }

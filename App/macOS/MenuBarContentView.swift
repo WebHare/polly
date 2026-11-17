@@ -9,7 +9,7 @@ struct MenuBarLabel: View {
     @Environment(\.openWindow) private var openWindow
 
     var body: some View {
-        let summary = MonitorSummary(servers: monitor.servers, states: monitor.states)
+        let summary = monitor.summary
         Image(nsImage: MenuBarIcon.image(mood: summary.mood, badge: summary.badge))
             .accessibilityLabel(summary.headline)
             .onAppear {
@@ -61,7 +61,7 @@ private struct PopoverContent: View {
     }
 
     var body: some View {
-        let summary = MonitorSummary(servers: monitor.servers, states: monitor.states)
+        let summary = monitor.summary
         let entries = summary.entries
         ZStack {
             if let index = entries.firstIndex(where: { $0.id == selectedID }) {
@@ -291,7 +291,7 @@ private struct ProblemRow: View {
         Button(action: open) {
             HStack(spacing: 8) {
                 StatusIcon(severity: problem.severity, size: 15)
-                (Text(problem.host).fontWeight(.semibold) + Text("  \(problem.service)").foregroundStyle(theme.muted))
+                (Text(problem.host).fontWeight(.semibold) + Text("  \(problem.title)").foregroundStyle(theme.muted))
                     .lineLimit(1)
                     .truncationMode(.tail)
                     .frame(maxWidth: .infinity, alignment: .leading)
