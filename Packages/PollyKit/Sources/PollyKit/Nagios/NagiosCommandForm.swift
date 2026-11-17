@@ -4,6 +4,8 @@ import Foundation
 enum NagiosCommand: String, Sendable {
     /// ACKNOWLEDGE_SVC_PROBLEM
     case acknowledge = "34"
+    /// ACKNOWLEDGE_HOST_PROBLEM
+    case acknowledgeHost = "33"
     /// SCHEDULE_SVC_DOWNTIME
     case serviceDowntime = "56"
     /// SCHEDULE_HOST_DOWNTIME: the host itself, not its services.
@@ -13,12 +15,17 @@ enum NagiosCommand: String, Sendable {
 
     /// Whether the form and the command name a service.
     var hasService: Bool { self == .acknowledge || self == .serviceDowntime }
-    var isDowntime: Bool { self != .acknowledge }
+    var isDowntime: Bool { self != .acknowledge && self != .acknowledgeHost }
+
+    /// The acknowledgement of this problem: of the service, or of the host for a host problem.
+    static func acknowledge(_ problem: ServiceProblem) -> NagiosCommand { problem.isHost ? .acknowledgeHost : .acknowledge }
+    /// The downtime of just this problem's own check.
+    static func downtime(_ problem: ServiceProblem) -> NagiosCommand { problem.isHost ? .hostDowntime : .serviceDowntime }
 
     /// How the command is named to the user when only part of a sequence went through.
     func label(for problem: ServiceProblem) -> String {
         switch self {
-        case .acknowledge: "the acknowledgement"
+        case .acknowledge, .acknowledgeHost: "the acknowledgement"
         case .serviceDowntime: "the downtime of \(problem.service)"
         case .hostDowntime: "the downtime of host \(problem.host)"
         case .hostServicesDowntime: "the downtime of the services on \(problem.host)"
@@ -61,7 +68,7 @@ enum NagiosCommandForm {
         if command.hasService { fields["service"] = problem.service }
         if let token = form["nagFormId"] { fields["nagFormId"] = token }
         switch command {
-        case .acknowledge:
+        case .acknowledge, .acknowledgeHost:
             fields["sticky_ack"] = "on"
             if input.notify { fields["send_notification"] = "on" }
         case .serviceDowntime, .hostDowntime, .hostServicesDowntime:

@@ -21,8 +21,8 @@ final class Notifier: NSObject, UNUserNotificationCenterDelegate {
     }
 
     private func post(server: NagiosServer, changes: ProblemChanges) {
-        var lines = changes.raised.map { "\($0.severity.label): \($0.host) / \($0.service)" }
-            + changes.recovered.map { "Recovered: \($0.host) / \($0.service)" }
+        var lines = changes.raised.map { "\($0.severity.label): \($0.host) / \($0.title)" }
+            + changes.recovered.map { "Recovered: \($0.host) / \($0.title)" }
         if lines.count > 5 {
             lines = lines.prefix(4) + ["and \(lines.count - 4) more"]
         }

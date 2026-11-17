@@ -56,6 +56,36 @@ struct NotificationPolicyTests {
     }
 }
 
+struct HostDownNotificationTests {
+    private let http = ServiceProblem(host: "web1", service: "HTTP", severity: .critical)
+    private let down = ServiceProblem.host("web1", .down)
+
+    /// The host is the news; its services failing with it are not, and they haven't recovered either.
+    @Test func reportsTheHostNotItsServices() {
+        let changes = NotificationPolicy.changes(previous: [http], current: [down, http, problem(.warning, service: "Disk")])
+        #expect(changes.raised.map(\.id) == ["web1/"])
+        #expect(changes.recovered.isEmpty)
+        let hidden = NotificationPolicy.changes(previous: [problem(.warning)], current: [down, http])
+        #expect(hidden.recovered.isEmpty)
+        #expect(hidden.raised.map(\.id) == ["web1/"])
+    }
+
+    /// With the filter off, services failing with their host notify like any other problem.
+    @Test func servicesNotifyWhenNotHidden() {
+        let changes = NotificationPolicy.changes(previous: [], current: [down, http], hideServicesOnDownHosts: false)
+        #expect(changes.raised.map(\.id) == ["web1/", "web1/HTTP"])
+        let gone = NotificationPolicy.changes(previous: [http], current: [down], hideServicesOnDownHosts: false)
+        #expect(gone.recovered.map(\.id) == ["web1/HTTP"])
+    }
+
+    /// When the host comes back, a service that is still broken was already known and is not raised again.
+    @Test func hostRecoveryLeavesKnownServiceProblemsQuiet() {
+        let changes = NotificationPolicy.changes(previous: [down, http], current: [http])
+        #expect(changes.recovered.map(\.id) == ["web1/"])
+        #expect(changes.raised.isEmpty)
+    }
+}
+
 struct NagiosLinkTests {
     private let client = NagiosClient(endpoint: URL(string: "http://mon.example.com/ops/nagios/cgi-bin/statusjson.cgi")!,
                                       username: "alice", password: "s3cret")
@@ -65,6 +95,11 @@ struct NagiosLinkTests {
         let url = try client.checkURL(for: ServiceProblem(host: "host & one", service: "DB + web?", severity: .critical))
         #expect(url.absoluteString
             == "http://mon.example.com/ops/nagios/cgi-bin/extinfo.cgi?host=host%20%26%20one&service=DB%20%2B%20web%3F&type=2")
+    }
+
+    @Test func checkURLForAHostOpensTheHostPage() throws {
+        let url = try client.checkURL(for: .host("host & one", .down))
+        #expect(url.absoluteString == "http://mon.example.com/ops/nagios/cgi-bin/extinfo.cgi?host=host%20%26%20one&type=1")
     }
 
     @Test func relatedURLPrefersActionOverNotes() throws {

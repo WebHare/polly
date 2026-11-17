@@ -41,7 +41,7 @@ public enum CommandKind: String, Sendable {
 
 /// What a downtime covers.
 public enum DowntimeScope: String, Sendable, CaseIterable {
-    /// Only the service of the problem.
+    /// Only the problem's own check: its service, or the host itself for a host problem.
     case service
     /// The problem's host and every service on it.
     case hostAndServices

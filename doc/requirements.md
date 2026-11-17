@@ -96,9 +96,17 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 The overview is the macOS menu bar panel and the iOS Problems tab. Both show the same summary of all enabled
 sources.
 
-- Problems (warning, critical and unknown services) of all sources are grouped by severity: critical, then
-  warning, then unknown; newest first within a group.
+- Problems (warning, critical and unknown services, and hosts that are down or unreachable) of all sources are
+  grouped by severity: critical, then warning, then unknown; newest first within a group.
   - Each problem shows host, service, its age and markers for acknowledged (ACK) and scheduled downtime.
+  - A host that is down or unreachable is one critical problem: the host with "Host down" or "Host unreachable"
+    instead of a service.
+    - The problems of the services on that host are not listed, and don't count in the numbers per severity.
+    - Why: one dead host makes all its services fail; one line says it, a dozen lines bury the rest.
+    - On by default; "Hide services on hosts that are down" in the macOS Alerts pane (`hideServicesOnDownHosts`
+      in `polly.yaml`) turns it off, so the services are listed next to their host again.
+    - Only the services on that host on the same source are hidden; the same host name on another source is
+      another host.
   - The age is "<1m", "3m", "2h", "3d" (largest unit only), refreshed every minute.
     - On macOS, hovering shows the exact duration and the local start time.
     - The age is the time since the service's last state change, so a warning escalating to critical restarts
@@ -166,14 +174,14 @@ sources.
 
 ## Problem detail
 
-- Shows the severity, its retry state ("SOFT 2/3" / "HARD 3/3"), ACK and DOWNTIME tags, service, host and the
-  source with its type.
+- Shows the severity ("DOWN" / "UNREACHABLE" for a host problem), its retry state ("SOFT 2/3" / "HARD 3/3"),
+  ACK and DOWNTIME tags, service (or "Host down" / "Host unreachable"), host and the source with its type.
 - Shows the check output and long output (selectable).
 - Shows the duration with its start time, how long ago the last check was, and when the next check is.
   - A value the server didn't send is shown as "Unknown".
 - Shows the actions the source type supports (Nagios: all of them; URL: none).
   - **Acknowledge…** (disabled when already acknowledged) and **Schedule downtime…**.
-  - **Open in Nagios**: the check's page in the Nagios web UI.
+  - **Open in Nagios**: the check's page in the Nagios web UI; the host's page for a host problem.
   - **Related link**: the action or notes link configured for the check.
   - If the password can't be read, the detail says why instead of showing no actions.
 - The password is only read when a problem is opened.
@@ -186,6 +194,8 @@ sources.
   - The form asks for author (prefilled by the server, or the username) and a required comment.
   - If the server doesn't return the expected form, the user is told to check their command permissions in the
     browser.
+- A host problem is acknowledged and put in downtime as the host itself, not one of its services.
+  - **Applies to** then offers "This host only" (the host's own downtime) or the host and all its services.
 - An acknowledgement is sticky: it lasts until the service is OK again, also when a warning turns critical.
   - The user can ask the server to notify its contacts; off by default.
 - A downtime is a fixed window from a start to an end time.
@@ -266,6 +276,9 @@ sources.
 - They are local notifications decided by Polly; the Nagios notification configuration is not touched.
 - The first successful poll is the baseline and never notifies.
 - After that, new problems, severity changes and recoveries are bundled into one notification per source.
+  - A host going down notifies about the host only; its services failing with it don't notify, and services
+    that drop out of the list because their host went down are not reported as recovered.
+    - With "Hide services on hosts that are down" off, those services notify like any other problem.
   - At most five lines; beyond that the last line says "and N more".
   - A newer notification for a source replaces the older one.
   - Notifications are also shown while Polly is in the foreground.
@@ -386,8 +399,8 @@ Drawn from the design and tagged as such, but without function:
 - **Notified** in the problem detail (Polly keeps no record of what it notified about).
 - Other monitoring systems in the Type control (Icinga 2, Checkmk, Zabbix).
 - Poll interval and "Verify TLS certificate" in the add-source form; the interval is fixed at 60 seconds.
-- The Alerts pane (PROTOTYPE, nothing is saved or applied): filters (hide acknowledged, soft states, downtime,
-  services on down hosts), notification rules and quiet hours.
+- The Alerts pane (PROTOTYPE) apart from "Hide services on hosts that are down": the other filters (hide
+  acknowledged, soft states, downtime), notification rules and quiet hours are not saved or applied.
 - The Team pane remains labeled **PLACEHOLDER** and explains the ideas for a future version:
   - A shared on-call schedule, escalation to the next person if nobody acknowledges an alert, and
     central billing with Pro features for each team member.

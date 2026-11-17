@@ -9,7 +9,7 @@ struct PhoneProblemDetail: View {
     @Environment(\.pollyTheme) private var theme
 
     var body: some View {
-        let entries = MonitorSummary(servers: monitor.servers, states: monitor.states).entries
+        let entries = monitor.summary.entries
         Group {
             if let index = entries.firstIndex(where: { $0.id == entryID }) {
                 ProblemDetailContent(entry: entries[index])
@@ -54,7 +54,7 @@ private struct ProblemDetailContent: View {
             VStack(alignment: .leading, spacing: 14) {
                 tags
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(problem.service)
+                    Text(problem.title)
                         .font(.system(size: 28, weight: .bold))
                         .tracking(-0.28)
                     (Text(problem.host).fontWeight(.bold).foregroundStyle(theme.text) + Text(" · \(server.name)"))
@@ -97,7 +97,7 @@ private struct ProblemDetailContent: View {
 
     private var tags: some View {
         HStack(spacing: 6) {
-            StatusPill(severity: problem.severity)
+            StatusPill(severity: problem.severity, label: problem.stateLabel)
             if let attempt = problem.checkAttempt { StateTag(text: attempt.label) }
             if problem.acknowledged { StateTag(text: "ACK") }
             if problem.downtimeDepth > 0 { StateTag(text: "DOWNTIME") }

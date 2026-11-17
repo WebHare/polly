@@ -59,7 +59,7 @@ public struct WebSnapshot: Codable, Sendable {
     @MainActor
     public init(servers: [NagiosServer], states: [UUID: MonitorModel.ServerState],
                 lastAttempts: [UUID: Date] = [:], lastSuccesses: [UUID: Date] = [:],
-                nextPollAt: Date? = nil, now: Date = .now, redactions: [String] = []) {
+                nextPollAt: Date? = nil, now: Date = .now, redactions: [String] = [], hideServicesOnDownHosts: Bool = true) {
         func clean(_ text: String) -> String {
             redactions.filter { !$0.isEmpty }.reduce(text) { $0.replacingOccurrences(of: $1, with: "[redacted]") }
         }
@@ -67,7 +67,7 @@ public struct WebSnapshot: Codable, Sendable {
         let freshnessLimit: TimeInterval = 150
         staleAfterSeconds = freshnessLimit
         self.nextPollAt = nextPollAt
-        let summary = MonitorSummary(servers: servers, states: states)
+        let summary = MonitorSummary(servers: servers, states: states, hideServicesOnDownHosts: hideServicesOnDownHosts)
         let active = servers.filter(\.enabled)
         let results = active.compactMap { server -> ServerStatus? in
             if case .ok(let result) = states[server.id] { return result }
@@ -99,7 +99,7 @@ public struct WebSnapshot: Codable, Sendable {
         problems = summary.entries.map { entry in
             let p = entry.problem
             return Problem(id: clean(entry.id), serverID: entry.server.id, serverName: clean(entry.server.name),
-                           host: clean(p.host), service: clean(p.service), severity: p.severity.word,
+                           host: clean(p.host), service: clean(p.title), severity: p.severity.word,
                            since: p.since, output: clean(p.output), longOutput: clean(p.longOutput),
                            lastCheck: p.lastCheck, nextCheck: p.nextCheck, acknowledged: p.acknowledged,
                            downtimeDepth: p.downtimeDepth, checkAttempt: p.checkAttempt?.label)

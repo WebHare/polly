@@ -30,7 +30,7 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
   Passwords are kept in the keychain unless you turn that off, in which case they go into the YAML file.
   You can edit the file by hand while Polly isn't running.
 - A server's status is read from `<base URL>/nagios/cgi-bin/statusjson.cgi`
-  (`programstatus` for the connection test; `hostcount`, `servicecount` and `servicelist` for status).
+  (`programstatus` for the connection test; `hostcount`, `servicecount`, `servicelist` and `hostlist` for status).
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
 - Click a problem to see the check output and to open the check on the server, open its action or notes
   link, acknowledge it or schedule downtime.
@@ -167,8 +167,9 @@ Why things are the way they are, so they can be revisited deliberately rather th
   needs nothing installed on the server. The user enters the base URL; the `/nagios/...` path is appended
   by the app.
 - **Cheap queries.** The connection test uses `programstatus`. Status uses `hostcount` and `servicecount`
-  for the totals plus `servicelist` filtered to warning/critical/unknown with `details=true`, so we only
-  transfer problem services, but do get `last_state_change` for the "how long" indicator.
+  for the totals plus `servicelist` filtered to warning/critical/unknown and `hostlist` filtered to
+  down/unreachable, both with `details=true`, so we only transfer problems, but do get `last_state_change` for
+  the "how long" indicator.
 - **HTTP Basic auth sent with every request** instead of waiting for a 401 challenge first, which saves a
   round trip per request. 401/403 are reported as "check username and password".
 - **Poll every 60 seconds**, all servers in parallel. Disabled servers are skipped, and a result that

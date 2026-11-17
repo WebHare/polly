@@ -115,7 +115,7 @@ struct CommandFormView: View {
 
     private var appliesTo: some View {
         group("Applies to") {
-            radio("This service only", selected: input.scope == .service) { input.scope = .service }
+            radio(command.problem.isHost ? "This host only" : "This service only", selected: input.scope == .service) { input.scope = .service }
             radio("Host \(command.problem.host) and its services", selected: input.scope == .hostAndServices) {
                 input.scope = .hostAndServices
             }

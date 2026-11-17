@@ -87,6 +87,31 @@ struct NagiosClientTests {
         #expect(load.nextCheck == nil)
     }
 
+    @Test func decodesDownAndUnreachableHosts() throws {
+        let json = """
+            {"result":{"type_code":0},
+             "data":{"hostlist":{"web1":{"name":"web1","status":4,"last_state_change":1731590000000,
+                                         "plugin_output":"PING CRITICAL - Packet loss = 100%","problem_has_been_acknowledged":true,
+                                         "scheduled_downtime_depth":1,"state_type":1,"current_attempt":10,"max_attempts":10},
+                                 "db1":{"status":8},"mail":{"status":2}}}}
+            """
+        let envelope: StatusJSONEnvelope<HostListPayload> = try NagiosClient.decode(data: Data(json.utf8), statusCode: 200)
+        let problems = try #require(envelope.data?.problems)
+        #expect(problems.map(\.host) == ["db1", "web1"])
+        #expect(problems.map(\.hostState) == [.unreachable, .down])
+        #expect(problems.allSatisfy { $0.severity == .critical && $0.service.isEmpty && $0.isHost })
+        let web1 = problems[1]
+        #expect(web1.title == "Host down")
+        #expect(web1.output == "PING CRITICAL - Packet loss = 100%")
+        #expect(web1.since == Date(timeIntervalSince1970: 1_731_590_000))
+        #expect(web1.acknowledged)
+        #expect(web1.downtimeDepth == 1)
+        #expect(web1.checkAttempt?.label == "HARD 10/10")
+        #expect(problems[0].title == "Host unreachable")
+        #expect(problems.map(\.stateLabel) == ["UNREACHABLE", "DOWN"])
+        #expect(ServiceProblem(host: "a", service: "x", severity: .warning).stateLabel == nil)
+    }
+
     /// A successful result without a payload must never be read as "no problems".
     @Test func missingDataIsNotHealthy() {
         #expect(throws: NagiosClientError.notStatusJSON) {
