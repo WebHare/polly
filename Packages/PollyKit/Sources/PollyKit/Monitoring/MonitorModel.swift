@@ -226,7 +226,7 @@ public final class MonitorModel {
 
     public func webSnapshot(now: Date = .now, redactions: [String] = []) -> WebSnapshot {
         WebSnapshot(servers: servers, states: states, lastAttempts: lastAttempts, lastSuccesses: lastSuccesses,
-                    nextPollAt: nextPollAt, now: now, redactions: redactions)
+                    nextPollAt: nextPollAt, now: now, redactions: redactions, hideServicesOnDownHosts: hideServicesOnDownHosts)
     }
 
     public func refresh(_ server: NagiosServer) async {
