@@ -21,6 +21,7 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Changed
 
+- Local macOS Debug and Release builds can share a fixed signing identity through an optional local configuration, avoiding repeated Keychain prompts after ad-hoc rebuilds.
 - Local macOS Debug builds are named **Polly DEV** and carry a yellow **DEV** ribbon on their app icon.
 
 - Explain the ideas for shared on-call duties, escalation and billing in the macOS Team placeholder.

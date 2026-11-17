@@ -38,6 +38,7 @@
 		1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		206F8CFFD8766B27EB430DBF /* ServersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersScreen.swift; sourceTree = "<group>"; };
 		276A57CF036E82890AFB589D /* PollyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PollyKit; path = Packages/PollyKit; sourceTree = SOURCE_ROOT; };
+		3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		4D179A8AB00DD1663451D08C /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		4F9EC63E3847380F178FB586 /* PollyDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyDesign.swift; sourceTree = "<group>"; };
 		4FC2FAB90B0B60484B906A00 /* PollyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyApp.swift; sourceTree = "<group>"; };
@@ -71,6 +72,7 @@
 			children = (
 				1557307A982CF826FC5F3E02 /* CHANGELOG.md */,
 				B0422AB0320370D5D30B9E8E /* App */,
+				BAEB989D6E8743CAAAFCADC4 /* Config */,
 				AA9CDDC218F38C95AC636EB0 /* Packages */,
 				E3462FD0D841AEECA52AF5F3 /* Products */,
 			);
@@ -132,6 +134,14 @@
 				6477A6C5A248731D409B1986 /* Shared */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		BAEB989D6E8743CAAAFCADC4 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		E3462FD0D841AEECA52AF5F3 /* Products */ = {
@@ -303,12 +313,10 @@
 		};
 		7BB2862653678B1E91C41030 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = MF6WPNPK5H;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -335,13 +343,11 @@
 		};
 		D63D7E36D06F862441789365 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = AppIconDev;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = MF6WPNPK5H;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;

@@ -77,9 +77,10 @@ instead of system colors and SF Symbols for status.
 
 ## Building and running locally
 
-- Without the WebHare bv team certificate, build ad-hoc signed:
+- For installed local macOS builds without the WebHare bv team certificate, configure a stable certificate in the ignored `Local.xcconfig` for both Debug and Release; see [Signing](DEVELOPERS.md#signing). Build without command-line signing overrides. Keep official WebHare defaults in `Config/Signing.xcconfig`.
+- Only for compile checks without a signing certificate, build ad-hoc signed:
   `xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual build`.
-  Do not change the signing settings in `project.yml` for this.
+  Do not install this fallback over a stably signed app: it changes its Keychain identity.
 - `xcodegen generate` with a newer XcodeGen adds `compatibilityVersion = "Xcode 14.0";` and drops the
   `productRefGroup` line in `project.pbxproj`. Revert those two lines before committing.
 - The app is sandboxed: settings are in

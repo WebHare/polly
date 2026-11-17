@@ -17,9 +17,21 @@ below with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
 ### Signing
 
-Builds are signed with the WebHare bv team (`DEVELOPMENT_TEAM: MF6WPNPK5H` in `project.yml`). To let Xcode
+Builds default to the WebHare bv team (`DEVELOPMENT_TEAM = MF6WPNPK5H` in `Config/Signing.xcconfig`, referenced by `project.yml`). To let Xcode
 create the signing certificate and profiles, add an Apple ID that is a member of that team in Xcode →
 Settings → Accounts. Simulator builds don't need this.
+
+For local macOS builds without WebHare team access, create `Local.xcconfig` next to `project.yml` with an existing Apple Development certificate and its team ID:
+
+```xcconfig
+CODE_SIGN_STYLE[sdk=macosx*] = Manual
+DEVELOPMENT_TEAM[sdk=macosx*] = YOUR_CERTIFICATE_TEAM_ID
+CODE_SIGN_IDENTITY[sdk=macosx*] = Apple Development: Your Name (CERTIFICATE_ID)
+```
+
+Find the exact certificate name with `security find-identity -v -p codesigning`; use the team that issued that certificate. `Local.xcconfig` is ignored by Git and optionally included for both Debug and Release. Xcode, SweetPad and `xcodebuild` read it without regenerating the project. The macOS conditions leave iOS signing unchanged. Keep this file on the development machine only; official builds use a clean checkout with the WebHare defaults.
+
+Build both local configurations without command-line signing overrides. In particular, `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=` takes precedence over the local file and returns to ad-hoc signing. Using the same stable certificate and bundle identifier allows Keychain permission to survive rebuilds and switching between Polly DEV and the local Release. Changing to a different signing identity or distribution channel may require authorization again. A local Release is not an official TestFlight or App Store release. See [issue #77](https://github.com/WebHare/polly/issues/77).
 
 ## The Xcode project
 
@@ -494,10 +506,12 @@ Validate locally before a PR:
 swift test --package-path Packages/PollyKit
 python3 -m unittest discover -s scripts -p 'test_*.py'
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'platform=macOS' \
-  -derivedDataPath .build/DerivedData CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual build
+  -derivedDataPath .build/DerivedData build
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
 ```
+
+Without a usable signing certificate, append `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual` to the macOS build command for compile-only verification. Do not use that fallback for an installed app that should retain Keychain permission between builds.
 
 ### Dashboard development and tests
 
