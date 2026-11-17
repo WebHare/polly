@@ -65,6 +65,16 @@ struct WebSnapshotTests {
         #expect(snapshot.servers[1].lastSuccessAt == now - 60)
     }
 
+    /// A down host is one problem named "Host down", unless the user wants its services listed too.
+    @Test func downHostIsOneProblem() {
+        let problems = [ServiceProblem.host("a", .down), ServiceProblem(host: "a", service: "HTTP", severity: .critical)]
+        let snapshot = WebSnapshot(servers: [first], states: [first.id: status(problems: problems)], now: now)
+        #expect(snapshot.problems.map(\.service) == ["Host down"])
+        let all = WebSnapshot(servers: [first], states: [first.id: status(problems: problems)], now: now,
+                              hideServicesOnDownHosts: false)
+        #expect(all.problems.map(\.service).sorted() == ["HTTP", "Host down"])
+    }
+
     @Test func publicPayloadDoesNotEncodeConfigurationOrRawErrors() throws {
         let snapshot = WebSnapshot(servers: [first], states: [first.id: .failed("private-user password http://private.test")], now: now)
         let json = String(decoding: try JSONEncoder().encode(snapshot), as: UTF8.self)

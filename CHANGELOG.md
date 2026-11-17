@@ -28,6 +28,10 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 - The Nagios servers and URLs Polly watches are now called sources, so they can't be mistaken for the
   servers they monitor. `polly.yaml` lists them under `sources:`; an existing native-app file is converted at startup. The web service never rewrites its file.
 - Polly on macOS is updated through TestFlight and the App Store; **Check for Updates…** is gone.
+- A host that is down or unreachable is shown as one problem, "Host down" or "Host unreachable", instead of
+  one for every service on it, with a "DOWN" or "UNREACHABLE" pill in its detail. Acknowledge and schedule
+  downtime act on the host itself. Turn off "Hide services on hosts that are down" in the Alerts pane on macOS
+  to list the services as well.
 - The icon in front of a source now only turns red when Polly can't reach it. Critical, warning and
   unknown services and down hosts get a small icon next to their count in the source's status line instead.
 

@@ -43,7 +43,7 @@ struct ProblemDetailView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let command {
-                bar { Button("‹ \(problem.service)") { self.command = nil }.keyboardShortcut(.cancelAction) }
+                bar { Button("‹ \(problem.title)") { self.command = nil }.keyboardShortcut(.cancelAction) }
                 CommandFormView(command: command) {
                     self.command = nil
                 } onSent: {
@@ -93,7 +93,7 @@ struct ProblemDetailView: View {
             HStack(spacing: 6) {
                 HStack(spacing: 5) {
                     StatusIcon(severity: problem.severity, size: 13, dark: true)
-                    Text(problem.severity.label.uppercased())
+                    Text(problem.stateLabel ?? problem.severity.label.uppercased())
                 }
                 .font(.system(size: 11, weight: .bold))
                 .tracking(0.55)
@@ -107,7 +107,7 @@ struct ProblemDetailView: View {
                 if problem.downtimeDepth > 0 { outlinedTag("DOWNTIME") }
             }
             VStack(alignment: .leading, spacing: 3) {
-                Text(problem.service).font(.system(size: 17, weight: .bold))
+                Text(problem.title).font(.system(size: 17, weight: .bold))
                 (Text(problem.host).fontWeight(.semibold).foregroundStyle(theme.text)
                     + Text(" · \(server.name) (\(server.kind.displayName))"))
                     .foregroundStyle(theme.muted)

@@ -3,6 +3,16 @@ import Testing
 @testable import PollyKit
 
 struct SettingsFileTests {
+    /// On unless the file says otherwise, so existing files keep the one-line-per-dead-host list.
+    @Test func hidesServicesOnDownHostsByDefault() throws {
+        #expect(try SettingsFile.parse("servers: []\n").hideServicesOnDownHosts)
+        #expect(try !SettingsFile.parse("hideServicesOnDownHosts: false\n").hideServicesOnDownHosts)
+        var settings = PollySettings()
+        settings.hideServicesOnDownHosts = false
+        #expect(SettingsFile.render(settings).contains("hideServicesOnDownHosts: false"))
+        #expect(try SettingsFile.parse(SettingsFile.render(settings)) == settings)
+    }
+
     @Test func roundTripsTrickyStrings() throws {
         let names = ["yes", "a: b", "#hash", "trailing ", "quote\"back\\slash", "ümlaut ✓", "multi\nline", "123", "", "- dash", "ok:"]
         var settings = PollySettings(passwordStorage: .file, showDockIcon: true)

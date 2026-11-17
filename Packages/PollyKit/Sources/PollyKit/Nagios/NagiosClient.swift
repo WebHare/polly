@@ -59,8 +59,8 @@ public struct NagiosClient: MonitorBackend {
     public func fetchStatus() async throws -> ServerStatus {
         // A task group, not `async let`: with async let the process crashed when a server refused the connection while
         // other requests were in flight. It looks like the async let teardown bugs in Swift 6.1+ (see swiftlang/swift#81771).
-        enum Part: Sendable { case hosts(HostCounts), services(ServiceCounts), problems([ServiceProblem]) }
-        var hosts = HostCounts(), services = ServiceCounts(), problems: [ServiceProblem] = []
+        enum Part: Sendable { case hosts(HostCounts), services(ServiceCounts), problems([ServiceProblem]), hostProblems([ServiceProblem]) }
+        var hosts = HostCounts(), services = ServiceCounts(), problems: [ServiceProblem] = [], hostProblems: [ServiceProblem] = []
         try await withThrowingTaskGroup(of: Part.self) { group in
             group.addTask {
                 let envelope: StatusJSONEnvelope<CountPayload<HostCounts>> = try await get(query: "hostcount")
@@ -76,16 +76,23 @@ public struct NagiosClient: MonitorBackend {
                                                                 URLQueryItem(name: "details", value: "true")])
                 return .problems(envelope.data?.problems ?? [])
             }
+            group.addTask {
+                let envelope: StatusJSONEnvelope<HostListPayload> =
+                    try await get(query: "hostlist", extra: [URLQueryItem(name: "hoststatus", value: "down unreachable"),
+                                                             URLQueryItem(name: "details", value: "true")])
+                return .hostProblems(envelope.data?.problems ?? [])
+            }
             for try await part in group {
                 switch part {
                 case .hosts(let value): hosts = value
                 case .services(let value): services = value
                 case .problems(let value): problems = value
+                case .hostProblems(let value): hostProblems = value
                 }
             }
         }
 
-        let status = ServerStatus(hosts: hosts, services: services, problems: problems, fetchedAt: Date())
+        let status = ServerStatus(hosts: hosts, services: services, problems: hostProblems + problems, fetchedAt: Date())
         // Nagios shows an account without permissions an empty installation, which must not look healthy.
         let h = status.hosts, s = status.services
         if h.up + h.down + h.unreachable + h.pending + s.ok + s.warning + s.critical + s.unknown + s.pending == 0 {
@@ -97,7 +104,8 @@ public struct NagiosClient: MonitorBackend {
     // MARK: - Links and commands
 
     public func checkURL(for problem: ServiceProblem) throws -> URL {
-        try cgiURL("extinfo.cgi", ["type": "2", "host": problem.host, "service": problem.service])
+        problem.isHost ? try cgiURL("extinfo.cgi", ["type": "1", "host": problem.host])
+            : try cgiURL("extinfo.cgi", ["type": "2", "host": problem.host, "service": problem.service])
     }
 
     public func relatedURL(for problem: ServiceProblem) async throws -> URL {
@@ -110,20 +118,22 @@ public struct NagiosClient: MonitorBackend {
     /// option whose form doesn't come back is simply not offered. The forms are fetched one after the other: on
     /// Nagios 4.5.12+ the first answer sets the CSRF cookie, and later requests have to carry it to get the same token.
     public func prepareCommand(_ kind: CommandKind, for problem: ServiceProblem) async throws -> any PreparedCommand {
-        let main: NagiosCommand = kind == .acknowledge ? .acknowledge : .serviceDowntime
+        let acknowledge = NagiosCommand.acknowledge(problem), ownDowntime = NagiosCommand.downtime(problem)
+        let main = kind == .acknowledge ? acknowledge : ownDowntime
         guard let form = try await form(main, for: problem) else {
             throw BackendError("Nagios did not return the expected command form. Check your command permissions in the browser.")
         }
         var forms = [main: form]
         if kind == .downtime {
             // Optional: a failure here only hides the option.
-            for extra in [NagiosCommand.hostDowntime, .hostServicesDowntime] + (problem.acknowledged ? [] : [.acknowledge]) {
+            for extra in [NagiosCommand.hostDowntime, .hostServicesDowntime] + (problem.acknowledged ? [] : [acknowledge])
+            where forms[extra] == nil {
                 forms[extra] = try? await self.form(extra, for: problem)
             }
         }
         var options: CommandOptions = []
         if forms[.hostDowntime] != nil, forms[.hostServicesDowntime] != nil { options.insert(.hostScope) }
-        if kind == .downtime, forms[.acknowledge] != nil { options.insert(.alsoAcknowledge) }
+        if kind == .downtime, forms[acknowledge] != nil { options.insert(.alsoAcknowledge) }
         let defaults = CommandInput(author: form["com_author"].flatMap { $0.isEmpty ? nil : $0 } ?? username,
                                     start: form["start_time"] ?? "", end: form["end_time"] ?? "",
                                     alsoAcknowledge: options.contains(.alsoAcknowledge))
@@ -261,24 +271,25 @@ private struct NagiosPreparedCommand: PreparedCommand {
     /// The requests `input` asks for, in the order they are sent, each with its POST body.
     private func steps(_ input: CommandInput) throws -> [(command: NagiosCommand, body: Data)] {
         var commands: [NagiosCommand]
+        let acknowledge = NagiosCommand.acknowledge(problem)
         switch kind {
         case .acknowledge:
-            commands = [.acknowledge]
+            commands = [acknowledge]
         case .downtime:
             if input.scope == .hostAndServices {
                 guard options.contains(.hostScope) else { throw BackendError("Nagios does not allow a downtime for this host.") }
                 commands = [.hostDowntime, .hostServicesDowntime]
             } else {
-                commands = [.serviceDowntime]
+                commands = [NagiosCommand.downtime(problem)]
             }
             if input.alsoAcknowledge {
                 guard options.contains(.alsoAcknowledge) else { throw BackendError("Nagios does not allow acknowledging this problem.") }
-                commands.append(.acknowledge)
+                commands.append(acknowledge)
             }
         }
         return try commands.map { command in
             // The acknowledgement that comes with a downtime doesn't notify: the downtime is the news.
-            let stepInput = kind == .downtime && command == .acknowledge
+            let stepInput = kind == .downtime && !command.isDowntime
                 ? CommandInput(author: input.author, comment: input.comment) : input
             return (command, try NagiosCommandForm.body(command, problem: problem, input: stepInput, form: forms[command]!.inputs))
         }
@@ -325,6 +336,23 @@ struct IgnoredPayload: Decodable {}
 
 struct CountPayload<Counts: Decodable>: Decodable {
     var count: Counts
+}
+
+/// With `details=true`: `{"hostlist": {"host1": {"status": 4, "last_state_change": 1731590000000, ...}}}`, with the
+/// same fields as a service. Only the hosts that are down or unreachable become problems.
+struct HostListPayload: Decodable {
+    var hostlist: [String: ServiceListPayload.Entry]
+
+    var problems: [ServiceProblem] {
+        hostlist.compactMap { host, entry in
+            NagiosHostState(rawValue: entry.status)?.problem.map {
+                ServiceProblem.host(host, $0, since: entry.lastStateChange, output: entry.output, longOutput: entry.longOutput,
+                                    lastCheck: entry.lastCheck, acknowledged: entry.acknowledged,
+                                    downtimeDepth: entry.downtimeDepth, checkAttempt: entry.checkAttempt, nextCheck: entry.nextCheck)
+            }
+        }
+        .sorted { $0.host < $1.host }
+    }
 }
 
 /// With `details=true`: `{"servicelist": {"host1": {"HTTP": {"status": 16, "last_state_change": 1731590000000, ...}}}}`.

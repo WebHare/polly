@@ -5,11 +5,11 @@
 //
 // Serves /nagios/cgi-bin/statusjson.cgi (programstatus, hostcount, servicecount, servicelist, hostlist)
 // with made-up hosts/services that slowly rotate through OK/WARNING/CRITICAL/UNKNOWN and host DOWN/UNREACHABLE.
-// Also serves /nagios/cgi-bin/extinfo.cgi (service page with action/notes links) and /nagios/cgi-bin/cmd.cgi with
-// the commands Polly uses: acknowledge a service problem (cmd_typ 34), schedule downtime for a host (55), a service
+// Also serves /nagios/cgi-bin/extinfo.cgi (host and service pages with action/notes links) and /nagios/cgi-bin/cmd.cgi with
+// the commands Polly uses: acknowledge a service problem (cmd_typ 34) or a host problem (33), schedule downtime for a host (55), a service
 // (56) or all services of a host (86). Commands follow Nagios Core 4.5 (cgi/cmd.c, base/commands.c,
 // common/downtime.c); see doc/nagios-protocol.md:
-// - normal acknowledgements end on any state change, sticky ones on recovery; acknowledging an OK service does nothing
+// - normal acknowledgements end on any state change (for a host: any change but DOWN <-> UNREACHABLE), sticky ones on recovery; acknowledging an OK service does nothing
 // - downtimes are counted in scheduled_downtime_depth while in effect; fixed and flexible downtimes work, triggered
 //   downtimes are ignored like a trigger that doesn't exist
 // - the CSRF cookie is set once and reused (4.5.12+), or never set (csrf=off, like 4.5.11 and older)
@@ -64,12 +64,12 @@ const inventory = {
 };
 
 const startedAt = Date.now() - 3 * 86400_000;
-const hosts = new Map(); // name -> { status, lastChange }
+const hosts = new Map(); // name -> { status, lastChange, ack }
 // ack: null or { type: ACK.normal | ACK.sticky, author, comment }
 const services = []; // { host, name, status, lastChange, lastCheck, ack }
 
 for (const [host, names] of Object.entries(inventory)) {
-  hosts.set(host, { status: HOST.up, lastChange: startedAt });
+  hosts.set(host, { status: HOST.up, lastChange: startedAt, ack: null });
   for (const name of names) {
     services.push({ host, name, status: SERVICE.ok, lastChange: startedAt, lastCheck: Date.now(), ack: null });
   }
@@ -158,6 +158,12 @@ function setHost(name, status) {
   host.lastChange = Date.now();
   const c = status === HOST.up ? "\x1b[32m" : "\x1b[31m";
   log(`${c}host ${name}: ${from} -> ${HOST_NAME[status].toUpperCase()}\x1b[0m`);
+  // base/checks.c: a sticky host acknowledgement ends on recovery; a normal one on any change, except between
+  // DOWN and UNREACHABLE.
+  if (host.ack && (status === HOST.up || (host.ack.type === ACK.normal && from === "up"))) {
+    host.ack = null;
+    log(`\x1b[36macknowledgement of host ${name} removed\x1b[0m`);
+  }
   if (status !== HOST.up) startPendingFlexDowntimes(name, null);
 }
 
@@ -244,10 +250,16 @@ function handleQuery(params) {
               name,
               status: h.status,
               last_state_change: h.lastChange,
+              last_check: Date.now() - Math.floor(Math.random() * 60_000),
               plugin_output: h.status === HOST.up ? "PING OK" : "PING CRITICAL - Packet loss = 100%",
-              problem_has_been_acknowledged: false,
-              acknowledgement_type: ACK.none,
+              long_plugin_output: "",
+              problem_has_been_acknowledged: h.ack != null,
+              acknowledgement_type: h.ack?.type ?? ACK.none,
               scheduled_downtime_depth: downtimeDepth(name),
+              state_type: 1,
+              current_attempt: h.status === HOST.up ? 1 : 10,
+              max_attempts: 10,
+              next_check: Date.now() + 45_000,
             }
           : h.status;
       }
@@ -347,7 +359,49 @@ ${body}
 }
 
 // Modelled on Nagios Core cgi/extinfo.c (show_service_info and the action/notes links); adjust when a real server differs.
+// Modelled on Nagios Core cgi/extinfo.c (show_host_info); only the parts Polly reads. The web hosts have an action URL.
+function hostInfoPage(name) {
+  const host = hosts.get(name);
+  if (!host) return htmlPage("Extended Information", "extinfo", "<P><DIV CLASS='errorMessage'>Error: Host Not Found!</DIV></P>");
+  const links = name.startsWith("web")
+    ? `<TR><TD ALIGN='right'>
+<A HREF='https://runbook.example.com/${name}?src=nagios&type=host' TARGET='_blank'><img src='/nagios/images/action.gif' border=0 alt='Perform Additional Actions On This Host' title='Perform Additional Actions On This Host'></A>
+</TD><TD>Extra Actions</TD></TR>`
+    : "";
+  const label = HOST_NAME[host.status].toUpperCase();
+  return htmlPage(
+    "Extended Information",
+    "extinfo",
+    `<table border=0 width=100%>
+<tr>
+<td align=left valign=top width=33%>
+<DIV CLASS='infoBox'>
+<DIV CLASS='infoBoxTitle'>Host Information</DIV>
+Last Updated: ${esc(new Date().toString())}<BR>
+</DIV>
+</td>
+<td align=center valign=top width=33%>
+<DIV CLASS='data'>Host</DIV>
+<DIV CLASS='dataTitle'>${esc(name)}</DIV>
+</td>
+<td align=right valign=bottom width=33%>
+<TABLE BORDER='0'>
+${links}
+</TABLE>
+</td>
+</tr>
+</table>
+<BR>
+<DIV CLASS='dataTitle'>Host State Information</DIV>
+<TABLE BORDER=0 CELLSPACING=0 CELLPADDING=0>
+<TR><TD CLASS='dataVar'>Host Status:</TD><TD CLASS='dataVal'><DIV CLASS='host${label}'>&nbsp;&nbsp;${label}&nbsp;&nbsp;</DIV></TD></TR>
+</TABLE>
+`,
+  );
+}
+
 function extinfoPage(params) {
+  if (params.get("type") === "1") return hostInfoPage(params.get("host"));
   const svc = findService(params.get("host"), params.get("service"));
   if (params.get("type") !== "2" || !svc) {
     return htmlPage("Extended Information", "extinfo", "<P><DIV CLASS='errorMessage'>Error: Service Not Found!</DIV></P>");
@@ -415,8 +469,9 @@ ${links.join("\n")}
 // cmd.cgi, modelled on Nagios Core 4.5 cgi/cmd.c; the effects follow base/commands.c and common/downtime.c.
 
 // include/common.h
-const CMD = { ackService: 34, hostDowntime: 55, serviceDowntime: 56, hostServicesDowntime: 86 };
+const CMD = { ackHost: 33, ackService: 34, hostDowntime: 55, serviceDowntime: 56, hostServicesDowntime: 86 };
 const CMD_TITLE = {
+  [CMD.ackHost]: "acknowledge a host problem",
   [CMD.ackService]: "acknowledge a service problem",
   [CMD.hostDowntime]: "schedule downtime for a particular host",
   [CMD.serviceDowntime]: "schedule downtime for a particular service",
@@ -443,9 +498,9 @@ function commandForm(params, formId) {
   const service = params.get("service") ?? "";
   // Nagios leaves the Host Name and Service rows of these forms unclosed; the parser has to cope.
   const rows = [`<tr><td CLASS='optBoxRequiredItem'>Host Name:</td><td><b><INPUT TYPE='TEXT' NAME='host' VALUE='${esc(host)}'></b></td></tr>`];
-  if (cmd === CMD.ackService) {
+  if (cmd === CMD.ackService || cmd === CMD.ackHost) {
+    if (cmd === CMD.ackService) rows.push(`<tr><td CLASS='optBoxRequiredItem'>Service:</td><td><b><INPUT TYPE='TEXT' NAME='service' VALUE='${esc(service)}'>`);
     rows.push(
-      `<tr><td CLASS='optBoxRequiredItem'>Service:</td><td><b><INPUT TYPE='TEXT' NAME='service' VALUE='${esc(service)}'>`,
       row("Sticky Acknowledgement", "<INPUT TYPE='checkbox' NAME='sticky_ack' CHECKED>", false),
       row("Send Notification", "<INPUT TYPE='checkbox' NAME='send_notification' CHECKED>", false),
       row("Persistent Comment", "<INPUT TYPE='checkbox' NAME='persistent' >", false),
@@ -532,11 +587,12 @@ function commitCommand(fields, cookies) {
   if (comment.trim() === "") error = "Comment was not entered";
 
   // Authorization: the mock user may command everything that exists.
-  const authorized = hosts.has(hostName) && (cmd === CMD.hostDowntime || cmd === CMD.hostServicesDowntime || findService(hostName, serviceName));
+  const hostCommand = [CMD.ackHost, CMD.hostDowntime, CMD.hostServicesDowntime].includes(cmd);
+  const authorized = hosts.has(hostName) && (hostCommand || findService(hostName, serviceName));
   if (!authorized) return errorPage("Sorry, but you are not authorized to commit the specified command.");
 
   const command = { cmd, host: hostName, service: serviceName, author: AUTHOR, comment };
-  if (cmd === CMD.ackService) {
+  if (cmd === CMD.ackService || cmd === CMD.ackHost) {
     command.sticky = fields.has("sticky_ack");
     command.notify = fields.has("send_notification");
     command.persistent = fields.has("persistent");
@@ -559,7 +615,14 @@ function commitCommand(fields, cookies) {
 
 /// What the Nagios core does with the external command. Like Nagios, it silently ignores what it can't use.
 function applyCommand(c) {
-  const what = c.service && c.cmd !== CMD.hostServicesDowntime ? `${c.host} / ${c.service}` : c.host;
+  const what = c.service && c.cmd !== CMD.hostServicesDowntime && c.cmd !== CMD.ackHost ? `${c.host} / ${c.service}` : c.host;
+  if (c.cmd === CMD.ackHost) {
+    const host = hosts.get(c.host);
+    // acknowledge_host_problem: there is nothing to acknowledge on a host that is up.
+    if (host.status === HOST.up) return log(`\x1b[33mACKNOWLEDGE host ${what} ignored: the host is up\x1b[0m`);
+    host.ack = { type: c.sticky ? ACK.sticky : ACK.normal, author: c.author, comment: c.comment };
+    return log(`\x1b[36mACKNOWLEDGE host ${what} (${c.sticky ? "sticky" : "normal"}${c.notify ? ", notify" : ""}) by ${c.author}: ${c.comment}\x1b[0m`);
+  }
   if (c.cmd === CMD.ackService) {
     const svc = findService(c.host, c.service);
     // acknowledge_service_problem: there is nothing to acknowledge on an OK service.
@@ -607,7 +670,10 @@ function handleControl(url) {
       setService(s, SERVICE.ok, " (mock/reset)");
       s.ack = null;
     }
-    for (const name of hosts.keys()) setHost(name, HOST.up);
+    for (const [name, h] of hosts) {
+      setHost(name, HOST.up);
+      h.ack = null;
+    }
     downtimes.length = 0;
     state.fault = "none";
     state.csrf = true;

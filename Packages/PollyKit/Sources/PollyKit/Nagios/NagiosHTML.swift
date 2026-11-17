@@ -3,17 +3,18 @@ import Foundation
 /// Minimal readers for the HTML that Nagios' CGIs produce. Nagios has no JSON for these pages, and its
 /// markup is regular enough (and sometimes broken enough) that a few regular expressions beat a parser.
 enum NagiosHTML {
-    /// The action URL of a service, or else its notes URL, from its `extinfo.cgi` page.
+    /// The action URL of a service or host, or else its notes URL, from its `extinfo.cgi` page.
     static func relatedURL(html: String, pageURL: URL) throws -> URL {
         // extinfo expands custom Nagios macros; objectjson returns their unresolved templates.
         let anchors = matches(#"<a\b([^>]*)>(.*?)</a\s*>"#, in: html)
-        for label in ["Perform Additional Actions On This Service", "View Additional Notes For This Service"] {
+        for label in ["Perform Additional Actions On This Service", "Perform Additional Actions On This Host",
+                      "View Additional Notes For This Service", "View Additional Notes For This Host"] {
             for anchor in anchors where anchor[2].localizedCaseInsensitiveContains(label) {
                 guard let href = attributes(anchor[1])["href"], !href.contains("$"),
                       let url = URL(string: href, relativeTo: pageURL)?.absoluteURL,
                       ["https", "http"].contains(url.scheme?.lowercased() ?? ""),
                       url.host != nil, url.user == nil, url.password == nil else {
-                    throw BackendError("Nagios supplied an unsupported or unresolved service URL. Open the check in your browser instead.")
+                    throw BackendError("Nagios supplied an unsupported or unresolved URL. Open the check in your browser instead.")
                 }
                 return url
             }

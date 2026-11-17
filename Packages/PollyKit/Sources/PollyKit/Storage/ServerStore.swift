@@ -79,6 +79,12 @@ public final class ServerStore: @unchecked Sendable {
         try withSettings { $0.debugLog = enabled }
     }
 
+    public var hideServicesOnDownHosts: Bool { read(\.hideServicesOnDownHosts) }
+
+    public func setHideServicesOnDownHosts(_ hide: Bool) throws {
+        try withSettings { $0.hideServicesOnDownHosts = hide }
+    }
+
     /// Switches password storage and moves all existing passwords to the new location.
     /// Switching away from the keychain reads and removes the existing keychain items (this may prompt
     /// once); after that the keychain is no longer accessed.

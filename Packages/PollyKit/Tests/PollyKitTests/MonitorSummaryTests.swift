@@ -84,6 +84,40 @@ import Testing
         #expect(summary.badge == "1")
     }
 
+    /// A host that is down is one line: its own, not one for every service on it.
+    @Test func servicesOnADownHostAreHidden() {
+        let problems = [
+            ServiceProblem.host("a", .down, since: Date(timeIntervalSince1970: 5)),
+            ServiceProblem(host: "a", service: "HTTP", severity: .critical, since: Date(timeIntervalSince1970: 50)),
+            ServiceProblem(host: "a", service: "Disk", severity: .warning),
+            ServiceProblem(host: "b", service: "HTTP", severity: .critical, since: Date(timeIntervalSince1970: 20)),
+            ServiceProblem.host("c", .unreachable, since: Date(timeIntervalSince1970: 10)),
+        ]
+        let summary = MonitorSummary(servers: [nagios], states: [nagios.id: status(down: 2, problems)])
+        #expect(summary.entries.map(\.problem.id) == ["b/HTTP", "c/", "a/"])
+        #expect(summary.entries.map(\.problem.title) == ["HTTP", "Host unreachable", "Host down"])
+        #expect(summary.countsLine == "3 critical")
+        #expect(summary.headline == "Polly is squawking: 2 hosts down")
+        #expect(summary.badge == "3")
+    }
+
+    /// With the filter off, every service problem is listed next to its down host.
+    @Test func servicesOnADownHostCanBeShown() {
+        let problems = [ServiceProblem.host("a", .down), ServiceProblem(host: "a", service: "HTTP", severity: .critical)]
+        let summary = MonitorSummary(servers: [nagios], states: [nagios.id: status(down: 1, problems)],
+                                     hideServicesOnDownHosts: false)
+        #expect(summary.entries.map(\.problem.id).sorted() == ["a/", "a/HTTP"])
+    }
+
+    /// The same host name on another server is another host.
+    @Test func aDownHostOnlyHidesItsOwnServersServices() {
+        let summary = MonitorSummary(servers: [nagios, other], states: [
+            nagios.id: status(down: 1, [ServiceProblem.host("a", .down)]),
+            other.id: status([ServiceProblem(host: "a", service: "HTTP", severity: .critical)]),
+        ])
+        #expect(summary.entries.map(\.problem.id).sorted() == ["a/", "a/HTTP"])
+    }
+
     /// Before the first answer nothing is known, which must not look like "all is well".
     @Test func nothingCheckedYetIsNotOk() {
         for states in [[:], [nagios.id: MonitorModel.ServerState.loading]] {

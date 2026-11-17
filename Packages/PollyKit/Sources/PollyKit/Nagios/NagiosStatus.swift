@@ -48,9 +48,18 @@ public struct CheckAttempt: Hashable, Sendable {
     public var label: String { "\(hard ? "HARD" : "SOFT") \(current)/\(max)" }
 }
 
+/// Why a host itself is a problem.
+public enum HostState: String, Hashable, Sendable {
+    case down, unreachable
+}
+
+/// A check that is not OK: a service, or the host itself when `hostState` is set.
 public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var host: String
+    /// Empty for a host problem.
     public var service: String
+    /// Set when the problem is the host itself being down or unreachable.
+    public var hostState: HostState?
     public var severity: Severity
     /// When the service entered its current state (Nagios `last_state_change`).
     public var since: Date?
@@ -66,6 +75,20 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var nextCheck: Date?
     public var id: String { "\(host)/\(service)" }
 
+    public var isHost: Bool { hostState != nil }
+
+    /// "DOWN" / "UNREACHABLE" for the status pill of a host problem; nil for a service, which shows its severity.
+    public var stateLabel: String? { hostState?.rawValue.uppercased() }
+
+    /// What to show after the host name: the service, or "Host down" / "Host unreachable".
+    public var title: String {
+        switch hostState {
+        case .down: "Host down"
+        case .unreachable: "Host unreachable"
+        case nil: service
+        }
+    }
+
     /// " · acknowledged · in downtime": the states to show after the service name, each with its separator.
     public var stateNote: String {
         [acknowledged ? "acknowledged" : nil, downtimeDepth > 0 ? "in downtime" : nil]
@@ -74,9 +97,10 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
 
     public init(host: String, service: String, severity: Severity, since: Date? = nil, output: String = "",
                 longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0,
-                checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil) {
+                checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil, hostState: HostState? = nil) {
         self.host = host
-        self.service = service
+        self.service = hostState == nil ? service : ""
+        self.hostState = hostState
         self.severity = severity
         self.since = since
         self.output = output
@@ -86,6 +110,28 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
         self.downtimeDepth = downtimeDepth
         self.checkAttempt = checkAttempt
         self.nextCheck = nextCheck
+    }
+}
+
+public extension ServiceProblem {
+    /// The host itself is down or unreachable; that is always critical.
+    static func host(_ host: String, _ state: HostState, since: Date? = nil, output: String = "", longOutput: String = "",
+                     lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0,
+                     checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil) -> ServiceProblem {
+        ServiceProblem(host: host, service: "", severity: .critical, since: since, output: output, longOutput: longOutput,
+                       lastCheck: lastCheck, acknowledged: acknowledged, downtimeDepth: downtimeDepth,
+                       checkAttempt: checkAttempt, nextCheck: nextCheck, hostState: state)
+    }
+}
+
+public extension Array where Element == ServiceProblem {
+    /// The hosts that are down or unreachable themselves.
+    var downHosts: Set<String> { Set(filter(\.isHost).map(\.host)) }
+
+    /// The problems to show: a host that is down stands for everything on it, so its services are left out.
+    var hidingServicesOnDownHosts: [ServiceProblem] {
+        let down = downHosts
+        return filter { $0.isHost || !down.contains($0.host) }
     }
 }
 
@@ -113,6 +159,19 @@ enum NagiosServiceState: Int {
         case .unknown: .unknown
         case .critical: .critical
         case .ok, .pending: nil
+        }
+    }
+}
+
+// statusjson.cgi bit values for host states.
+enum NagiosHostState: Int {
+    case pending = 1, up = 2, down = 4, unreachable = 8
+
+    var problem: HostState? {
+        switch self {
+        case .down: .down
+        case .unreachable: .unreachable
+        case .up, .pending: nil
         }
     }
 }

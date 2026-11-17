@@ -20,6 +20,7 @@ public final class MonitorModel {
     public private(set) var passwordStorage: PasswordStorage = .keychain
     public private(set) var showDockIcon = false
     public private(set) var debugLog = false
+    public private(set) var hideServicesOnDownHosts = true
     public var pollInterval: Duration = .seconds(60)
     /// When the poll loop refreshes all servers again; nil while it isn't running.
     public private(set) var nextPollAt: Date?
@@ -79,6 +80,7 @@ public final class MonitorModel {
         passwordStorage = store.passwordStorage
         showDockIcon = store.showDockIcon
         debugLog = store.debugLog
+        hideServicesOnDownHosts = store.hideServicesOnDownHosts
         // Drop status of removed and disabled servers so they don't count towards the overall state.
         let active = Set(servers.filter(\.enabled).map(\.id))
         states = states.filter { active.contains($0.key) }
@@ -95,6 +97,16 @@ public final class MonitorModel {
     public func setDebugLog(_ enabled: Bool) throws {
         defer { reload() }
         try store.setDebugLog(enabled)
+    }
+
+    public func setHideServicesOnDownHosts(_ hide: Bool) throws {
+        defer { reload() }
+        try store.setHideServicesOnDownHosts(hide)
+    }
+
+    /// What the overview shows, with the user's filters applied.
+    public var summary: MonitorSummary {
+        MonitorSummary(servers: servers, states: states, hideServicesOnDownHosts: hideServicesOnDownHosts)
     }
 
     public func setNotifications(_ enabled: Bool, for server: NagiosServer) throws {
@@ -214,7 +226,7 @@ public final class MonitorModel {
 
     public func webSnapshot(now: Date = .now, redactions: [String] = []) -> WebSnapshot {
         WebSnapshot(servers: servers, states: states, lastAttempts: lastAttempts, lastSuccesses: lastSuccesses,
-                    nextPollAt: nextPollAt, now: now, redactions: redactions)
+                    nextPollAt: nextPollAt, now: now, redactions: redactions, hideServicesOnDownHosts: hideServicesOnDownHosts)
     }
 
     public func refresh(_ server: NagiosServer) async {
@@ -235,7 +247,8 @@ public final class MonitorModel {
         lastAttempts[server.id] = .now
         guard case .ok(let status) = result else { return }
         lastSuccesses[server.id] = status.fetchedAt
-        let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems)
+        let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems,
+                                                  hideServicesOnDownHosts: hideServicesOnDownHosts)
         baselines[server.id] = status.problems
         if current.notifications, !changes.isEmpty { onProblemChanges?(current, changes) }
     }

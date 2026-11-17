@@ -105,6 +105,59 @@ struct MockIntegrationTests {
         #expect(try await problem("HTTP")?.acknowledged == false)
     }
 
+    private func hostProblem() async throws -> ServiceProblem? {
+        try await client().fetchStatus().problems.first { $0.host == host && $0.isHost }
+    }
+
+    @Test func downHostIsAProblemOfItsOwn() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/sethost?host=\(host)&status=down")
+        let down = try #require(try await hostProblem())
+        #expect(down.hostState == .down)
+        #expect(down.severity == .critical)
+        #expect(!down.output.isEmpty)
+        #expect(down.since != nil)
+        try await control("/mock/sethost?host=\(host)&status=unreachable")
+        #expect(try await hostProblem()?.hostState == .unreachable)
+        try await control("/mock/reset")
+        #expect(try await hostProblem() == nil)
+    }
+
+    @Test func acknowledgeAndDowntimeADownHost() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/sethost?host=\(host)&status=down")
+        let target = try #require(try await hostProblem())
+        #expect(try client().checkURL(for: target).query()?.contains("type=1") == true)
+        #expect(try await client().relatedURL(for: target).host() == "runbook.example.com")
+
+        let acknowledge = try await client().prepareCommand(.acknowledge, for: target)
+        try await acknowledge.submit(CommandInput(author: acknowledge.defaults.author, comment: "Investigating"))
+        #expect(try await hostProblem()?.acknowledged == true)
+
+        let downtime = try await client().prepareCommand(.downtime, for: try #require(try await hostProblem()))
+        #expect(downtime.options == [.hostScope])
+        var input = downtime.defaults
+        input.comment = "Maintenance"
+        input.scope = .hostAndServices
+        try await downtime.submit(input)
+        #expect(try await hostProblem()?.downtimeDepth == 1)
+        let services = try #require(try await statusJSON("servicelist")["servicelist"] as? [String: [String: [String: Any]]])
+        #expect(services[host]?.values.allSatisfy { $0["scheduled_downtime_depth"] as? Int == 1 } == true)
+        try await control("/mock/reset")
+    }
+
+    /// A normal host acknowledgement ends when the host comes back up, like a sticky one.
+    @Test func hostAcknowledgementEndsOnRecovery() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/sethost?host=\(host)&status=down")
+        let acknowledge = try await client().prepareCommand(.acknowledge, for: try #require(try await hostProblem()))
+        try await acknowledge.submit(CommandInput(author: "x", comment: "Investigating"))
+        try await control("/mock/sethost?host=\(host)&status=up")
+        try await control("/mock/sethost?host=\(host)&status=down")
+        #expect(try await hostProblem()?.acknowledged == false)
+        try await control("/mock/reset")
+    }
+
     /// The raw statusjson.cgi entry, for what Polly doesn't decode (host downtime, acknowledgement type).
     private func statusJSON(_ query: String) async throws -> [String: Any] {
         var request = URLRequest(url: base.appending(path: "nagios/cgi-bin/statusjson.cgi").appending(queryItems: [

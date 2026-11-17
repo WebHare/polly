@@ -70,11 +70,13 @@ struct StateTag: View {
 /// The solid status pill of the problem detail: "⨯ CRITICAL".
 struct StatusPill: View {
     let severity: Severity
+    /// Replaces the severity word, e.g. "DOWN" for a host.
+    var label: String?
 
     var body: some View {
         HStack(spacing: 6) {
             StatusIcon(severity: severity, size: 15, dark: true)
-            Text(severity.label.uppercased())
+            Text(label ?? severity.label.uppercased())
         }
         .font(.system(size: 12, weight: .bold))
         .tracking(0.6)

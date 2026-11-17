@@ -98,6 +98,7 @@ private func statusJSON(for request: URLRequest, problems: String = "{}", hostsU
     let data = switch query {
     case "hostcount": #"{"count":{"up":\#(hostsUp),"down":0,"unreachable":0,"pending":0}}"#
     case "servicecount": #"{"count":{"ok":\#(hostsUp),"warning":0,"critical":0,"unknown":0,"pending":0}}"#
+    case "hostlist": #"{"hostlist":{}}"#
     default: #"{"servicelist":\#(problems)}"#
     }
     return .init(body: #"{"result":{"type_code":0},"data":\#(data)}"#)
@@ -190,7 +191,7 @@ struct TransportTests {
 
         let text = try String(contentsOf: file, encoding: .utf8)
         let lines = text.split(separator: "\n")
-        #expect(lines.count == 3)
+        #expect(lines.count == 4)
         for line in lines {
             #expect((try? JSONSerialization.jsonObject(with: Data(line.utf8))) != nil)
         }

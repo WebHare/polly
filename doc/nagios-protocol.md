@@ -26,10 +26,10 @@ When a real server turns out to behave differently from this document, update th
 | What | Request | Answer |
 |---|---|---|
 | Connection test | `GET statusjson.cgi?query=programstatus` | JSON |
-| Status | `GET statusjson.cgi?query=hostcount`, `servicecount` and `servicelist`, in parallel | JSON |
-| Check page | `GET extinfo.cgi?type=2&host=…&service=…` | HTML, opened in the browser |
+| Status | `GET statusjson.cgi?query=hostcount`, `servicecount`, `servicelist` and `hostlist`, in parallel | JSON |
+| Check page | `GET extinfo.cgi?type=2&host=…&service=…`, or `type=1&host=…` for a host | HTML, opened in the browser |
 | Related link | the same `extinfo.cgi` page, read by Polly | HTML |
-| Command form | `GET cmd.cgi?cmd_typ=34\|55\|56\|86&host=…[&service=…]` | HTML form (+ CSRF cookie on 4.5.12+) |
+| Command form | `GET cmd.cgi?cmd_typ=33\|34\|55\|56\|86&host=…[&service=…]` | HTML form (+ CSRF cookie on 4.5.12+) |
 | Command | `POST cmd.cgi` | HTML confirmation or error |
 
 All CGIs live under `<base URL>/nagios/cgi-bin/`. The user enters only the base URL (e.g.
@@ -220,19 +220,33 @@ anchors, recognized by their `alt`/`title` text:
 
 ## cmd.cgi (acknowledge and downtime)
 
+### query=hostlist (hosts that are down)
+
+```
+statusjson.cgi?query=hostlist&hoststatus=down%20unreachable&details=true
+```
+
+- Each host is an object keyed by host name, with the same fields as a service (`status`, `plugin_output`,
+  `long_plugin_output`, `last_state_change`, `last_check`, `next_check`, `state_type`, the attempts,
+  `problem_has_been_acknowledged`, `scheduled_downtime_depth`).
+- Host `status` bits: pending `1`, up `2`, down `4`, unreachable `8`. Down and unreachable become a critical host
+  problem; the service problems on that host are then not shown (that is Polly's choice, not Nagios').
+
 Commands go through the same form the web interface uses (`cgi/cmd.c`), in two steps: fetch the form, then post
 it. Nothing changes on the server until the post.
 
 | Command | `cmd_typ` (`include/common.h`) |
 |---|---|
 | Acknowledge a service problem | `34` (`CMD_ACKNOWLEDGE_SVC_PROBLEM`) |
+| Acknowledge a host problem | `33` (`CMD_ACKNOWLEDGE_HOST_PROBLEM`) |
 | Schedule downtime for a service | `56` (`CMD_SCHEDULE_SVC_DOWNTIME`) |
 | Schedule downtime for a host (not its services) | `55` (`CMD_SCHEDULE_HOST_DOWNTIME`) |
 | Schedule downtime for all services of a host (not the host) | `86` (`CMD_SCHEDULE_HOST_SVC_DOWNTIME`) |
 
 How Polly combines them:
 
-- **Acknowledge** posts `34`.
+- **Acknowledge** posts `34`, or `33` for a host problem.
+- For a host problem, the downtime's own command is `55` instead of `56`, and `33` replaces `34`.
 - **Schedule downtime** posts `56`, or for "host and its services" `55` and then `86`, since Nagios has no single
   command for both. With "also acknowledge" it then posts `34`, without notification.
 - When the downtime form opens, Polly fetches all forms it may need, **one after the other**: `56` first, then

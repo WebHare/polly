@@ -106,5 +106,8 @@ struct ServerStoreTests {
         let reopened = try ServerStore(fileURL: file, credentials: InMemoryCredentialStore())
         #expect(reopened.allServers().first?.notifications == true)
         #expect(reopened.debugLog)
+        #expect(reopened.hideServicesOnDownHosts)
+        try reopened.setHideServicesOnDownHosts(false)
+        #expect(try !ServerStore(fileURL: file, credentials: InMemoryCredentialStore()).hideServicesOnDownHosts)
     }
 }
