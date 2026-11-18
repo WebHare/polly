@@ -84,6 +84,20 @@ for `WebHare/polly`, the same way as for `WebHare/agent-radar`; set them by hand
 
 Only the team's Account Holder can create a Developer ID Application certificate.
 
+The **TestFlight** workflow (started by hand, see DEVELOPERS.md) uploads the iOS and macOS builds and uses:
+
+| Name                            | Kind     | Value                                                                                             |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `APPSTORE_CERTIFICATE_P12`      | secret   | base64 of one .p12 with the Apple Distribution and Mac Installer Distribution certificates + keys |
+| `APPSTORE_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                                             |
+| `APPSTORE_PROFILE_IOS`          | secret   | base64 of the "App Store Connect" profile for `nl.webhare.polly` (.mobileprovision)               |
+| `APPSTORE_PROFILE_MACOS`        | secret   | base64 of the "Mac App Store Connect" profile for `nl.webhare.polly` (.provisionprofile)          |
+| `APPSTORE_API_KEY`              | secret   | base64 of an App Store Connect API key (.p8) with the App Manager role                            |
+| `APPSTORE_API_KEY_ID`           | variable | that key's Key ID                                                                                 |
+| `APPSTORE_API_ISSUER_ID`        | variable | the Issuer ID (the same as `NOTARY_API_ISSUER_ID`)                                                |
+
+The certificates and profiles expire after a year and have to be renewed by hand.
+
 ## Design decisions
 
 Why things are the way they are, so they can be revisited deliberately rather than by accident.
@@ -283,6 +297,8 @@ Why things are the way they are, so they can be revisited deliberately rather th
 - **Yams for YAML**; the keychain is a system library.
 - **No in-app updater.** Polly is distributed through TestFlight and the Mac App Store, which handle
   updates. Sparkle was used briefly in 0.2.0 and removed before any release was published.
+- **fastlane for TestFlight uploads**, pinned in the `Gemfile`, with automatic signing through an App Store
+  Connect API key so nobody has to export certificates.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is
