@@ -140,6 +140,9 @@ public struct ServerStatus: Equatable, Sendable {
     public var services: ServiceCounts
     public var problems: [ServiceProblem]
     public var fetchedAt: Date
+    /// Whether the monitoring system itself sends notifications to its contacts (Nagios' program-wide
+    /// `enable_notifications`); nil when it doesn't report this.
+    public var notificationsEnabled: Bool? = nil
 
     public var severity: Severity {
         if hosts.down + hosts.unreachable > 0 || services.critical > 0 { return .critical }

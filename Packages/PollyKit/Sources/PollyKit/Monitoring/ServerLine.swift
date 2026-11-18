@@ -36,6 +36,11 @@ public struct ServerLine: Equatable, Sendable {
         case .ok(let status):
             icon = .reachable
             parts = status.summaryParts
+            // Easy to forget once switched off, and then nobody hears about problems.
+            if status.notificationsEnabled == false {
+                if parts.last?.severity == nil { parts[parts.count - 1].text += " · " } else { parts.append(Part(" · ")) }
+                parts.append(Part("notifications off", .warning))
+            }
         case .failed(let message):
             icon = .unreachable
             parts = [Part("Unreachable · \(message)")]

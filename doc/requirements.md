@@ -145,13 +145,21 @@ sources.
   - Otherwise just Polly. The non-critical icons adapt to a light or dark menu bar.
 - The panel shows the overview, the list of sources with their state, and **Refresh**, **Settings…** and
   **Quit**.
-  - The footer says when the last check was ("Checked 14 s ago"), or "Retrying in 46 s" when unreachable.
+  - The footer says "Retrying in 46 s" when a source is unreachable, "Checking…", "Paused" or "No sources"; it
+    doesn't say when the sources were last checked.
+    - Why: with several sources one time for all of them says little, and an indicator that only matters when
+      something is wrong doesn't belong in the footer. Each source's detail shows its own last refresh.
   - It sizes to its content up to about a quarter of the screen height, then scrolls.
   - The user can resize it by dragging; that size is remembered, and **Fit** returns to automatic sizing.
 - Clicking a problem slides the panel to its detail (see [Problem detail](#problem-detail)).
   - "‹ Problems" (or Escape) goes back; "2 of 6" with up/down buttons (or the arrow keys) steps through the
     problems without going back.
   - Why in the panel, not a window: the menu bar panel closes as soon as it loses focus.
+- Clicking a source slides the panel to the source detail; "‹ Back" (or Escape) goes back.
+  - It shows the source's name, type, URL, state line, when Polly last refreshed it ("14 s ago", or "Failed
+    1 min ago · last answer 10 min ago") and when it refreshes next.
+  - For a source whose monitoring system reports it (Nagios), a switch turns that system's own notifications
+    on or off (see [Notifications on the monitoring system](#notifications-on-the-monitoring-system)).
 - The Settings window has a sidebar with Sources, Alerts, Team, Account and About Polly.
   - **Sources**: the source list (switch, bell, edit, duplicate, refresh, delete), the Add button and the advanced
     settings (see [Settings and storage](#settings-and-storage)).
@@ -288,6 +296,27 @@ sources.
   problem as new once it is back.
 - Caveat: notifications only happen while Polly is polling. On iOS that is only while it is in the foreground;
   there is no push.
+
+## Notifications on the monitoring system
+
+- Every source line says "notifications off" (with a warning icon) when the monitoring system itself sends no
+  notifications.
+  - Why: once switched off it is easy to forget, and then nobody hears about problems.
+- The source detail (macOS panel) has a switch for the monitoring system's own notifications (Nagios: the
+  program-wide "notifications enabled" setting).
+  - This is not Polly's bell: it turns off the notifications the monitoring system sends to all its contacts,
+    for every host and service, not just the user's.
+  - Turning it off asks for confirmation first, inside the panel, explaining that it affects everyone. Turning it
+    on doesn't ask.
+  - The command is sent once and never retried; a failure is shown under the switch.
+  - Once Nagios accepts the command the switch shows the new position with "Turning off… waiting for Nagios to
+    report the change" until the status agrees, at most 150 seconds; after that it shows what Nagios reports.
+    - Why: Nagios applies the command and rewrites its status file only after a while
+      (`status_update_interval`).
+  - The switch is only shown when the source answers and reports the setting; it is disabled for a source
+    type that can't change it.
+  - The Nagios user needs `authorized_for_system_commands` in `cgi.cfg`; otherwise Nagios refuses the change
+    and Polly shows its error.
 
 ## Settings and storage
 

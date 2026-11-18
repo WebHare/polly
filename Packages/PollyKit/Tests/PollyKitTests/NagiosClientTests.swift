@@ -112,6 +112,20 @@ struct NagiosClientTests {
         #expect(ServiceProblem(host: "a", service: "x", severity: .warning).stateLabel == nil)
     }
 
+    /// `enable_notifications` is the program-wide switch for host and service notifications (cgi/statusjson.c).
+    @Test func decodesTheProgramWideNotificationSwitch() throws {
+        let json = """
+            {"result":{"type_code":0},
+             "data":{"programstatus":{"version":"4.5.14","nagios_pid":1234,"program_start":1731500000000,
+                                      "enable_notifications":false,"execute_service_checks":true}}}
+            """
+        let envelope: StatusJSONEnvelope<ProgramStatusPayload> = try NagiosClient.decode(data: Data(json.utf8), statusCode: 200)
+        #expect(envelope.data?.programstatus?.notificationsEnabled == false)
+        let older: StatusJSONEnvelope<ProgramStatusPayload> = try NagiosClient.decode(
+            data: Data(#"{"result":{"type_code":0},"data":{"programstatus":{"version":"4.4.0"}}}"#.utf8), statusCode: 200)
+        #expect(older.data?.programstatus?.notificationsEnabled == nil)
+    }
+
     /// A successful result without a payload must never be read as "no problems".
     @Test func missingDataIsNotHealthy() {
         #expect(throws: NagiosClientError.notStatusJSON) {

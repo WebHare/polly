@@ -33,6 +33,8 @@ public struct BackendCapabilities: OptionSet, Sendable {
     public static let links = BackendCapabilities(rawValue: 1 << 0)
     /// `prepareCommand(_:for:)` works.
     public static let commands = BackendCapabilities(rawValue: 1 << 1)
+    /// `setNotificationsEnabled(_:)` works.
+    public static let monitorNotifications = BackendCapabilities(rawValue: 1 << 2)
 }
 
 public enum CommandKind: String, Sendable {
@@ -155,6 +157,9 @@ public protocol MonitorBackend: Sendable {
     func relatedURL(for problem: ServiceProblem) async throws -> URL
     /// Fetches what is needed to send a command, without sending it.
     func prepareCommand(_ kind: CommandKind, for problem: ServiceProblem) async throws -> any PreparedCommand
+    /// Turns the monitoring system's own notifications to all its contacts on or off. Sent once, never retried;
+    /// the change shows in a later `fetchStatus()`.
+    func setNotificationsEnabled(_ enabled: Bool) async throws
 }
 
 public extension MonitorBackend {
@@ -170,5 +175,9 @@ public extension MonitorBackend {
 
     func prepareCommand(_ kind: CommandKind, for problem: ServiceProblem) async throws -> any PreparedCommand {
         throw BackendError("Commands are not supported for this source type.")
+    }
+
+    func setNotificationsEnabled(_ enabled: Bool) async throws {
+        throw BackendError("Notifications can't be switched for this source type.")
     }
 }

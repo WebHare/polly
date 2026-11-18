@@ -93,12 +93,14 @@ final class Box<Value>: @unchecked Sendable {
     }
 }
 
-private func statusJSON(for request: URLRequest, problems: String = "{}", hostsUp: Int = 1) -> StubProtocol.Response {
+private func statusJSON(for request: URLRequest, problems: String = "{}", hostsUp: Int = 1,
+                        notifications: Bool? = nil) -> StubProtocol.Response {
     let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "query" }?.value
     let data = switch query {
     case "hostcount": #"{"count":{"up":\#(hostsUp),"down":0,"unreachable":0,"pending":0}}"#
     case "servicecount": #"{"count":{"ok":\#(hostsUp),"warning":0,"critical":0,"unknown":0,"pending":0}}"#
     case "hostlist": #"{"hostlist":{}}"#
+    case "programstatus": #"{"programstatus":{"version":"4.5.14"\#(notifications.map { ",\"enable_notifications\":\($0)" } ?? "")}}"#
     default: #"{"servicelist":\#(problems)}"#
     }
     return .init(body: #"{"result":{"type_code":0},"data":\#(data)}"#)
@@ -159,6 +161,79 @@ struct TransportTests {
         await #expect(throws: BackendError.self) { try await command.submit(CommandInput(author: "a", comment: "c")) }
     }
 
+    @Test func statusCarriesTheProgramWideNotificationSwitch() async throws {
+        StubProtocol.handler = { statusJSON(for: $0, notifications: false) }
+        defer { StubProtocol.handler = nil }
+        #expect(try await client.fetchStatus().notificationsEnabled == false)
+    }
+
+    /// Turning notifications off fetches the form for cmd_typ 11 and posts it exactly once.
+    @Test func switchingNotificationsFetchesTheFormAndPostsOnce() async throws {
+        let requests = Box<[URLRequest]>([])
+        let bodies = Box<[String]>([])
+        StubProtocol.handler = { request in
+            requests.value.append(request)
+            guard request.httpMethod == "POST" else {
+                return .init(body: "<form method='post' action='cmd.cgi'>\n<INPUT TYPE='hidden' NAME='nagFormId' VALUE='tok'\n"
+                    + "<tr><td><INPUT TYPE='HIDDEN' NAME='cmd_typ' VALUE='11'><INPUT TYPE='HIDDEN' NAME='cmd_mod' VALUE='2'></td></tr>")
+            }
+            bodies.value.append(StubProtocol.body(of: request))
+            return .init(body: "<div class='infoMessage'>Your command request was successfully submitted to Nagios for processing.</div>")
+        }
+        defer { StubProtocol.handler = nil }
+
+        #expect(client.capabilities.contains(.monitorNotifications))
+        try await client.setNotificationsEnabled(false)
+        #expect(requests.value.map(\.httpMethod) == ["GET", "POST"])
+        #expect(requests.value[0].url?.absoluteString == "https://nagios.test/nagios/cgi-bin/cmd.cgi?cmd_typ=11")
+        #expect(requests.value[1].url?.absoluteString == "https://nagios.test/nagios/cgi-bin/cmd.cgi")
+        #expect(bodies.value == ["cmd_mod=2&cmd_typ=11&nagFormId=tok"])
+    }
+
+    @Test func switchingNotificationsNeedsTheFormAndAConfirmation() async {
+        let posts = Box(0)
+        StubProtocol.handler = { request in
+            if request.httpMethod == "POST" { posts.value += 1 }
+            return .init(body: "<P><DIV CLASS='errorMessage'>Sorry, but you are not authorized to commit the specified command.</DIV></P>")
+        }
+        defer { StubProtocol.handler = nil }
+        await #expect(throws: BackendError.self) { try await client.setNotificationsEnabled(true) }
+        #expect(posts.value == 0)
+
+        StubProtocol.handler = { request in
+            request.httpMethod == "POST" ? .init(body: "<p>Error: Invalid or missing CSRF cookie!</p>")
+                : .init(body: "<input name='cmd_typ' value='12'><input name='cmd_mod' value='2'>")
+        }
+        await #expect(throws: BackendError.self) { try await client.setNotificationsEnabled(true) }
+    }
+
+    /// Nagios applies the command later, so the switch shows the requested value until the status agrees.
+    @MainActor @Test func monitorNotificationsShowTheRequestUntilNagiosAgrees() async throws {
+        let enabled = Box(true)
+        StubProtocol.handler = { request in
+            if request.url?.lastPathComponent == "cmd.cgi" {
+                return request.httpMethod == "POST"
+                    ? .init(body: "<div class='infoMessage'>Your command request was successfully submitted to Nagios for processing.</div>")
+                    : .init(body: "<input name='cmd_typ' value='11'><input name='cmd_mod' value='2'>")
+            }
+            return statusJSON(for: request, notifications: enabled.value)
+        }
+        defer { StubProtocol.handler = nil }
+
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "s3cret")
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        await model.refreshAll()
+        #expect(model.sourceDetail(for: server).notifications == .on)
+
+        try await model.setMonitorNotifications(false, for: server)
+        #expect(model.sourceDetail(for: server).notifications == .switching(to: false))
+        enabled.value = false
+        await model.refresh(server)
+        #expect(model.sourceDetail(for: server).notifications == .off)
+        #expect(model.notificationRequests.isEmpty)
+    }
+
     /// Nagios shows an account without permissions an empty installation, which must not look healthy.
     @Test func noHostsAndServicesIsNotHealthy() async {
         StubProtocol.handler = { statusJSON(for: $0, hostsUp: 0) }
@@ -191,7 +266,7 @@ struct TransportTests {
 
         let text = try String(contentsOf: file, encoding: .utf8)
         let lines = text.split(separator: "\n")
-        #expect(lines.count == 4)
+        #expect(lines.count == 5)
         for line in lines {
             #expect((try? JSONSerialization.jsonObject(with: Data(line.utf8))) != nil)
         }

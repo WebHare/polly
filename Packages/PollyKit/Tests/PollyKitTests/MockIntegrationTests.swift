@@ -294,4 +294,31 @@ struct MockIntegrationTests {
         await #expect(throws: NagiosClientError.redirect) { try await client(path: "redirect").testConnection() }
         await #expect(throws: NagiosClientError.unauthorized) { try await client(password: "wrong").testConnection() }
     }
+
+    @Test func programWideNotificationsCanBeSwitched() async throws {
+        try await control("/mock/reset")
+        #expect(try await client().fetchStatus().notificationsEnabled == true)
+        try await client().setNotificationsEnabled(false)
+        #expect(try await client().fetchStatus().notificationsEnabled == false)
+        try await client().setNotificationsEnabled(true)
+        #expect(try await client().fetchStatus().notificationsEnabled == true)
+    }
+
+    /// `CMT_DISABLE_NOTIFICATIONS=2` in cgi.cfg makes a comment required; the form then has author and comment fields.
+    @Test func programWideNotificationsWithARequiredComment() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/config?notificationComment=2&csrf=off")
+        try await client().setNotificationsEnabled(false)
+        #expect(try await client().fetchStatus().notificationsEnabled == false)
+        try await control("/mock/reset")
+    }
+
+    /// Without `authorized_for_system_commands` Nagios shows the form but refuses the commit.
+    @Test func programWideNotificationsNeedSystemCommandPermission() async throws {
+        try await control("/mock/reset")
+        try await control("/mock/config?systemCommands=off")
+        await #expect(throws: BackendError.self) { try await client().setNotificationsEnabled(false) }
+        #expect(try await client().fetchStatus().notificationsEnabled == true)
+        try await control("/mock/reset")
+    }
 }

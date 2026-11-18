@@ -49,7 +49,7 @@ public struct NagiosClient: MonitorBackend {
         self.init(endpoint: server.statusJSONURL, username: server.username, password: password, session: session)
     }
 
-    public var capabilities: BackendCapabilities { [.links, .commands] }
+    public var capabilities: BackendCapabilities { [.links, .commands, .monitorNotifications] }
 
     /// Connectivity check: runs the cheap `programstatus` query and verifies the answer.
     public func testConnection() async throws {
@@ -59,8 +59,12 @@ public struct NagiosClient: MonitorBackend {
     public func fetchStatus() async throws -> ServerStatus {
         // A task group, not `async let`: with async let the process crashed when a server refused the connection while
         // other requests were in flight. It looks like the async let teardown bugs in Swift 6.1+ (see swiftlang/swift#81771).
-        enum Part: Sendable { case hosts(HostCounts), services(ServiceCounts), problems([ServiceProblem]), hostProblems([ServiceProblem]) }
+        enum Part: Sendable {
+            case hosts(HostCounts), services(ServiceCounts), problems([ServiceProblem]), hostProblems([ServiceProblem])
+            case notifications(Bool?)
+        }
         var hosts = HostCounts(), services = ServiceCounts(), problems: [ServiceProblem] = [], hostProblems: [ServiceProblem] = []
+        var notifications: Bool?
         try await withThrowingTaskGroup(of: Part.self) { group in
             group.addTask {
                 let envelope: StatusJSONEnvelope<CountPayload<HostCounts>> = try await get(query: "hostcount")
@@ -82,17 +86,23 @@ public struct NagiosClient: MonitorBackend {
                                                              URLQueryItem(name: "details", value: "true")])
                 return .hostProblems(envelope.data?.problems ?? [])
             }
+            group.addTask {
+                let envelope: StatusJSONEnvelope<ProgramStatusPayload> = try await get(query: "programstatus")
+                return .notifications(envelope.data?.programstatus?.notificationsEnabled)
+            }
             for try await part in group {
                 switch part {
                 case .hosts(let value): hosts = value
                 case .services(let value): services = value
                 case .problems(let value): problems = value
                 case .hostProblems(let value): hostProblems = value
+                case .notifications(let value): notifications = value
                 }
             }
         }
 
-        let status = ServerStatus(hosts: hosts, services: services, problems: hostProblems + problems, fetchedAt: Date())
+        let status = ServerStatus(hosts: hosts, services: services, problems: hostProblems + problems, fetchedAt: Date(),
+                                  notificationsEnabled: notifications)
         // Nagios shows an account without permissions an empty installation, which must not look healthy.
         let h = status.hosts, s = status.services
         if h.up + h.down + h.unreachable + h.pending + s.ok + s.warning + s.critical + s.unknown + s.pending == 0 {
@@ -140,6 +150,32 @@ public struct NagiosClient: MonitorBackend {
         let notations = NagiosDateNotation.candidates(prefilledStart: defaults.start, prefilledEnd: defaults.end)
         return NagiosPreparedCommand(kind: kind, problem: problem, defaults: defaults, options: options, forms: forms,
                                      notations: notations, client: self)
+    }
+
+    /// Program-wide DISABLE_NOTIFICATIONS / ENABLE_NOTIFICATIONS: fetches the form, then posts it once with the same
+    /// session, so the CSRF cookie travels along.
+    public func setNotificationsEnabled(_ enabled: Bool) async throws {
+        let command: NagiosCommand = enabled ? .enableNotifications : .disableNotifications
+        let request = request(url: try cgiURL("cmd.cgi", ["cmd_typ": command.rawValue]))
+        let inputs = NagiosCommandForm.inputs(try await page(request))
+        guard NagiosCommandForm.isForm(inputs, for: command) else {
+            throw BackendError("Nagios did not return the expected command form. Check your command permissions in the browser.")
+        }
+        try await commit(try NagiosCommandForm.body(command, form: inputs, author: username), formRequest: request)
+    }
+
+    /// Posts a filled-in form once, to the URL it came from without its query, and checks Nagios' confirmation.
+    fileprivate func commit(_ body: Data, formRequest: URLRequest) async throws {
+        var post = formRequest
+        // The form's query only selects the form; the command itself is the POST body.
+        var components = URLComponents(url: formRequest.url!, resolvingAgainstBaseURL: false)!
+        components.query = nil
+        post.url = components.url
+        post.httpMethod = "POST"
+        post.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        post.setValue(formRequest.url!.absoluteString, forHTTPHeaderField: "Referer")
+        post.httpBody = body
+        try NagiosCommandForm.validateResult(try await page(post))
     }
 
     /// The form for `command`, or nil when Nagios answers with something else (no permission, a login page, ...).
@@ -305,7 +341,7 @@ private struct NagiosPreparedCommand: PreparedCommand {
         let steps = try steps(input)
         for (index, step) in steps.enumerated() {
             do {
-                try await post(step.body, to: forms[step.command]!.request)
+                try await client.commit(step.body, formRequest: forms[step.command]!.request)
             } catch where steps.count > 1 {
                 if index == 0 { throw error }
                 throw CommandSequenceError(accepted: steps[..<index].map { $0.command.label(for: problem) },
@@ -315,24 +351,24 @@ private struct NagiosPreparedCommand: PreparedCommand {
             }
         }
     }
-
-    private func post(_ body: Data, to formRequest: URLRequest) async throws {
-        var post = formRequest
-        // The form's query only selects the form; the command itself is the POST body.
-        var components = URLComponents(url: formRequest.url!, resolvingAgainstBaseURL: false)!
-        components.query = nil
-        post.url = components.url
-        post.httpMethod = "POST"
-        post.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        post.setValue(formRequest.url!.absoluteString, forHTTPHeaderField: "Referer")
-        post.httpBody = body
-        try NagiosCommandForm.validateResult(try await client.page(post))
-    }
 }
 
 // MARK: - Payloads
 
 struct IgnoredPayload: Decodable {}
+
+/// `{"programstatus": {"version": "4.5.14", "enable_notifications": true, ...}}`; only the notification switch is read.
+struct ProgramStatusPayload: Decodable {
+    struct Status: Decodable {
+        var notificationsEnabled: Bool?
+
+        private enum CodingKeys: String, CodingKey {
+            case notificationsEnabled = "enable_notifications"
+        }
+    }
+
+    var programstatus: Status?
+}
 
 struct CountPayload<Counts: Decodable>: Decodable {
     var count: Counts
