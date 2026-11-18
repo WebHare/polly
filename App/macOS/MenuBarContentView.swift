@@ -310,7 +310,7 @@ private struct SourceRow: View {
     }
 }
 
-private struct ProblemRow: View {
+struct ProblemRow: View {
     let entry: ProblemEntry
     let open: () -> Void
     @Environment(\.pollyTheme) private var theme
@@ -343,6 +343,7 @@ private struct ProblemRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("problem-\(entry.id)")
         .onHover { hovered = $0 }
     }
 

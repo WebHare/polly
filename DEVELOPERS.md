@@ -17,9 +17,21 @@ below with `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
 
 ### Signing
 
-Builds are signed with the WebHare bv team (`DEVELOPMENT_TEAM: MF6WPNPK5H` in `project.yml`). To let Xcode
+Builds default to the WebHare bv team (`DEVELOPMENT_TEAM = MF6WPNPK5H` in `Config/Signing.xcconfig`, referenced by `project.yml`). To let Xcode
 create the signing certificate and profiles, add an Apple ID that is a member of that team in Xcode →
 Settings → Accounts. Simulator builds don't need this.
+
+For local macOS builds without WebHare team access, create `Local.xcconfig` next to `project.yml` with an existing Apple Development certificate and its team ID:
+
+```xcconfig
+CODE_SIGN_STYLE[sdk=macosx*] = Manual
+DEVELOPMENT_TEAM[sdk=macosx*] = YOUR_CERTIFICATE_TEAM_ID
+CODE_SIGN_IDENTITY[sdk=macosx*] = Apple Development: Your Name (CERTIFICATE_ID)
+```
+
+Find the exact certificate name with `security find-identity -v -p codesigning`; use the team that issued that certificate. `Local.xcconfig` is ignored by Git and optionally included for both Debug and Release. Xcode, SweetPad and `xcodebuild` read it without regenerating the project. The macOS conditions leave iOS signing unchanged. Keep this file on the development machine only; official builds use a clean checkout with the WebHare defaults.
+
+Build both local configurations without command-line signing overrides. In particular, `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=` takes precedence over the local file and returns to ad-hoc signing. Using the same stable certificate and bundle identifier allows Keychain permission to survive rebuilds and switching between Polly DEV and the local Release. Changing to a different signing identity or distribution channel may require authorization again. A local Release is not an official TestFlight or App Store release. See [issue #77](https://github.com/WebHare/polly/issues/77).
 
 ## The Xcode project
 
@@ -72,6 +84,18 @@ Keyboard controls only work when the mock runs in a terminal, not when it is sta
 ## 2. Run the app
 
 ### macOS
+
+Debug builds produce **Polly DEV.app**, with a yellow DEV ribbon on the Dock/Finder icon. Release builds
+remain **Polly.app**; iOS is unchanged. Both macOS builds retain the same bundle identifier, settings and
+Keychain entries, so this visual distinction does not create a separate monitoring configuration.
+
+The development icon is generated from the existing exported release icons, with the same yellow ribbon
+as Office42 and Application42. After regenerating the original design icons, run (requires `rsvg-convert`):
+
+```sh
+python3 /absolute/path/to/polly/scripts/generate-dev-icon.py
+python3 /absolute/path/to/polly/scripts/generate-dev-icon.py --check
+```
 
 In Xcode: open `Polly.xcodeproj`, choose the **Polly** scheme with **My Mac** as destination, and press Run.
 In VS Code, use SweetPad.
@@ -477,16 +501,45 @@ release or an update feed.
 The 0.2.0 build briefly carried a Sparkle updater; it was removed before any release was published. Its EdDSA
 key backup stays in 1Password but is not used; do not configure it as a GitHub secret.
 
+### TestFlight
+
+`scripts/testflight-macos.sh` and `scripts/testflight-ios.sh` build the current checkout with fastlane
+(`fastlane/Fastfile`, lanes `mac beta` and `ios beta`) and upload it to TestFlight. Run either with `--help`
+for the options. They install fastlane into `vendor/bundle` on first use and need a current Ruby
+(`brew install ruby`; macOS ships 2.6).
+
+- **Credentials**: an App Store Connect API key with the App Manager role, given as `ASC_KEY_ID`, `ASC_ISSUER_ID`
+  and `ASC_KEY_PATH` (the path to the `.p8` file; never commit it). Locally the builds are signed automatically
+  with the certificates of the Apple ID signed in to Xcode, and fastlane uses the key to upload. A `--dry-run`
+  without a key uses only the Apple ID and uploads nothing.
+- **Version and build number** come from `project.yml`. TestFlight refuses a build number it already has for
+  that platform, so bump `CURRENT_PROJECT_VERSION` first, or pass `--build-number auto` for an in-between
+  beta (the latest TestFlight build of that platform + 1; the repository is not changed).
+- **What to Test** is this version's dated `CHANGELOG.md` section, or `[Unreleased]` while the version is not
+  dated yet, as plain text. Override it with `--notes-file`.
+- **Testers**: `--groups` (or `POLLY_TESTFLIGHT_GROUPS`) adds the build to TestFlight groups; `--external`
+  also distributes it to their external testers, which submits it for beta review.
+- The builds are exported to `build/testflight/` (`Polly-osx.pkg` or `Polly-ios.ipa`, plus dSYMs).
+- iOS: automatic signing needs at least one iOS device registered in the team, even for an App Store build.
+- **From GitHub**: Actions → **TestFlight** → Run workflow (or `gh workflow run testflight.yml -f platform=both`)
+  builds the chosen branch and uploads it with `--build-number auto`. It signs manually with a fixed Apple
+  Distribution and Mac Installer Distribution certificate and the App Store profiles from the repository secrets
+  (see "Continuous integration" in the README), because automatic signing on a clean runner would create a new
+  development certificate in the team account on every run. Setting `POLLY_PROFILE_NAME` to the name of an
+  installed App Store profile does the same locally.
+
 Validate locally before a PR:
 
 ```sh
 swift test --package-path Packages/PollyKit
 python3 -m unittest discover -s scripts -p 'test_*.py'
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'platform=macOS' \
-  -derivedDataPath .build/DerivedData CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual build
+  -derivedDataPath .build/DerivedData build
 xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
 ```
+
+Without a usable signing certificate, append `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual` to the macOS build command for compile-only verification. Do not use that fallback for an installed app that should retain Keychain permission between builds.
 
 ### Dashboard development and tests
 

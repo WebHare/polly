@@ -112,6 +112,11 @@ public final class MonitorModel {
         MonitorSummary(servers: servers, states: states, hideServicesOnDownHosts: hideServicesOnDownHosts)
     }
 
+    public func summary(for sourceID: UUID) -> MonitorSummary {
+        MonitorSummary(servers: servers.filter { $0.id == sourceID }, states: states,
+                       hideServicesOnDownHosts: hideServicesOnDownHosts)
+    }
+
     public func setNotifications(_ enabled: Bool, for server: NagiosServer) throws {
         defer { reload() }
         try store.setNotifications(enabled, for: server.id)

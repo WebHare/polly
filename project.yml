@@ -1,5 +1,7 @@
 # XcodeGen spec. Regenerate the Xcode project with:  xcodegen generate
 name: Polly
+fileGroups:
+  - Config
 options:
   bundleIdPrefix: nl.webhare
   deploymentTarget:
@@ -31,12 +33,19 @@ targets:
         destinationFilters: [iOS]
     dependencies:
       - package: PollyKit
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     info:
       path: App/Info.plist
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         NSHumanReadableCopyright: Copyright © 2026 WebHare b.v. GNU GPL version 2.
+        # Required for Mac App Store uploads.
+        LSApplicationCategoryType: public.app-category.developer-tools
+        # Only the system's HTTPS/TLS, which is exempt from export compliance documentation.
+        ITSAppUsesNonExemptEncryption: false
         # Nagios servers are often internal and plain http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true
@@ -56,9 +65,11 @@ targets:
         "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
         # The multiplatform default points inside MacOS/Frameworks, not Contents/Frameworks.
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"
-        CODE_SIGN_STYLE: Automatic
-        # WebHare bv. A stable team signature keeps keychain access working across rebuilds.
-        DEVELOPMENT_TEAM: MF6WPNPK5H
+      configs:
+        Debug:
+          "PRODUCT_NAME[sdk=macosx*]": Polly DEV
+          "INFOPLIST_KEY_CFBundleDisplayName[sdk=macosx*]": Polly DEV
+          "ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]": AppIconDev
 
 schemes:
   Polly:

@@ -1,0 +1,6 @@
+// Keep the official team as the default; local overrides must never be committed.
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM = MF6WPNPK5H
+CODE_SIGN_IDENTITY = iPhone Developer
+
+#include? "../Local.xcconfig"

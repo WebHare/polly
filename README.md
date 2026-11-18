@@ -57,9 +57,12 @@ See [DEVELOPERS.md](DEVELOPERS.md) for building and running the app, the mock Na
 
 `.github/workflows/build.yml` tests PollyKit and PollyWeb on Linux amd64 and arm64 runners, including
 real Nagios HTTP integration and a build/start/restart test of the production container. A pinned
-Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The required
-macOS job fails if either Linux architecture or the browser job fails. It also tests both Swift packages,
-real HTTP/source recovery, the iOS Simulator build and a universal macOS Release build.
+Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The macOS job
+runs in parallel and tests both Swift packages, real HTTP/source recovery, the iOS Simulator build and a
+universal macOS Release build. The required `build` job fails unless the Linux, browser and macOS jobs all
+passed. The Linux jobs cache their Swift debug builds per architecture, Swift version and `Package.resolved`.
+The container build compiles the Swift dependencies in a separate layer, which CI keeps in the GitHub Actions
+cache (`--cache-from`/`--cache-to type=gha`), so only the Polly targets compile when the manifests are unchanged.
 The separate iOS workflow still builds for devices without signing.
 
 The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
@@ -83,6 +86,20 @@ for `WebHare/polly`, the same way as for `WebHare/agent-radar`; set them by hand
 | `NOTARY_API_ISSUER_ID`       | variable | the Issuer ID shown above the App Store Connect API keys list              |
 
 Only the team's Account Holder can create a Developer ID Application certificate.
+
+The **TestFlight** workflow (started by hand, see DEVELOPERS.md) uploads the iOS and macOS builds and uses:
+
+| Name                            | Kind     | Value                                                                                             |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `APPSTORE_CERTIFICATE_P12`      | secret   | base64 of one .p12 with the Apple Distribution and Mac Installer Distribution certificates + keys |
+| `APPSTORE_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                                             |
+| `APPSTORE_PROFILE_IOS`          | secret   | base64 of the "App Store Connect" profile for `nl.webhare.polly` (.mobileprovision)               |
+| `APPSTORE_PROFILE_MACOS`        | secret   | base64 of the "Mac App Store Connect" profile for `nl.webhare.polly` (.provisionprofile)          |
+| `APPSTORE_API_KEY`              | secret   | base64 of an App Store Connect API key (.p8) with the App Manager role                            |
+| `APPSTORE_API_KEY_ID`           | variable | that key's Key ID                                                                                 |
+| `APPSTORE_API_ISSUER_ID`        | variable | the Issuer ID (the same as `NOTARY_API_ISSUER_ID`)                                                |
+
+The certificates and profiles expire after a year and have to be renewed by hand.
 
 ## Design decisions
 
@@ -276,14 +293,15 @@ Why things are the way they are, so they can be revisited deliberately rather th
 ### Signing and sandbox
 
 - **App Sandbox with only `network.client`** on macOS.
-- **Signed with the WebHare bv team** rather than ad-hoc. Ad-hoc signatures change on every build, which
-  makes macOS treat each build as a new app and re-prompt for keychain access.
+- **WebHare bv signing by default**, with an optional ignored `Local.xcconfig` for stable local macOS signing in both Debug and Release; see [Signing](DEVELOPERS.md#signing). Ad-hoc signatures change on every build, which makes macOS treat each build as a new app and re-prompt for Keychain access.
 
 ### Tooling
 
 - **Yams for YAML**; the keychain is a system library.
 - **No in-app updater.** Polly is distributed through TestFlight and the Mac App Store, which handle
   updates. Sparkle was used briefly in 0.2.0 and removed before any release was published.
+- **fastlane for TestFlight uploads**, pinned in the `Gemfile`, with automatic signing through an App Store
+  Connect API key so nobody has to export certificates.
 - **Mock Nagios server in plain Node.js** (no npm install) so the UI can be exercised with realistic,
   changing data, including outages (HTTP 503) and authentication failures, without a real Nagios.
 - **XcodeBuildMCP** is configured in `.mcp.json` so Claude Code can build and run the app; SweetPad is

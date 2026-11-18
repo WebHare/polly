@@ -6,6 +6,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Added
 
+- Click a source in macOS Settings to see its live status, problems and check details. Source rows now show status or connection errors, with a separate edit button.
+
 - A locally buildable Linux container and Docker Compose setup for the web dashboard, with private
   configuration, non-root operation, HTTPS proxy examples and documented upgrades/rollback. The web
   version is Nagios-only and read-only; native URL checks, commands and notifications remain in the apps.
@@ -24,6 +26,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Changed
 
+- Local macOS Debug and Release builds can share a fixed signing identity through an optional local configuration, avoiding repeated Keychain prompts after ad-hoc rebuilds.
+- Local macOS Debug builds are named **Polly DEV** and carry a yellow **DEV** ribbon on their app icon.
 - The menu bar panel's footer no longer says when the sources were last checked; each source's detail does.
 
 - Explain the ideas for shared on-call duties, escalation and billing in the macOS Team placeholder.

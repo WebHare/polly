@@ -54,7 +54,7 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - For a URL, the test only fails on a critical problem; a certificate that expires soon doesn't block adding
     it.
 - The user can edit a source: its type, name, URL, username and password.
-  - macOS: double-click the source or choose **Edit…** in its context menu; the form opens as
+  - macOS: click the pencil next to the source or choose **Edit…** in its context menu; the form opens as
     the "Edit source" modal.
   - iOS: tap the source (not its bell or switch), swipe left and choose **Edit**, or **Edit…** in its context menu;
     the form opens as a sheet titled "Edit Nagios Server" or "Edit URL".
@@ -70,6 +70,11 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
     - Why: it is a different system now; its problems are not changes of the old one's.
   - **Edit source…** on the Unreachable screen opens this form for the unreachable source (macOS: in the
     Settings window, on the Sources pane; iOS: on the Sources tab).
+- On macOS, clicking a source in Settings opens its live status and problems without needing the menu bar icon.
+  - The source list also shows the latest status or connection error.
+  - The detail shows only this source, with host and service totals, problems grouped by severity, and the time of its last successful check.
+  - Clicking a problem opens its check output and existing actions; **Refresh** checks this source again.
+  - Loading, paused and unreachable sources are distinguished from a source with no problems.
 - The user can duplicate a source to add a similar one without typing everything again.
   - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
   - Opens the add form prefilled with the source's type, URL, username, password and bell; the name gets
@@ -135,6 +140,11 @@ sources.
 
 ## macOS menu bar
 
+- Local macOS development builds are named **Polly DEV** and have a yellow **DEV** ribbon on their app icon, so they can be distinguished from the installed release.
+  - They keep the same source settings; the label does not create a separate monitoring setup.
+  - Release builds and iPhone/iPad builds keep the ordinary name and icon.
+  - Developers can use a fixed local signing identity for both macOS development and local Release builds without changing the official WebHare signing defaults or iOS signing.
+    - Rebuilding with the same signing identity preserves Keychain authorization; switching identity or distribution channel may require authorization again.
 - Polly is a menu bar app with no Dock icon by default.
   - A Dock icon can be turned on in Settings; clicking it opens the Settings window.
 - The menu bar icon is Polly's head plus a count when there is something to read.

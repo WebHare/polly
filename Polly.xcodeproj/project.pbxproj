@@ -24,6 +24,7 @@
 		7CB444DDC61700762B1CB3A3 /* CHANGELOG.md in Resources */ = {isa = PBXBuildFile; fileRef = 1557307A982CF826FC5F3E02 /* CHANGELOG.md */; };
 		829E409BF4448BA863387845 /* CommandFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E9D2DE609BD15437DBD40E43 /* CommandFormView.swift */; };
 		C179B8117D58EF760F919BDE /* MenuBarContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */; platformFilters = (macos, ); };
+		C3AE79B7153D0E460269CCAF /* SourceStatusView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */; platformFilters = (macos, ); };
 		D010D679D247C02694A7B3EE /* PollyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FC2FAB90B0B60484B906A00 /* PollyApp.swift */; };
 		EC5F3F0EC120BBEC4B69F976 /* MenuBarIcon.swift in Sources */ = {isa = PBXBuildFile; fileRef = 922DC996571A754701F1C24C /* MenuBarIcon.swift */; platformFilters = (macos, ); };
 		FAAFAE346268B1B7809C42D6 /* ServerFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */; platformFilters = (ios, ); };
@@ -39,6 +40,7 @@
 		1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		206F8CFFD8766B27EB430DBF /* ServersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersScreen.swift; sourceTree = "<group>"; };
 		276A57CF036E82890AFB589D /* PollyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PollyKit; path = Packages/PollyKit; sourceTree = SOURCE_ROOT; };
+		3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		4D179A8AB00DD1663451D08C /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		4F9EC63E3847380F178FB586 /* PollyDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyDesign.swift; sourceTree = "<group>"; };
 		4FC2FAB90B0B60484B906A00 /* PollyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyApp.swift; sourceTree = "<group>"; };
@@ -54,6 +56,7 @@
 		E9D2DE609BD15437DBD40E43 /* CommandFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommandFormView.swift; sourceTree = "<group>"; };
 		F6AD3120BD8F3F5A5F437C92 /* Polly.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Polly.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FAB995832DBAC6866F111D6A /* SeverityStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeverityStyle.swift; sourceTree = "<group>"; };
+		FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceStatusView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,6 +76,7 @@
 			children = (
 				1557307A982CF826FC5F3E02 /* CHANGELOG.md */,
 				B0422AB0320370D5D30B9E8E /* App */,
+				BAEB989D6E8743CAAAFCADC4 /* Config */,
 				AA9CDDC218F38C95AC636EB0 /* Packages */,
 				E3462FD0D841AEECA52AF5F3 /* Products */,
 			);
@@ -115,6 +119,7 @@
 				5F30EFE40D0F1FACB5272BA4 /* ProblemDetailView.swift */,
 				D20C4E8D81E51B30896155BF /* SettingsView.swift */,
 				E1933F355D9E35BBD4CB0C48 /* SourceDetailView.swift */,
+				FDC8A7198BD02E869DC6867C /* SourceStatusView.swift */,
 			);
 			path = macOS;
 			sourceTree = "<group>";
@@ -135,6 +140,14 @@
 				6477A6C5A248731D409B1986 /* Shared */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		BAEB989D6E8743CAAAFCADC4 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		E3462FD0D841AEECA52AF5F3 /* Products */ = {
@@ -239,6 +252,7 @@
 				5CEE84D1A6B0F44DCBD6B762 /* SettingsView.swift in Sources */,
 				7A5B5BBF2361CDB91D8C644C /* SeverityStyle.swift in Sources */,
 				42784BF9052B6AD122142880 /* SourceDetailView.swift in Sources */,
+				C3AE79B7153D0E460269CCAF /* SourceStatusView.swift in Sources */,
 				3E6BC76B15FF76998B49DE9C /* WhatsNewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -307,12 +321,10 @@
 		};
 		7BB2862653678B1E91C41030 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = MF6WPNPK5H;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -339,16 +351,16 @@
 		};
 		D63D7E36D06F862441789365 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = AppIconDev;
 				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
-				CODE_SIGN_IDENTITY = "iPhone Developer";
-				CODE_SIGN_STYLE = Automatic;
-				DEVELOPMENT_TEAM = MF6WPNPK5H;
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Polly;
+				"INFOPLIST_KEY_CFBundleDisplayName[sdk=macosx*]" = "Polly DEV";
 				"INFOPLIST_KEY_LSUIElement[sdk=macosx*]" = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
@@ -360,6 +372,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "$(inherited) @executable_path/../Frameworks";
 				PRODUCT_BUNDLE_IDENTIFIER = nl.webhare.polly;
 				PRODUCT_NAME = Polly;
+				"PRODUCT_NAME[sdk=macosx*]" = "Polly DEV";
 				SDKROOT = auto;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx";
 				SUPPORTS_MACCATALYST = NO;
