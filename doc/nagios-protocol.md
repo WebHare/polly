@@ -7,16 +7,17 @@ the source code, not a specification.
 
 Sources:
 
-1. **A real Nagios Core server** (monitor.webhare.net). Every read described here was checked against it: status,
-   check details, the check page and both command forms.
+1. **A real Nagios Core server** (monitor.webhare.net, 4.4.13). Every read described here was checked against it:
+   status, check details, the check page, both command forms and the program-wide notification form.
 2. **The Nagios Core source**, checked out in `nagioscore/` (git-ignored; get it with
    `git clone https://github.com/NagiosEnterprises/nagioscore.git nagioscore`). This document was checked against
    `master` after 4.5.14 (`98d275a`) and the tags back to 4.4.0. File references below are to that tree.
 3. **The mock server**, [mock/nagios-mock.mjs](../mock/nagios-mock.mjs). It differs from Nagios in a few places;
    see [Where the mock differs](#where-the-mock-differs).
 
-> **Not verified against a real server:** actually submitting an acknowledgement or a downtime (the `POST` to
-> `cmd.cgi`). That has only been done against the mock and checked against the source.
+> **Not verified against a real server:** actually submitting an acknowledgement, a downtime or a change of the
+> program-wide notifications (the `POST` to `cmd.cgi`). That has only been done against the mock and checked
+> against the source.
 
 When a real server turns out to behave differently from this document, update the mock first, then the client
 (see "Changing the mock" in [DEVELOPERS.md](../DEVELOPERS.md)), and then this document.
@@ -26,10 +27,10 @@ When a real server turns out to behave differently from this document, update th
 | What | Request | Answer |
 |---|---|---|
 | Connection test | `GET statusjson.cgi?query=programstatus` | JSON |
-| Status | `GET statusjson.cgi?query=hostcount`, `servicecount`, `servicelist` and `hostlist`, in parallel | JSON |
+| Status | `GET statusjson.cgi?query=hostcount`, `servicecount`, `servicelist`, `hostlist` and `programstatus`, in parallel | JSON |
 | Check page | `GET extinfo.cgi?type=2&host=…&service=…`, or `type=1&host=…` for a host | HTML, opened in the browser |
 | Related link | the same `extinfo.cgi` page, read by Polly | HTML |
-| Command form | `GET cmd.cgi?cmd_typ=33\|34\|55\|56\|86&host=…[&service=…]` | HTML form (+ CSRF cookie on 4.5.12+) |
+| Command form | `GET cmd.cgi?cmd_typ=33\|34\|55\|56\|86&host=…[&service=…]`, or `cmd_typ=11\|12` without host | HTML form (+ CSRF cookie on 4.5.12+) |
 | Command | `POST cmd.cgi` | HTML confirmation or error |
 
 All CGIs live under `<base URL>/nagios/cgi-bin/`. The user enters only the base URL (e.g.
@@ -109,14 +110,24 @@ Every answer, success or failure, has the same envelope:
   either makes the whole answer unreadable for a strict JSON parser, so Polly then reports "not valid
   statusjson.cgi output" for that server.
 
-### query=programstatus (connection test)
+### query=programstatus (connection test and notification switch)
 
-The cheapest query. Polly only checks that a valid, successful envelope with `data` comes back; the contents
-aren't used.
+The cheapest query, written by `json_status_program` in `cgi/statusjson.c`. It has no authorization check: every
+user who may use the CGIs gets it.
 
 ```json
-"data": { "programstatus": { "version": "4.5.14", "nagios_pid": 1234, "program_start": 1731500000000, … } }
+"data": { "programstatus": { "version": "4.5.14", "nagios_pid": 1234, "daemon_mode": true,
+                             "program_start": 1731500000000, "last_log_rotation": 0,
+                             "enable_notifications": true, "execute_service_checks": true, … } }
 ```
+
+- For the **connection test** Polly only checks that a valid, successful envelope with `data` comes back.
+- With the **status** Polly reads `enable_notifications`: the program-wide switch for host and service
+  notifications (`enable_notifications` in `nagios.cfg`, changed at runtime by `DISABLE_NOTIFICATIONS` and
+  `ENABLE_NOTIFICATIONS`). A JSON boolean. When it is missing (or `programstatus` has no such object) Polly treats
+  the setting as unknown and offers no switch; it doesn't fail the status for it.
+- The other fields (`execute_service_checks`, `enable_event_handlers`, `enable_flap_detection`, …) are the other
+  program-wide switches of the Tactical Overview (`cgi/tac.c`); Polly doesn't use them.
 
 ### query=hostcount and query=servicecount
 
@@ -183,8 +194,19 @@ statusjson.cgi?query=servicelist&servicestatus=warning%20critical%20unknown&deta
   | `problem_has_been_acknowledged` | someone acknowledged it | boolean |
   | `scheduled_downtime_depth` | number of downtimes the service is in | `0` = none |
 
-- The other fields are ignored. Polly doesn't query `hostlist`; a host that is down is only visible in
-  `hostcount` and through its services.
+- The other fields are ignored.
+
+### query=hostlist (hosts that are down)
+
+```
+statusjson.cgi?query=hostlist&hoststatus=down%20unreachable&details=true
+```
+
+- Each host is an object keyed by host name, with the same fields as a service (`status`, `plugin_output`,
+  `long_plugin_output`, `last_state_change`, `last_check`, `next_check`, `state_type`, the attempts,
+  `problem_has_been_acknowledged`, `scheduled_downtime_depth`).
+- Host `status` bits: pending `1`, up `2`, down `4`, unreachable `8`. Down and unreachable become a critical host
+  problem; the service problems on that host are then not shown (that is Polly's choice, not Nagios').
 
 ## extinfo.cgi (check page and related link)
 
@@ -218,19 +240,7 @@ anchors, recognized by their `alt`/`title` text:
 - Errors are `<P><DIV CLASS='errorMessage'>…</DIV></P>` with "Error: Service Not Found!", "Error: Service Status
   Not Found!" or "It appears as though you do not have permission to view information for this service...".
 
-## cmd.cgi (acknowledge and downtime)
-
-### query=hostlist (hosts that are down)
-
-```
-statusjson.cgi?query=hostlist&hoststatus=down%20unreachable&details=true
-```
-
-- Each host is an object keyed by host name, with the same fields as a service (`status`, `plugin_output`,
-  `long_plugin_output`, `last_state_change`, `last_check`, `next_check`, `state_type`, the attempts,
-  `problem_has_been_acknowledged`, `scheduled_downtime_depth`).
-- Host `status` bits: pending `1`, up `2`, down `4`, unreachable `8`. Down and unreachable become a critical host
-  problem; the service problems on that host are then not shown (that is Polly's choice, not Nagios').
+## cmd.cgi (acknowledge, downtime and notifications)
 
 Commands go through the same form the web interface uses (`cgi/cmd.c`), in two steps: fetch the form, then post
 it. Nothing changes on the server until the post.
@@ -242,6 +252,8 @@ it. Nothing changes on the server until the post.
 | Schedule downtime for a service | `56` (`CMD_SCHEDULE_SVC_DOWNTIME`) |
 | Schedule downtime for a host (not its services) | `55` (`CMD_SCHEDULE_HOST_DOWNTIME`) |
 | Schedule downtime for all services of a host (not the host) | `86` (`CMD_SCHEDULE_HOST_SVC_DOWNTIME`) |
+| Turn notifications off program-wide | `11` (`CMD_DISABLE_NOTIFICATIONS`) |
+| Turn notifications on program-wide | `12` (`CMD_ENABLE_NOTIFICATIONS`) |
 
 How Polly combines them:
 
@@ -414,6 +426,48 @@ Note: It may take a while before the command is actually processed.<BR><BR>
 - **Never retry a post.** A lost answer doesn't mean the command wasn't accepted, and a second post would
   acknowledge twice or schedule a second downtime.
 
+### Program-wide notifications (11 and 12)
+
+The same two steps as above, but the commands name no host or service. They are what the **Notifications**
+switch on the Tactical Overview (`cgi/tac.c`) and "Disable notifications" on the process information page
+(`extinfo.cgi?type=0`) link to.
+
+```
+GET <base>/nagios/cgi-bin/cmd.cgi?cmd_typ=11
+```
+
+The form, as printed by `request_command_data` (seen this way on monitor.webhare.net, 4.4.13):
+
+```html
+<P><DIV ALIGN=CENTER CLASS='cmdType'>You are requesting to disable notifications</DIV></p>
+…
+<form method='post' action='cmd.cgi'>
+<INPUT TYPE='hidden' NAME='nagFormId' VALUE='1a2b3c4d5e6f'          ← only with the CSRF cookie, as above
+<TABLE CELLSPACING=0 CELLPADDING=0 CLASS='optBox'>
+<tr><td><INPUT TYPE='HIDDEN' NAME='cmd_typ' VALUE='11'><INPUT TYPE='HIDDEN' NAME='cmd_mod' VALUE='2'></td></tr>
+<tr><td CLASS='optBoxItem' colspan=2>There are no options for this command.<br>Click the 'Commit' button to submit the command.</td></tr>
+…
+```
+
+- **Check the form**: `cmd_typ` and `cmd_mod=2` must echo the request, and there must be no `host` or `service`
+  input.
+- **Comment.** These commands take no comment by default (`CMD_DEF(DISABLE_NOTIFICATIONS, 0, NULL)` in
+  `cgi/extcmd_list.c`). A line `CMT_DISABLE_NOTIFICATIONS=2,"text"` in `cgi.cfg` (`cgicfg_callback` in
+  `cgi/cmd.c`) adds the `com_author` and `com_data` fields instead of the "no options" row: `1` optional, `2`
+  required (then "Comment was not entered" without one), with an optional default comment. The comment is only
+  checked; `commit_command` doesn't pass it on to the core.
+  - Polly sends `com_author` and `com_data` only when the form has a `com_data` field: the form's author (or
+    Polly's username when it is empty) and the form's default comment, or "Notifications turned off from Polly" /
+    "…on from Polly" when there is none.
+- **Body**: `cmd_typ`, `cmd_mod=2`, `nagFormId` when the form had one, and the comment fields when asked for.
+  The CGI also reads `schedule_delay` (minutes, default `0`); Polly doesn't send it.
+- **Permission**: the form is shown to anyone, but the commit needs `is_authorized_for_system_commands`, i.e. the
+  user in `authorized_for_system_commands` in `cgi.cfg` (or `use_authentication=0`, which refuses all commands
+  anyway). Otherwise the answer is "Sorry, but you are not authorized to commit the specified command.".
+- The answer is the same success page or error as for the other commands.
+- `cmd.cgi` writes `[<now>] DISABLE_NOTIFICATIONS;<now + schedule_delay * 60>` to the command file
+  (`commit_command`); the core ignores the extra field.
+
 ## What Nagios does with a command
 
 `cmd.cgi` only writes a line to the external command file; the Nagios core does the actual work. This section
@@ -530,6 +584,29 @@ downtimes themselves with their ID, times, author and comment; Polly doesn't use
 > quiet, but `servicelist` gives no sign of it, so Polly's own notifications would report them. Polly would have
 > to look at the host's `scheduled_downtime_depth` too (`hostlist` with `details=true`) to match Nagios.
 
+### Program-wide notifications (DISABLE_NOTIFICATIONS / ENABLE_NOTIFICATIONS)
+
+Handled in `process_external_command2` (`base/commands.c`) by `disable_all_notifications` and
+`enable_all_notifications`. `ENTER_STANDBY_MODE` and `ENTER_ACTIVE_MODE` are old aliases of the same commands.
+
+1. If the setting already has the requested value, nothing happens.
+2. Otherwise `enable_notifications` changes and `MODATTR_NOTIFICATIONS_ENABLED` is set in the modified host and
+   service process attributes. `update_program_status` only informs event broker modules; `status.dat`, and so
+   `statusjson.cgi`, shows the new value after the next periodic status write (`status_update_interval`).
+3. While it is off, `check_service_notification_viability` and `check_host_notification_viability`
+   (`base/notifications.c`) stop every notification of every type: problems, recoveries, acknowledgements,
+   flapping and downtime. Only a forced custom notification (`SEND_CUSTOM_…_NOTIFICATION` with the forced option)
+   still goes out. Checks, event handlers and state changes go on as usual, so problems keep showing in Polly.
+4. Nothing is queued while it is off, and turning it on sends nothing by itself. A problem that is still there
+   can be notified again by a later check, as a re-notification.
+
+It survives a restart: the retention file (`xdata/xrddefault.c`) keeps `enable_notifications` and the modified
+attributes, and with `use_retained_program_state=1` (the default) the retained value wins over `nagios.cfg` for
+as long as the attribute is marked modified. So a server that was switched off stays off until someone switches
+it on again.
+
+In `statusjson.cgi`: `enable_notifications` in `programstatus`.
+
 ## Known differences between servers
 
 | | Nagios Core 4.5.14 defaults | monitor.webhare.net |
@@ -538,17 +615,22 @@ downtimes themselves with their ID, times, author and comment; Polly doesn't use
 | `date_format` | `us` | `iso8601` |
 | Author field | locked (`lock_author_names=1`) | locked |
 | `state_type` in JSON | `0`/`1` | not recorded |
+| `enable_notifications` in `programstatus` | yes | yes (4.4.13) |
+| Comment field on `cmd_typ=11`/`12` | none (no `CMT_` line) | none |
 
 ## Where the mock differs
 
-The mock follows the behaviour described here for the commands Polly uses (`34`, `55`, `56`, `86`), including the
+The mock follows the behaviour described here for the commands Polly uses (`11`, `12`, `33`, `34`, `55`, `56`, `86`), including the
 effects in the core: sticky and normal acknowledgements, ignored acknowledgements of OK services, overlapping and
 flexible downtimes, host downtime depth in `hostlist`, the real success and error texts, and the CSRF cookie per
-version (`csrf=on` for 4.5.12+, `csrf=off` for 4.5.11 and older). What it leaves out:
+version (`csrf=on` for 4.5.12+, `csrf=off` for 4.5.11 and older). For `11` and `12` it also mimics the `CMT_`
+comment setting (`notificationComment`) and `authorized_for_system_commands` (`systemCommands`). What it leaves
+out:
 
 - Triggered downtimes: a downtime with a `trigger` is ignored, as if the trigger didn't exist.
-- Notifications, comments, `downtimelist`, deleting downtimes and removing acknowledgements.
+- Sending notifications, comments, `downtimelist`, deleting downtimes and removing acknowledgements.
 - Authorization: the mock user may command every host and service, and the author is always "Nagios Admin".
+- `schedule_delay` and the `ENTER_STANDBY_MODE`/`ENTER_ACTIVE_MODE` aliases.
 - `status_update_interval`: the mock answers with the new state right away.
 - Soft states: every service is in a hard state, so a normal acknowledgement ends on every state change.
 

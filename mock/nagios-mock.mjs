@@ -7,12 +7,14 @@
 // with made-up hosts/services that slowly rotate through OK/WARNING/CRITICAL/UNKNOWN and host DOWN/UNREACHABLE.
 // Also serves /nagios/cgi-bin/extinfo.cgi (host and service pages with action/notes links) and /nagios/cgi-bin/cmd.cgi with
 // the commands Polly uses: acknowledge a service problem (cmd_typ 34) or a host problem (33), schedule downtime for a host (55), a service
-// (56) or all services of a host (86). Commands follow Nagios Core 4.5 (cgi/cmd.c, base/commands.c,
+// (56) or all services of a host (86), and turn notifications off (11) or on (12) program-wide. Commands follow Nagios Core 4.5 (cgi/cmd.c, base/commands.c,
 // common/downtime.c); see doc/nagios-protocol.md:
 // - normal acknowledgements end on any state change (for a host: any change but DOWN <-> UNREACHABLE), sticky ones on recovery; acknowledging an OK service does nothing
 // - downtimes are counted in scheduled_downtime_depth while in effect; fixed and flexible downtimes work, triggered
 //   downtimes are ignored like a trigger that doesn't exist
 // - the CSRF cookie is set once and reused (4.5.12+), or never set (csrf=off, like 4.5.11 and older)
+// - program-wide notifications show as enable_notifications in programstatus; commands 11 and 12 need
+//   authorized_for_system_commands (systemCommands=off refuses them) and take a comment only when CMT_ asks for one
 // --no-rotate starts with automatic rotation paused.
 //
 // Mock-only, without auth:
@@ -20,6 +22,8 @@
 //   GET /mock/set?host=H&service=S&status=ok|warning|critical|unknown
 //   GET /mock/sethost?host=H&status=up|down|unreachable
 //   GET /mock/config?csrf=on|off&dateFormat=us|euro|iso8601|strict-iso8601   how cmd.cgi behaves (reset by /mock/reset)
+//   GET /mock/config?notifications=on|off&notificationComment=0|1|2&systemCommands=on|off
+//       program-wide notifications; CMT_DISABLE/ENABLE_NOTIFICATIONS in cgi.cfg; authorized_for_system_commands
 //   /redirect/<path>                                      302 to /<path>
 // Press "h" in the terminal for keyboard controls.
 
@@ -129,6 +133,12 @@ const state = {
   // Both variants exist in the wild: monitor.webhare.net (4.5.11 or older) sends no nagFormId at all and uses ISO dates.
   csrf: true,
   dateFormat: "us",
+  // nagios.cfg enable_notifications, changed by DISABLE_NOTIFICATIONS / ENABLE_NOTIFICATIONS.
+  notifications: true,
+  // cgi.cfg CMT_DISABLE_NOTIFICATIONS / CMT_ENABLE_NOTIFICATIONS: 0 no comment (the default), 1 optional, 2 required.
+  notificationComment: 0,
+  // cgi.cfg authorized_for_system_commands includes the mock user.
+  systemCommands: true,
 };
 
 // ---------------------------------------------------------------------------------------------
@@ -225,7 +235,7 @@ function handleQuery(params) {
   switch (query) {
     case "programstatus":
       return envelope(query, {
-        programstatus: { version: "4.5.0-mock", nagios_pid: process.pid, program_start: startedAt, enable_notifications: true },
+        programstatus: { version: "4.5.0-mock", nagios_pid: process.pid, program_start: startedAt, enable_notifications: state.notifications },
       });
 
     case "hostcount": {
@@ -469,8 +479,11 @@ ${links.join("\n")}
 // cmd.cgi, modelled on Nagios Core 4.5 cgi/cmd.c; the effects follow base/commands.c and common/downtime.c.
 
 // include/common.h
-const CMD = { ackHost: 33, ackService: 34, hostDowntime: 55, serviceDowntime: 56, hostServicesDowntime: 86 };
+const CMD = { disableNotifications: 11, enableNotifications: 12, ackHost: 33, ackService: 34, hostDowntime: 55, serviceDowntime: 56, hostServicesDowntime: 86 };
+const PROGRAM_WIDE = [CMD.disableNotifications, CMD.enableNotifications];
 const CMD_TITLE = {
+  [CMD.disableNotifications]: "disable notifications",
+  [CMD.enableNotifications]: "enable notifications",
   [CMD.ackHost]: "acknowledge a host problem",
   [CMD.ackService]: "acknowledge a service problem",
   [CMD.hostDowntime]: "schedule downtime for a particular host",
@@ -483,10 +496,10 @@ const AUTHOR = "Nagios Admin";
 const row = (label, input, required = true) =>
   `<tr><td CLASS='${required ? "optBoxRequiredItem" : "optBoxItem"}'>${label}:</td><td><b>${input}</b></td></tr>`;
 
-function commentRows() {
+function commentRows(required = true) {
   return [
-    row("Author (Your Name)", `<INPUT TYPE='TEXT' NAME='com_author' VALUE='${esc(AUTHOR)}' READONLY DISABLED>`),
-    row("Comment", "<INPUT TYPE='TEXT' NAME='com_data' VALUE='' SIZE=40>"),
+    row("Author (Your Name)", `<INPUT TYPE='TEXT' NAME='com_author' VALUE='${esc(AUTHOR)}' READONLY DISABLED>`, required),
+    row("Comment", "<INPUT TYPE='TEXT' NAME='com_data' VALUE='' SIZE=40>", required),
   ];
 }
 
@@ -498,7 +511,12 @@ function commandForm(params, formId) {
   const service = params.get("service") ?? "";
   // Nagios leaves the Host Name and Service rows of these forms unclosed; the parser has to cope.
   const rows = [`<tr><td CLASS='optBoxRequiredItem'>Host Name:</td><td><b><INPUT TYPE='TEXT' NAME='host' VALUE='${esc(host)}'></b></td></tr>`];
-  if (cmd === CMD.ackService || cmd === CMD.ackHost) {
+  if (PROGRAM_WIDE.includes(cmd)) {
+    // print_comment_field: author and comment only when CMT_ in cgi.cfg asks for them; no host or service.
+    rows.length = 0;
+    if (state.notificationComment) rows.push(...commentRows(state.notificationComment === 2));
+    else rows.push("<tr><td CLASS='optBoxItem' colspan=2>There are no options for this command.<br>Click the 'Commit' button to submit the command.</td></tr>");
+  } else if (cmd === CMD.ackService || cmd === CMD.ackHost) {
     if (cmd === CMD.ackService) rows.push(`<tr><td CLASS='optBoxRequiredItem'>Service:</td><td><b><INPUT TYPE='TEXT' NAME='service' VALUE='${esc(service)}'>`);
     rows.push(
       row("Sticky Acknowledgement", "<INPUT TYPE='checkbox' NAME='sticky_ack' CHECKED>", false),
@@ -584,15 +602,20 @@ function commitCommand(fields, cookies) {
   // clean_comment_data: semicolons would split the external command.
   const comment = (fields.get("com_data") ?? "").replaceAll(";", " ");
   let error = null;
-  if (comment.trim() === "") error = "Comment was not entered";
+  // The comment is required for the problem commands, and for the program-wide ones only with CMT_...=2.
+  const programWide = PROGRAM_WIDE.includes(cmd);
+  if (comment.trim() === "" && (!programWide || state.notificationComment === 2)) error = "Comment was not entered";
 
-  // Authorization: the mock user may command everything that exists.
+  // Authorization: the mock user may command everything that exists, and the program-wide commands when it is
+  // in authorized_for_system_commands.
   const hostCommand = [CMD.ackHost, CMD.hostDowntime, CMD.hostServicesDowntime].includes(cmd);
-  const authorized = hosts.has(hostName) && (hostCommand || findService(hostName, serviceName));
+  const authorized = programWide ? state.systemCommands : hosts.has(hostName) && (hostCommand || findService(hostName, serviceName));
   if (!authorized) return errorPage("Sorry, but you are not authorized to commit the specified command.");
 
   const command = { cmd, host: hostName, service: serviceName, author: AUTHOR, comment };
-  if (cmd === CMD.ackService || cmd === CMD.ackHost) {
+  if (programWide) {
+    // No options: the external command only carries the scheduled time.
+  } else if (cmd === CMD.ackService || cmd === CMD.ackHost) {
     command.sticky = fields.has("sticky_ack");
     command.notify = fields.has("send_notification");
     command.persistent = fields.has("persistent");
@@ -615,6 +638,11 @@ function commitCommand(fields, cookies) {
 
 /// What the Nagios core does with the external command. Like Nagios, it silently ignores what it can't use.
 function applyCommand(c) {
+  if (PROGRAM_WIDE.includes(c.cmd)) {
+    // enable_all_notifications / disable_all_notifications: a no-op when already in that state.
+    state.notifications = c.cmd === CMD.enableNotifications;
+    return log(`\x1b[36m${state.notifications ? "ENABLE" : "DISABLE"}_NOTIFICATIONS: notifications are ${state.notifications ? "on" : "off"}\x1b[0m`);
+  }
   const what = c.service && c.cmd !== CMD.hostServicesDowntime && c.cmd !== CMD.ackHost ? `${c.host} / ${c.service}` : c.host;
   if (c.cmd === CMD.ackHost) {
     const host = hosts.get(c.host);
@@ -678,6 +706,9 @@ function handleControl(url) {
     state.fault = "none";
     state.csrf = true;
     state.dateFormat = "us";
+    state.notifications = true;
+    state.notificationComment = 0;
+    state.systemCommands = true;
     return [200, { ok: true }];
   }
   if (url.pathname === "/mock/config") {
@@ -689,9 +720,17 @@ function handleControl(url) {
     if ((csrf && !["on", "off"].includes(csrf)) || (dateFormat && !DATE_FORMATS.includes(dateFormat))) {
       return [404, { error: `csrf must be on|off, dateFormat must be ${DATE_FORMATS.join("|")}` }];
     }
+    const onOff = ["notifications", "systemCommands"].map((k) => [k, url.searchParams.get(k)]).filter(([, v]) => v);
+    const comment = url.searchParams.get("notificationComment");
+    if (onOff.some(([, v]) => !["on", "off"].includes(v)) || (comment && !["0", "1", "2"].includes(comment))) {
+      return [404, { error: "notifications and systemCommands must be on|off, notificationComment 0|1|2" }];
+    }
     if (csrf) state.csrf = csrf === "on";
     if (dateFormat) state.dateFormat = dateFormat;
-    return [200, { ok: true, csrf: state.csrf, dateFormat: state.dateFormat, fault: state.fault }];
+    for (const [k, v] of onOff) state[k] = v === "on";
+    if (comment) state.notificationComment = Number(comment);
+    return [200, { ok: true, csrf: state.csrf, dateFormat: state.dateFormat, fault: state.fault, notifications: state.notifications,
+                   notificationComment: state.notificationComment, systemCommands: state.systemCommands }];
   }
   if (url.pathname === "/mock/set") {
     const p = url.searchParams;
@@ -792,12 +831,13 @@ Keys:
 Without auth: GET /mock/reset, GET /mock/set?host=H&service=S&status=ok|warning|critical|unknown,
   GET /mock/sethost?host=H&status=up|down|unreachable,
   GET /mock/config?csrf=on|off&dateFormat=${DATE_FORMATS.join("|")}, /redirect/<path> (302)
+  GET /mock/config?notifications=on|off&notificationComment=0|1|2&systemCommands=on|off
 `);
 }
 
 function showState() {
   console.log(
-    `\nrotation: ${state.rotating ? "on" : "paused"}  offline: ${state.offline}  auth: ${state.auth ? `${opts.user}:${opts.password}` : "off"}  csrf: ${state.csrf ? "on" : "off"}  dates: ${state.dateFormat}  requests: ${state.requests}`,
+    `\nrotation: ${state.rotating ? "on" : "paused"}  offline: ${state.offline}  auth: ${state.auth ? `${opts.user}:${opts.password}` : "off"}  csrf: ${state.csrf ? "on" : "off"}  dates: ${state.dateFormat}  notifications: ${state.notifications ? "on" : "off"}  requests: ${state.requests}`,
   );
   const marks = (host, service, ack) =>
     [ack ? `ACK${ack.type === ACK.sticky ? " (sticky)" : ""}` : "", downtimeDepth(host, service) ? `DOWNTIME ${downtimeDepth(host, service)}` : ""].filter(Boolean).join(" ");

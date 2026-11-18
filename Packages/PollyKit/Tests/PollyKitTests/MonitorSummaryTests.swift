@@ -151,6 +151,18 @@ import Testing
         #expect(line.text == "11 hosts, 1 down · 23 services, 1 crit, 1 warn, 1 unknown")
     }
 
+    /// Notifications switched off on the monitoring system itself are easy to forget, so every source line says so.
+    @Test func serverLineSaysWhenTheMonitorSendsNoNotifications() {
+        guard case .ok(var status) = status([]) else { return }
+        status.notificationsEnabled = false
+        let line = ServerLine(server: nagios, state: .ok(status))
+        #expect(line.parts == [.init("10 hosts up · 20 services OK · "), .init("notifications off", .warning)])
+        status.notificationsEnabled = true
+        #expect(ServerLine(server: nagios, state: .ok(status)).text == "10 hosts up · 20 services OK")
+        status.notificationsEnabled = nil
+        #expect(ServerLine(server: nagios, state: .ok(status)).text == "10 hosts up · 20 services OK")
+    }
+
     /// Problems on the monitored hosts don't make the monitor itself look broken.
     @Test func serverIconOnlyShowsWhetherTheMonitorAnswers() {
         let fine = ServerLine(server: nagios, state: status([]))

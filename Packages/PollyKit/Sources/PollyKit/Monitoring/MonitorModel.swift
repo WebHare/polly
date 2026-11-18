@@ -28,6 +28,8 @@ public final class MonitorModel {
     public private(set) var lastAttempts: [UUID: Date] = [:]
     public private(set) var lastSuccesses: [UUID: Date] = [:]
     public private(set) var lastPollCompletedAt: Date?
+    /// Changes of a monitoring system's own notifications that were sent but may not show in its status yet.
+    public private(set) var notificationRequests: [UUID: NotificationRequest] = [:]
     /// A server whose edit form the server list should open ("Edit server…" on the Unreachable screen).
     /// The server list clears it once the form is open.
     public var editRequest: UUID?
@@ -87,6 +89,7 @@ public final class MonitorModel {
         baselines = baselines.filter { active.contains($0.key) }
         lastAttempts = lastAttempts.filter { active.contains($0.key) }
         lastSuccesses = lastSuccesses.filter { active.contains($0.key) }
+        notificationRequests = notificationRequests.filter { active.contains($0.key) }
     }
 
     public func setShowDockIcon(_ show: Bool) throws {
@@ -119,6 +122,21 @@ public final class MonitorModel {
         try store.setNotifications(enabled, for: server.id)
     }
 
+    /// What the source detail shows for a server.
+    public func sourceDetail(for server: NagiosServer, now: Date = .now) -> SourceDetail {
+        SourceDetail(server: servers.first { $0.id == server.id } ?? server, state: states[server.id],
+                     lastSuccess: lastSuccesses[server.id], lastAttempt: lastAttempts[server.id],
+                     notificationRequest: notificationRequests[server.id], now: now)
+    }
+
+    /// Turns the notifications of the monitoring system itself on or off, for all its contacts. Sent once; the
+    /// source detail shows the change as pending until the server reports it.
+    public func setMonitorNotifications(_ enabled: Bool, for server: NagiosServer) async throws {
+        try await backend(for: server).setNotificationsEnabled(enabled)
+        notificationRequests[server.id] = NotificationRequest(enabled: enabled, at: .now)
+        await refresh(server)
+    }
+
     /// The backend for a server, with its password. Used by the UI for links and commands.
     public func backend(for server: NagiosServer) throws -> any MonitorBackend {
         try server.makeBackend(password: store.password(for: server.id), session: session,
@@ -142,6 +160,7 @@ public final class MonitorModel {
             baselines[server.id] = nil
             lastAttempts[server.id] = nil
             lastSuccesses[server.id] = nil
+            notificationRequests[server.id] = nil
         }
         reload()
         if let updated = enabledServer(server.id) {
@@ -252,6 +271,9 @@ public final class MonitorModel {
         lastAttempts[server.id] = .now
         guard case .ok(let status) = result else { return }
         lastSuccesses[server.id] = status.fetchedAt
+        if let request = notificationRequests[server.id], request.enabled == status.notificationsEnabled {
+            notificationRequests[server.id] = nil
+        }
         let changes = NotificationPolicy.changes(previous: baselines[server.id], current: status.problems,
                                                   hideServicesOnDownHosts: hideServicesOnDownHosts)
         baselines[server.id] = status.problems

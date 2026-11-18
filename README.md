@@ -30,10 +30,13 @@ mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
   Passwords are kept in the keychain unless you turn that off, in which case they go into the YAML file.
   You can edit the file by hand while Polly isn't running.
 - A server's status is read from `<base URL>/nagios/cgi-bin/statusjson.cgi`
-  (`programstatus` for the connection test; `hostcount`, `servicecount`, `servicelist` and `hostlist` for status).
+  (`programstatus` for the connection test; `hostcount`, `servicecount`, `servicelist`, `hostlist` and
+  `programstatus` for status).
 - Adding a server tests the connection first; if that fails you can still choose **Add Anyway**.
 - Click a problem to see the check output and to open the check on the server, open its action or notes
   link, acknowledge it or schedule downtime.
+- Click a source in the macOS menu bar panel to see when it was last refreshed and to turn the Nagios server's
+  own notifications on or off.
 - The macOS and iOS screens follow the Polly design. Parts of it that are drawn but do not work yet carry an
   orange PLACEHOLDER or PROTOTYPE tag (recheck, downtime presets, poll interval, TLS switch, the Alerts pane).
 - **About Polly** (macOS) and **Settings** (iOS) show the version and bundled changelog. Updates come from

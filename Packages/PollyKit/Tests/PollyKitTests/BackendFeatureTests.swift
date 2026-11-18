@@ -196,6 +196,30 @@ struct NagiosCommandFormTests {
         #expect(!NagiosCommandForm.isForm([:], for: .acknowledge, problem: target))
     }
 
+    /// The program-wide commands name no host or service (cgi/cmd.c, request_command_data).
+    @Test func recognizesTheProgramWideNotificationForms() {
+        let off = ["cmd_typ": "11", "cmd_mod": "2", "nagFormId": "abc"]
+        #expect(NagiosCommandForm.isForm(off, for: .disableNotifications))
+        #expect(!NagiosCommandForm.isForm(off, for: .enableNotifications))
+        #expect(!NagiosCommandForm.isForm(["cmd_typ": "11", "cmd_mod": "2", "host": "web1"], for: .disableNotifications))
+        #expect(!NagiosCommandForm.isForm([:], for: .enableNotifications))
+    }
+
+    /// Without `CMT_DISABLE_NOTIFICATIONS` in cgi.cfg the form has no author or comment, and none is sent.
+    @Test func programWideBodyOnlyCarriesACommentWhenTheFormAsksForOne() throws {
+        let plain = String(decoding: try NagiosCommandForm.body(.disableNotifications, form: ["nagFormId": "abc"], author: "alice"),
+                           as: UTF8.self)
+        #expect(plain == "cmd_mod=2&cmd_typ=11&nagFormId=abc")
+        let commented = String(decoding: try NagiosCommandForm.body(.enableNotifications,
+                                                                    form: ["com_author": "Alice Admin", "com_data": ""], author: "alice"),
+                               as: UTF8.self)
+        #expect(commented == "cmd_mod=2&cmd_typ=12&com_author=Alice%20Admin&com_data=Notifications%20turned%20on%20from%20Polly")
+        let prefilled = String(decoding: try NagiosCommandForm.body(.disableNotifications,
+                                                                    form: ["com_author": "", "com_data": "Maintenance window"],
+                                                                    author: "alice"), as: UTF8.self)
+        #expect(prefilled == "cmd_mod=2&cmd_typ=11&com_author=alice&com_data=Maintenance%20window")
+    }
+
     @Test func http200AloneIsNotConfirmation() throws {
         try NagiosCommandForm.validateResult("<DIV CLASS='infoMessage'>Your command request was successfully submitted to Nagios for processing.<BR></DIV>")
         for html in ["<html>Login</html>", "<div class='errorMessage'>Not authorized</div>",

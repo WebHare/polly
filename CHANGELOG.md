@@ -20,11 +20,15 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 - Edit a source: double-click it or use **Edit…** in its context menu on macOS; tap it on iPhone and iPad.
 - Duplicate a source to add a similar one: **Duplicate…** in its context menu, or swipe right on iPhone and iPad.
 - **Edit source…** on the "Polly can't reach" screen opens the form for that source.
+- Click a source in the macOS menu bar panel to see when it was last refreshed and when it refreshes next, and
+  to turn the Nagios server's own notifications on or off for everyone (after a confirmation).
+- A source line says "notifications off" when its Nagios server sends no notifications at all.
 
 ### Changed
 
 - Local macOS Debug and Release builds can share a fixed signing identity through an optional local configuration, avoiding repeated Keychain prompts after ad-hoc rebuilds.
 - Local macOS Debug builds are named **Polly DEV** and carry a yellow **DEV** ribbon on their app icon.
+- The menu bar panel's footer no longer says when the sources were last checked; each source's detail does.
 
 - Explain the ideas for shared on-call duties, escalation and billing in the macOS Team placeholder.
 - The Nagios servers and URLs Polly watches are now called sources, so they can't be mistaken for the

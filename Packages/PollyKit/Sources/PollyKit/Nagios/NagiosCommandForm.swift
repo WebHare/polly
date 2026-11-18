@@ -12,10 +12,16 @@ enum NagiosCommand: String, Sendable {
     case hostDowntime = "55"
     /// SCHEDULE_HOST_SVC_DOWNTIME: every service on the host, not the host itself.
     case hostServicesDowntime = "86"
+    /// DISABLE_NOTIFICATIONS: program-wide, for every host and service.
+    case disableNotifications = "11"
+    /// ENABLE_NOTIFICATIONS: program-wide, for every host and service.
+    case enableNotifications = "12"
 
     /// Whether the form and the command name a service.
     var hasService: Bool { self == .acknowledge || self == .serviceDowntime }
-    var isDowntime: Bool { self != .acknowledge && self != .acknowledgeHost }
+    var isDowntime: Bool { [.serviceDowntime, .hostDowntime, .hostServicesDowntime].contains(self) }
+    /// A program-wide command: it names no host or service.
+    var isProgramWide: Bool { self == .disableNotifications || self == .enableNotifications }
 
     /// The acknowledgement of this problem: of the service, or of the host for a host problem.
     static func acknowledge(_ problem: ServiceProblem) -> NagiosCommand { problem.isHost ? .acknowledgeHost : .acknowledge }
@@ -29,6 +35,8 @@ enum NagiosCommand: String, Sendable {
         case .serviceDowntime: "the downtime of \(problem.service)"
         case .hostDowntime: "the downtime of host \(problem.host)"
         case .hostServicesDowntime: "the downtime of the services on \(problem.host)"
+        case .disableNotifications: "turning notifications off"
+        case .enableNotifications: "turning notifications on"
         }
     }
 }
@@ -53,6 +61,31 @@ enum NagiosCommandForm {
             && form["service"] == (command.hasService ? problem.service : nil)
     }
 
+    /// Whether `form` is the form for the program-wide `command`: it echoes the command and names no host or service.
+    static func isForm(_ form: [String: String], for command: NagiosCommand) -> Bool {
+        command.isProgramWide && form["cmd_typ"] == command.rawValue && form["cmd_mod"] == "2"
+            && form["host"] == nil && form["service"] == nil
+    }
+
+    /// The POST body for a program-wide command. These take no options; only when `CMT_<command>` in cgi.cfg asks
+    /// for a comment does the form have author and comment fields, and then they are sent, with the form's default
+    /// comment or one of Polly's. Nagios checks the comment but doesn't pass it on to the core.
+    static func body(_ command: NagiosCommand, form: [String: String], author: String) throws -> Data {
+        var fields = ["cmd_typ": command.rawValue, "cmd_mod": "2"]
+        if let token = form["nagFormId"] { fields["nagFormId"] = token }
+        if let prefilled = form["com_data"] {
+            let comment = prefilled.isEmpty
+                ? "Notifications turned \(command == .enableNotifications ? "on" : "off") from Polly" : prefilled
+            let author = form["com_author"].flatMap { $0.isEmpty ? nil : $0 } ?? author
+            for value in [author, comment] where value.rangeOfCharacter(from: .controlCharacters) != nil || value.contains(";") {
+                throw BackendError("The author and comment cannot contain semicolons or control characters.")
+            }
+            fields["com_author"] = author
+            fields["com_data"] = comment
+        }
+        return Data(encode(fields).utf8)
+    }
+
     /// The POST body for a command. `form` is the fetched form, which supplies the CSRF token and the
     /// date notation the server uses.
     static func body(_ command: NagiosCommand, problem: ServiceProblem, input: CommandInput, form: [String: String]) throws -> Data {
@@ -71,6 +104,8 @@ enum NagiosCommandForm {
         case .acknowledge, .acknowledgeHost:
             fields["sticky_ack"] = "on"
             if input.notify { fields["send_notification"] = "on" }
+        case .disableNotifications, .enableNotifications:
+            throw BackendError("This command is not about a problem.")
         case .serviceDowntime, .hostDowntime, .hostServicesDowntime:
             for value in [input.start, input.end] {
                 guard !value.isEmpty, value.range(of: #"^[0-9/:T .-]+$"#, options: .regularExpression) != nil else {

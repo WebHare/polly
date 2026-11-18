@@ -170,6 +170,7 @@ The tests put the mock into a known state through endpoints that need no login:
 | `GET /mock/set?host=H&service=S&status=ok\|warning\|critical\|unknown` | Set one service's status |
 | `GET /mock/sethost?host=H&status=up\|down\|unreachable` | Set one host's status |
 | `GET /mock/config?csrf=on\|off&dateFormat=us\|euro\|iso8601\|strict-iso8601` | `csrf=off` behaves like Nagios 4.5.11 and older (no CSRF token, as on monitor.webhare.net); `dateFormat` is Nagios' `date_format` (monitor.webhare.net uses `iso8601`) |
+| `GET /mock/config?notifications=on\|off&notificationComment=0\|1\|2&systemCommands=on\|off` | `notifications` is the program-wide `enable_notifications`; `notificationComment` is `CMT_DISABLE_NOTIFICATIONS`/`CMT_ENABLE_NOTIFICATIONS` in `cgi.cfg` (0 no comment field, 1 optional, 2 required); `systemCommands=off` takes the user out of `authorized_for_system_commands` |
 | `/redirect/<path>` | Answers with a 302 redirect to `/<path>` |
 
 `URLMonitorNetworkTests` checks real websites, including badssl.com's broken certificates. It is skipped
