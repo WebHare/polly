@@ -5,7 +5,8 @@ is built the way it is, see [README.md](README.md).
 
 ## Requirements
 
-- Xcode 16 or later. Polly targets macOS 14+ and iOS 17+.
+- Xcode 27 or later. Polly targets macOS 14+ and iOS 17+. App Store Connect refuses iOS and iPadOS builds
+  made with an SDK older than iOS 27 from April 2027 (ITMS-90725), so uploads must use Xcode 27.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 - Node.js 18 or later, for the mock Nagios server. It has no npm dependencies.
 - For VS Code: we think you need the
@@ -527,6 +528,36 @@ for the options. They install fastlane into `vendor/bundle` on first use and nee
   (see "Continuous integration" in the README), because automatic signing on a clean runner would create a new
   development certificate in the team account on every run. Setting `POLLY_PROFILE_NAME` to the name of an
   installed App Store profile does the same locally.
+  - The inputs are `platform` (`both`, `ios` or `macos`), `groups` (comma-separated TestFlight groups; the
+    internal testers always get the build) and `external` (also distribute to the groups' external testers,
+    which submits the build for beta review).
+  - Testers see the build once App Store Connect has processed it, usually within half an hour.
+  - When a job fails, the gym build logs are attached to the run as an artifact.
+
+#### Renewing the TestFlight signing secrets
+
+WebHare's portal fills the secrets in the README table from its registry; after changing a registry value,
+run the portal's GitHub sync before rerunning the workflow.
+
+- **Certificate .p12**: one file with two identities, each a certificate *with its private key*:
+  "Apple Distribution: WebHare bv" (signs the apps) and "3rd Party Mac Developer Installer: WebHare bv" (signs
+  the macOS `.pkg`; Apple's site calls it Mac Installer Distribution).
+  - In Keychain Access, open **My Certificates**, select both certificate rows (collapsed, so each brings its
+    own key along) and export them as one .p12. Selecting rows in the flat list easily exports both keys but
+    only one certificate.
+  - Check the export before storing it; both names must be listed:
+    `openssl pkcs12 -legacy -in Certificates.p12 -nokeys | grep friendlyName`.
+  - Keychain encrypts .p12 files with RC2-40, which OpenSSL 3 only reads with `-legacy`. Without it, the error
+    ("unsupported", "MAC verification failed") looks like a wrong password, but isn't.
+  - If two separate exports each hold one identity, import both into a throwaway keychain
+    (`security create-keychain`, `security import`) and write one .p12 with
+    `security export -k <keychain> -t identities -f pkcs12`.
+- **Profiles**: an iOS "App Store Connect" profile (`.mobileprovision`) and a macOS "Mac App Store Connect"
+  profile (`.provisionprofile`) for `nl.webhare.polly`, both using the Apple Distribution certificate. They
+  expire after a year or when that certificate is replaced; the current ones expire on 16 November 2027.
+- **API key**: an App Store Connect API key with the App Manager role (the notarization key's Developer role
+  cannot upload builds). It can be created in App Store Connect → Users and Access → Integrations, without
+  developer.apple.com.
 
 Validate locally before a PR:
 

@@ -84,7 +84,7 @@ jobs:
 
   # Runs in parallel with linux and web; the build job below gates merging on all three.
   macos:
-    runs-on: macos-26
+    runs-on: xcode-27
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
       # (see README.md, "Continuous integration"). Without them the app is ad-hoc signed.
