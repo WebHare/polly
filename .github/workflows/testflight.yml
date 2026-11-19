@@ -29,7 +29,7 @@ concurrency:
 
 jobs:
   upload:
-    runs-on: macos-26
+    runs-on: xcode-27
     strategy:
       fail-fast: false
       matrix:
@@ -91,6 +91,13 @@ jobs:
 
           echo "$API_KEY" | base64 --decode > "$RUNNER_TEMP/asc-api-key.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/asc-api-key.p8" >> "$GITHUB_ENV"
+
+      # App Store Connect refuses builds made with an older SDK (ITMS-90725).
+      - name: Check the Xcode version
+        run: |
+          xcodebuild -version
+          MAJOR=$(xcodebuild -version | sed -n 's/^Xcode \([0-9]*\).*/\1/p')
+          if [ "$MAJOR" -lt 27 ]; then echo "::error::Xcode $MAJOR is too old; uploads need Xcode 27 or later"; exit 1; fi
 
       - name: Upload to TestFlight
         env:

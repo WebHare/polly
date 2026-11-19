@@ -64,6 +64,8 @@ passed. The Linux jobs cache their Swift debug builds per architecture, Swift ve
 The container build compiles the Swift dependencies in a separate layer, which CI keeps in the GitHub Actions
 cache (`--cache-from`/`--cache-to type=gha`), so only the Polly targets compile when the manifests are unchanged.
 The separate iOS workflow still builds for devices without signing.
+The macOS, iOS and TestFlight jobs run on GitHub's `xcode-27` runner image (Xcode 27, still a preview image),
+because App Store Connect requires the iOS 27 SDK or later for uploads from April 2027.
 
 The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
 through TestFlight and the App Store. CI does not publish web images or deploy the dashboard.

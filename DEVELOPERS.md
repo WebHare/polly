@@ -5,7 +5,8 @@ is built the way it is, see [README.md](README.md).
 
 ## Requirements
 
-- Xcode 16 or later. Polly targets macOS 14+ and iOS 17+.
+- Xcode 27 or later. Polly targets macOS 14+ and iOS 17+. App Store Connect refuses iOS and iPadOS builds
+  made with an SDK older than iOS 27 from April 2027 (ITMS-90725), so uploads must use Xcode 27.
 - [XcodeGen](https://github.com/yonaskolb/XcodeGen): `brew install xcodegen`
 - Node.js 18 or later, for the mock Nagios server. It has no npm dependencies.
 - For VS Code: we think you need the
