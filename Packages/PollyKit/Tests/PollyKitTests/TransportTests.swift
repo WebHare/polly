@@ -192,6 +192,69 @@ struct TransportTests {
         #expect(model.summary.entries.map(\.problem.host) == ["web1"])
     }
 
+    /// Two devices with one iCloud: a shared key-value store, and a shared credential store as iCloud Keychain.
+    @MainActor @Test func sourcesFollowAcrossDevicesThroughICloud() async throws {
+        let cloud = FakeCloudStore()
+        let keychain = InMemoryCredentialStore()
+        let mac = MonitorModel(store: try ServerStore(fileURL: nil, credentials: keychain), session: OfflineProtocol.session())
+        let phone = MonitorModel(store: try ServerStore(fileURL: nil, credentials: keychain), session: OfflineProtocol.session())
+        mac.connectCloud(cloud)
+        phone.connectCloud(cloud)
+
+        try mac.add(server, password: "pw")
+        phone.cloudDidChange()
+        #expect(phone.servers.map(\.id) == [server.id])
+        #expect(phone.servers[0].name == "Prod")
+        #expect(try phone.store.password(for: server.id) == "pw")
+        // The bell is per device: a source arriving from iCloud starts without one.
+        #expect(!phone.servers[0].notifications)
+
+        // Pausing stays on the device; disabling is shared.
+        try phone.setPaused(true, for: phone.servers[0])
+        try phone.setEnabled(false, for: phone.servers[0])
+        mac.cloudDidChange()
+        #expect(!mac.servers[0].isPaused)
+        #expect(!mac.servers[0].enabled)
+
+        try mac.delete(mac.servers[0])
+        phone.cloudDidChange()
+        #expect(phone.servers.isEmpty)
+    }
+
+    @MainActor @Test func aDeviceWithSyncOffKeepsItsListToItself() async throws {
+        let cloud = FakeCloudStore()
+        let mac = MonitorModel(store: try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore()),
+                               session: OfflineProtocol.session())
+        try mac.setSyncWithICloud(false)
+        mac.connectCloud(cloud)
+        try mac.add(server, password: nil)
+        #expect(cloud.values.isEmpty)
+        // Turning it on shares the list.
+        try mac.setSyncWithICloud(true)
+        #expect(!cloud.values.isEmpty)
+    }
+
+    /// A device that joins keeps its own copy of a source under the ID from iCloud, with its password.
+    @MainActor @Test func joiningAdoptsTheIDFromICloudAndKeepsThePassword() async throws {
+        let cloud = FakeCloudStore()
+        let mac = MonitorModel(store: try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore()),
+                               session: OfflineProtocol.session())
+        mac.connectCloud(cloud)
+        try mac.add(server, password: "mac-pw")
+
+        let phoneStore = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        var mine = server
+        mine.id = UUID()
+        mine.name = "Prod on the phone"
+        try phoneStore.add(mine, password: "phone-pw")
+        let phone = MonitorModel(store: phoneStore, session: OfflineProtocol.session())
+        phone.connectCloud(cloud)
+        #expect(phone.servers.map(\.id) == [server.id])
+        #expect(phone.servers[0].notifications)
+        #expect(try phone.store.password(for: server.id) == "phone-pw")
+        #expect(try phone.store.password(for: mine.id) == nil)
+    }
+
     @Test func preparingOnlyReadsAndSubmittingPostsOnce() async throws {
         let requests = Box<[URLRequest]>([])
         let bodies = Box<[String]>([])
@@ -532,4 +595,26 @@ struct TransportTests {
         await model.refreshAll()
         #expect(received.count == 1)
     }
+}
+
+/// iCloud key-value storage in memory.
+final class FakeCloudStore: CloudKeyValueStore {
+    var values: [String: String] = [:]
+    func string(forKey key: String) -> String? { values[key] }
+    func set(_ value: String?, forKey key: String) { values[key] = value }
+}
+
+/// Fails every request right away, for tests whose models refresh in the background: unlike `StubProtocol`, no
+/// shared handler that a later test could receive those requests on.
+final class OfflineProtocol: URLProtocol {
+    static func session() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [OfflineProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() { client?.urlProtocol(self, didFailWithError: URLError(.notConnectedToInternet)) }
+    override func stopLoading() {}
 }

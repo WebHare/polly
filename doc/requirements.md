@@ -440,6 +440,32 @@ sources that are not paused.
     **Show Log in Finder** on macOS.
     - Credentials never reach the log.
     - At 5 MB the log is moved to `polly-debug.log.1` and started anew.
+- The sources follow the user's other devices through iCloud ("Sync sources with iCloud", on by default; in the
+  Advanced settings on macOS and the Settings tab on iOS).
+  - Shared: each source's name, type, URL, username, whether it is disabled, and the order of the list.
+    Adding, editing, disabling, deleting and reordering (by editing `polly.yaml`) on one device shows on the
+    others.
+  - Not shared: pausing and the notification bell, which are per device, and the app settings (password
+    storage, Dock icon, traffic log, this switch itself).
+    - Why: pausing on the Mac shouldn't silence the phone, and a phone may want notifications a Mac doesn't.
+    - A source that arrives from another device has its bell off.
+  - Passwords stored in the keychain go to iCloud Keychain, so the other devices have them too. Passwords
+    stored in `polly.yaml` are not shared; the source arrives without one.
+    - Polly finds passwords in either place, so turning sync off or on never loses one; they move to match.
+  - A device that joins merges its own sources with those in iCloud. A source with the same type, URL and
+    username is the same source, so nothing is listed twice; it keeps this device's pause and bell, and the
+    name from iCloud.
+  - Changes on two devices to different sources are both kept. When both changed the same source, the change
+    that reached iCloud last wins. A source that one device deleted and another changed is kept.
+    - Why: a lost change is worse than a source that has to be deleted again.
+  - A source that arrives, or that points at another server now, is checked right away; its first answer
+    doesn't notify.
+  - Turning sync off keeps this device's list as it is and stops sharing it; turning it on again merges like a
+    joining device.
+  - When syncing fails, the text under the switch says why. A list in iCloud written by a newer Polly is left
+    alone.
+  - Development builds share a list of their own, separate from the released app's.
+  - Builds signed without iCloud (the Developer ID download, local builds without a profile) don't sync.
 - The menu bar panel size is window state, not a setting, and is not stored in `polly.yaml`.
 
 ## Web service

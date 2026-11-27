@@ -29,6 +29,9 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 - Click a source in the macOS menu bar panel to see when it was last refreshed and when it refreshes next, and
   to turn the Nagios server's own notifications on or off for everyone (after a confirmation).
 - A source line says "notifications off" when its Nagios server sends no notifications at all.
+- Sources follow you to your other Macs, iPhones and iPads through iCloud, with their passwords through iCloud
+  Keychain. On by default; turn it off with **Sync sources with iCloud** in the settings. Pausing and
+  notifications stay per device.
 - Pause a source with **Check in Polly** in its detail in the menu bar panel (or **Pause** in its context menu).
   A paused source stays listed but isn't checked or counted, and the menu bar icon shows a pause sign with the
   number of paused sources. Pausing survives a restart.

@@ -168,7 +168,7 @@ struct ServersScreen: View {
     }
 }
 
-/// Where passwords are kept and the debug log.
+/// Where passwords are kept, iCloud sync and the debug log.
 struct PhoneSettingsScreen: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
@@ -183,6 +183,14 @@ struct PhoneSettingsScreen: View {
                 Text(monitor.passwordStorage == .keychain
                      ? "Passwords are stored in the system keychain."
                      : "Passwords are stored unencrypted in polly.yaml; the keychain is not used.")
+                    .foregroundStyle(theme.muted)
+            }
+            Section {
+                Toggle("Sync sources with iCloud", isOn: syncBinding)
+                    .listRowBackground(theme.surface)
+            } footer: {
+                Text(SourceSync.settingText(on: monitor.syncWithICloud, passwordStorage: monitor.passwordStorage,
+                                            error: monitor.syncError))
                     .foregroundStyle(theme.muted)
             }
             Section {
@@ -223,6 +231,14 @@ struct PhoneSettingsScreen: View {
             } catch {
                 errorMessage = "Could not move passwords: \(error.localizedDescription)"
             }
+        }
+    }
+
+    private var syncBinding: Binding<Bool> {
+        Binding {
+            monitor.syncWithICloud
+        } set: { sync in
+            do { try monitor.setSyncWithICloud(sync) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
         }
     }
 

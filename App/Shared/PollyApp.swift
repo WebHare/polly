@@ -20,6 +20,12 @@ struct PollyApp: App {
             store = try! ServerStore(fileURL: nil, credentials: KeychainCredentialStore())
         }
         let monitor = MonitorModel(store: store)
+        // Debug builds share a list of their own, so test sources never reach the user's real devices.
+        #if DEBUG
+        monitor.connectICloud(key: "sources-debug")
+        #else
+        monitor.connectICloud()
+        #endif
         Notifier.shared.install(on: monitor)
         #if os(macOS)
         monitor.startPolling()

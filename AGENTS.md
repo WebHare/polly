@@ -80,13 +80,16 @@ instead of system colors and SF Symbols for status.
 
 - For installed local macOS builds without the WebHare bv team certificate, configure a stable certificate in the ignored `Local.xcconfig` for both Debug and Release; see [Signing](DEVELOPERS.md#signing). Build without command-line signing overrides. Keep official WebHare defaults in `Config/Signing.xcconfig`.
 - Only for compile checks without a signing certificate, build ad-hoc signed:
-  `xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual build`.
+  `xcodebuild -project Polly.xcodeproj -scheme Polly -destination 'platform=macOS' CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual POLLY_MACOS_ENTITLEMENTS=App/macOS/Polly.entitlements build`.
+  Without the last setting the build carries the iCloud entitlements, and macOS refuses to launch it.
   Do not install this fallback over a stably signed app: it changes its Keychain identity.
 - `xcodegen generate` with a newer XcodeGen adds `compatibilityVersion = "Xcode 14.0";` and drops the
   `productRefGroup` line in `project.pbxproj`. Revert those two lines before committing.
 - The app is sandboxed: settings are in
   `~/Library/Containers/nl.webhare.polly/Data/Library/Application Support/Polly/polly.yaml`. To run with test
-  data, launch once, quit, write a server pointing at the mock with `passwordStorage: file`, and relaunch.
+  data, launch once, quit, write a server pointing at the mock with `passwordStorage: file` and
+  `syncWithICloud: false`, and relaunch. Without the latter, test sources sync to the user's other devices
+  (Debug builds use a separate iCloud list, Release builds the real one).
   Put the file back afterwards; it is the user's real configuration.
 - Run the mock on a free port: `node mock/nagios-mock.mjs --port 8089 --no-rotate`, login `nagiosadmin` / `nagios`.
 - A new or changed app icon may not show in the Dock until the bundle is registered again:

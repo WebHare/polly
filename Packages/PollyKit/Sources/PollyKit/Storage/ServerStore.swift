@@ -10,6 +10,10 @@ public final class ServerStore: @unchecked Sendable {
     private let credentials: CredentialStore
     private var settings: PollySettings
     private let lock = NSRecursiveLock()
+    /// The iCloud list as this device last synced it, when there is no file to keep it next to.
+    private var memorySyncBase: String?
+    /// Passwords already moved into or out of iCloud Keychain to match the setting, this launch.
+    private var passwordsInPlace: Set<UUID> = []
 
     public init(fileURL: URL?, credentials: CredentialStore, initial: PollySettings = PollySettings()) throws {
         self.fileURL = fileURL
@@ -85,6 +89,18 @@ public final class ServerStore: @unchecked Sendable {
         try withSettings { $0.hideServicesOnDownHosts = hide }
     }
 
+    public var syncWithICloud: Bool { read(\.syncWithICloud) }
+
+    /// Turns syncing on or off, and moves the keychain passwords into or out of iCloud Keychain to match.
+    public func setSyncWithICloud(_ sync: Bool) throws {
+        try withSettings { $0.syncWithICloud = sync }
+        lock.withLock { passwordsInPlace = [] }
+        guard read(\.passwordStorage) == .keychain else { return }
+        for id in read({ $0.servers.map(\.server.id) }) {
+            try credentials.setSynchronizable(sync, for: id)
+        }
+    }
+
     /// Switches password storage and moves all existing passwords to the new location.
     /// Switching away from the keychain reads and removes the existing keychain items (this may prompt
     /// once); after that the keychain is no longer accessed.
@@ -108,7 +124,7 @@ public final class ServerStore: @unchecked Sendable {
             }
         case .keychain:
             for entry in read(\.servers) {
-                try credentials.setPassword(entry.password, for: entry.server.id)
+                try credentials.setPassword(entry.password, for: entry.server.id, synchronizable: read(\.syncWithICloud))
             }
             try withSettings { settings in
                 for index in settings.servers.indices {
@@ -129,7 +145,7 @@ public final class ServerStore: @unchecked Sendable {
     public func add(_ server: NagiosServer, password: String?) throws {
         let storage = read(\.passwordStorage)
         if storage == .keychain {
-            try credentials.setPassword(password, for: server.id)
+            try credentials.setPassword(password, for: server.id, synchronizable: read(\.syncWithICloud))
         }
         try withSettings {
             $0.servers.append(.init(server: server, password: storage == .file ? Self.nonEmpty(password) : nil))
@@ -139,7 +155,7 @@ public final class ServerStore: @unchecked Sendable {
     public func update(_ server: NagiosServer, password: String?) throws {
         let storage = read(\.passwordStorage)
         if storage == .keychain {
-            try credentials.setPassword(password, for: server.id)
+            try credentials.setPassword(password, for: server.id, synchronizable: read(\.syncWithICloud))
         }
         try withSettings { settings in
             guard let index = settings.servers.firstIndex(where: { $0.server.id == server.id }) else { return }
@@ -183,8 +199,69 @@ public final class ServerStore: @unchecked Sendable {
             (settings.passwordStorage, settings.servers.first { $0.server.id == id }?.password)
         }
         switch storage {
-        case .keychain: return try credentials.password(for: id)
+        case .keychain:
+            // Passwords stored before syncing (or with it off on this device) move to match the setting, once.
+            let sync = read(\.syncWithICloud)
+            if lock.withLock({ passwordsInPlace.insert(id).inserted }) {
+                try? credentials.setSynchronizable(sync, for: id)
+            }
+            return try credentials.password(for: id)
         case .file: return filePassword
+        }
+    }
+
+    // MARK: - iCloud
+
+    private var syncBaseURL: URL? {
+        fileURL?.deletingLastPathComponent().appending(path: "polly-sync.yaml")
+    }
+
+    /// The iCloud list as this device last synced it; nil before the first sync.
+    public func syncBase() -> [SyncedSource]? {
+        let text = lock.withLock { () -> String? in
+            guard let url = syncBaseURL else { return memorySyncBase }
+            return try? String(contentsOf: url, encoding: .utf8)
+        }
+        return text.flatMap { try? SyncedSource.parse($0) }
+    }
+
+    public func setSyncBase(_ base: [SyncedSource]?) throws {
+        try lock.withLock {
+            let text = base.map(SyncedSource.render)
+            guard let url = syncBaseURL else { memorySyncBase = text; return }
+            if let text {
+                try Data(text.utf8).write(to: url, options: .atomic)
+            } else if FileManager.default.fileExists(atPath: url.path(percentEncoded: false)) {
+                try FileManager.default.removeItem(at: url)
+            }
+        }
+    }
+
+    /// Takes over the merged list: sources keep their password, also when a source got the ID it has in iCloud.
+    public func applySync(_ merge: SourceSync.Merge) throws {
+        let storage = read(\.passwordStorage)
+        let sync = read(\.syncWithICloud)
+        if storage == .keychain {
+            for (old, new) in merge.renamed {
+                // The password in iCloud Keychain under the new ID, if any, is the one the other devices use.
+                if try credentials.password(for: new) == nil, let password = try credentials.password(for: old) {
+                    try credentials.setPassword(password, for: new, synchronizable: sync)
+                }
+                try credentials.setPassword(nil, for: old)
+            }
+        }
+        try withSettings { settings in
+            let entries = Dictionary(settings.servers.map { ($0.server.id, $0) }, uniquingKeysWith: { first, _ in first })
+            let oldID = Dictionary(merge.renamed.map { ($1, $0) }, uniquingKeysWith: { first, _ in first })
+            settings.servers = merge.servers.map { server in
+                let entry = entries[server.id] ?? oldID[server.id].flatMap { entries[$0] }
+                return PollySettings.Server(server: server, password: storage == .file ? entry?.password : nil)
+            }
+        }
+        if storage == .keychain {
+            for id in merge.deleted {
+                try? credentials.setPassword(nil, for: id)
+            }
         }
     }
 
