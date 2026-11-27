@@ -87,7 +87,7 @@ jobs:
     runs-on: xcode-27
     env:
       # Developer ID signing and notarization only happen when these secrets are configured
-      # (see README.md, "Continuous integration"). Without them the app is ad-hoc signed.
+      # (see DEVELOPERS.md, "Continuous integration"). Without them the app is ad-hoc signed.
       # The secrets and variables are maintained by WebHare's portal (webhare_portal, data/github-projects.yaml).
       HAS_SIGNING: ${{ secrets.MACOS_CERTIFICATE_P12 != '' && secrets.NOTARY_API_KEY != '' }}
       TEAM_ID: MF6WPNPK5H

@@ -5,8 +5,9 @@ needs on top of the other documentation:
 
 - `doc/requirements.md`: every expected feature, business rule, caveat and product decision (see
   [Requirements](#requirements)).
-- `README.md`: the layout and the implementation and architecture decisions (project structure, libraries, how
-  a backend is built).
+- `README.md`: what Polly is and the types of source it can monitor, for users.
+- `doc/architecture.md`: the layout and the implementation and architecture decisions (project structure,
+  libraries, how a backend is built).
 - `DEVELOPERS.md`: building, running and testing the app and the mock server.
 
 Read the relevant section before changing behaviour, and update it in the same change when a decision changes.
