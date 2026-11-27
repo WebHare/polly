@@ -261,10 +261,10 @@ private struct ServersPane: View {
             .buttonStyle(.borderless)
             .foregroundStyle(theme.faint)
             .help(server.notifications ? "Notifications are on for this source" : "Notifications are off for this source")
-            Toggle("Monitor \(server.name)", isOn: enabledBinding(for: server))
+            Toggle("Enable \(server.name)", isOn: enabledBinding(for: server))
                 .labelsHidden()
                 .toggleStyle(PollyToggleStyle())
-                .help(server.enabled ? "Pause monitoring this source" : "Resume monitoring this source")
+                .help(server.enabled ? "Disable this source: Polly leaves it out of the menu bar panel" : "Enable this source")
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 12)
@@ -275,6 +275,9 @@ private struct ServersPane: View {
             Button("Duplicate…") { duplicate(server) }
             Divider()
             Button("Refresh") { Task { await monitor.refresh(server) } }
+            if server.enabled {
+                Button(server.isPaused ? "Resume" : "Pause") { setPaused(!server.isPaused, for: server) }
+            }
             Button("Delete", role: .destructive) { delete(server) }
         }
     }
@@ -373,6 +376,10 @@ private struct ServersPane: View {
             }
             do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func setPaused(_ paused: Bool, for server: NagiosServer) {
+        do { try monitor.setPaused(paused, for: server) } catch { errorMessage = error.localizedDescription }
     }
 
     private func enabledBinding(for server: NagiosServer) -> Binding<Bool> {

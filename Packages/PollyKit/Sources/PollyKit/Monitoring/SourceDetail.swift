@@ -35,8 +35,10 @@ public struct SourceDetail: Equatable, Sendable {
     public static let switchingTimeout: TimeInterval = 150
 
     /// When Polly last refreshed the source: "14 s ago", "Failed 1 min ago · last answer 10 min ago", "Not yet"
-    /// or "Paused".
+    /// or "Disabled". A paused source says when it last answered.
     public var lastRefresh: String
+    /// Not checked, so there is no next refresh, and its notification switch is unknown.
+    public var paused: Bool
     /// nil when the source doesn't report its notification switch, or hasn't answered.
     public var notifications: Notifications?
 
@@ -44,8 +46,13 @@ public struct SourceDetail: Equatable, Sendable {
                 notificationRequest: NotificationRequest?, now: Date) {
         func ago(_ date: Date) -> String { DurationFormatting.ago(now.timeIntervalSince(date)) }
         notifications = nil
+        paused = server.enabled && server.isPaused
         guard server.enabled else {
-            lastRefresh = "Paused"
+            lastRefresh = "Disabled"
+            return
+        }
+        guard !paused else {
+            lastRefresh = lastSuccess.map(ago) ?? "Not yet"
             return
         }
         switch state {

@@ -197,6 +197,11 @@ struct ServerStateIcon: View {
         case .paused:
             Image(systemName: "pause.circle").font(.system(size: size - 2)).foregroundStyle(theme.faint)
                 .frame(width: size, height: size)
+                .accessibilityLabel("Paused")
+        case .disabled:
+            Image(systemName: "minus.circle").font(.system(size: size - 2)).foregroundStyle(theme.faint)
+                .frame(width: size, height: size)
+                .accessibilityLabel("Disabled")
         case .reachable: StatusIcon(severity: .ok, size: size)
         case .unreachable: StatusIcon(severity: .critical, size: size)
         case .loading: ProgressView().controlSize(.small).frame(width: size, height: size)

@@ -4,7 +4,7 @@ import Foundation
 /// and one line with what it reports, each problem count a part of its own so it can carry a status icon.
 public struct ServerLine: Equatable, Sendable {
     public enum Icon: Equatable, Sendable {
-        case paused, loading, reachable, unreachable
+        case disabled, paused, loading, reachable, unreachable
     }
 
     public struct Part: Equatable, Sendable {
@@ -25,11 +25,17 @@ public struct ServerLine: Equatable, Sendable {
 
     public var text: String { parts.map(\.text).joined() }
 
-    public init(server: NagiosServer, state: MonitorModel.ServerState?) {
+    public init(server: NagiosServer, state: MonitorModel.ServerState?, now: Date = .now,
+                timeZone: TimeZone = .current, locale: Locale = .current) {
         tint = nil
         guard server.enabled else {
+            icon = .disabled
+            parts = [Part("Disabled")]
+            return
+        }
+        if let since = server.pausedSince {
             icon = .paused
-            parts = [Part("Monitoring paused")]
+            parts = [Part("Paused since \(DurationFormatting.moment(since, now: now, timeZone: timeZone, locale: locale)) · not checked")]
             return
         }
         switch state {

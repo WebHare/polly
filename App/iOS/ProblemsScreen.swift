@@ -49,7 +49,7 @@ struct ProblemsScreen: View {
 
     /// Every enabled server is still loading for the first time, so there is nothing to say yet.
     private var isWaitingForFirstAnswer: Bool {
-        let enabled = monitor.servers.filter(\.enabled)
+        let enabled = monitor.servers.filter(\.isActive)
         return !enabled.isEmpty && enabled.allSatisfy { server in
             switch monitor.states[server.id] {
             case .loading, nil: true
@@ -168,7 +168,8 @@ struct ProblemsScreen: View {
             switch summary.screen {
             case .empty:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
-                Text("Add a Nagios server, a URL or a feed and Polly starts polling right away.")
+                Text(summary.allDisabled ? "Turn a source on in Sources, or add one, and Polly starts polling right away."
+                                         : "Add a Nagios server, a URL or a feed and Polly starts polling right away.")
                     .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
                 Menu("Add source…") {
                     Button("Nagios Server…", systemImage: "server.rack") { adding = .nagios }
@@ -180,7 +181,7 @@ struct ProblemsScreen: View {
                 .padding(.top, 10)
             case .waiting:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
-                Text(summary.isPaused ? "Turn a source back on and Polly starts checking again." : "Waiting for the first answer.")
+                Text(summary.isPaused ? "Resume a source in Sources and Polly starts checking again." : "Waiting for the first answer.")
                     .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
             case .unreachable:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)

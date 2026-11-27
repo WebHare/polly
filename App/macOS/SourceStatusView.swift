@@ -96,11 +96,12 @@ struct SourceStatusView: View {
                 Text("Polly could not read this source. Check its settings or try Refresh.")
                     .foregroundStyle(theme.muted)
             case .waiting:
-                Text(summary.isPaused ? "Resume monitoring in Sources to check this source."
+                Text(summary.isPaused ? "Paused. Switch on Check in Polly in its detail in the menu bar panel to check it again."
                                       : "Waiting for the first answer.")
                     .foregroundStyle(theme.muted)
             case .empty:
-                Text("This source is no longer configured.").foregroundStyle(theme.muted)
+                Text(summary.allDisabled ? "This source is disabled. Turn it on in Sources to check it."
+                                         : "This source is no longer configured.").foregroundStyle(theme.muted)
             }
         }
         .padding(18)

@@ -99,12 +99,20 @@ public enum SettingsFile {
             if let header = entry.authHeader, let problem = SourceCredentials.problem(withHeaderName: header) {
                 throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has an invalid authHeader: \(problem)")
             }
+            var pausedSince: Date?
+            if let text = entry.pausedSince {
+                guard let date = ISO8601DateFormatter().date(from: text) else {
+                    throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has an unreadable pausedSince '\(text)'")
+                }
+                pausedSince = date
+            }
             let server = NagiosServer(
                 id: entry.id.flatMap(UUID.init(uuidString:)) ?? UUID(),
                 name: entry.name ?? url.host() ?? urlText,
                 baseURL: url,
                 username: entry.username ?? "",
                 enabled: entry.enabled ?? true,
+                pausedSince: pausedSince,
                 kind: kind,
                 notifications: entry.notifications ?? false,
                 authHeader: entry.authHeader
@@ -124,6 +132,7 @@ public enum SettingsFile {
             var authHeader: String?
             var password: String?
             var enabled: Bool?
+            var pausedSince: String?
             var notifications: Bool?
             var id: String?
         }
@@ -193,6 +202,9 @@ public enum SettingsFile {
                 out += "    password: \(scalar(password))\n"
             }
             out += "    enabled: \(server.enabled)\n"
+            if let pausedSince = server.pausedSince {
+                out += "    pausedSince: \(ISO8601DateFormatter().string(from: pausedSince))\n"
+            }
             out += "    notifications: \(server.notifications)\n"
             // UUIDs are hex and dashes: always safe as a plain scalar.
             out += "    id: \(server.id.uuidString.lowercased())\n"

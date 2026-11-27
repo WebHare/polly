@@ -27,9 +27,15 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 - Click a source in the macOS menu bar panel to see when it was last refreshed and when it refreshes next, and
   to turn the Nagios server's own notifications on or off for everyone (after a confirmation).
 - A source line says "notifications off" when its Nagios server sends no notifications at all.
+- Pause a source with **Check in Polly** in its detail in the menu bar panel (or **Pause** in its context menu).
+  A paused source stays listed but isn't checked or counted, and the menu bar icon shows a pause sign with the
+  number of paused sources. Pausing survives a restart.
 
 ### Changed
 
+- The source switch in Settings now disables a source: it disappears from the menu bar panel and the Problems tab
+  instead of showing as paused.
+- The Nagios notification switch in a source's detail says more clearly that it affects every user of that Nagios.
 - Local macOS Debug and Release builds can share a fixed signing identity through an optional local configuration, avoiding repeated Keychain prompts after ad-hoc rebuilds.
 - Local macOS Debug builds are named **Polly DEV** and carry a yellow **DEV** ribbon on their app icon.
 - The menu bar panel's footer no longer says when the sources were last checked; each source's detail does.

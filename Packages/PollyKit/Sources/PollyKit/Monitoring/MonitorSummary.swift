@@ -15,7 +15,7 @@ public struct ProblemEntry: Identifiable, Hashable, Sendable {
 /// Everything the overview shows, derived from the servers and their latest state: which screen, the
 /// problems grouped by severity, Polly's mood and the sentence that goes with it.
 public struct MonitorSummary: Sendable {
-    /// `waiting`: servers are configured, but none has answered yet or all of them are paused.
+    /// `empty`: no servers, or all of them disabled. `waiting`: none has answered yet or all of them are paused.
     public enum Screen: Sendable { case empty, problems, unreachable, waiting, ok }
     public enum Mood: Sendable { case ok, warning, critical, unreachable }
 
@@ -37,16 +37,26 @@ public struct MonitorSummary: Sendable {
     public private(set) var lastFetched: Date?
     /// The first server that could not be reached, with its error.
     public private(set) var unreachable: (server: NagiosServer, message: String)?
+    /// Enabled servers that are paused: listed, but not checked or counted.
+    public private(set) var paused = 0
+    /// There are servers, but every one of them is disabled.
+    public let allDisabled: Bool
     private let hasServers: Bool
-    /// Servers that are switched on, and how many of those have a result.
+    /// Servers that are enabled and not paused, and how many of those have a result.
     private var watching = 0
     private var checked = 0
 
     @MainActor
     public init(servers: [NagiosServer], states: [UUID: MonitorModel.ServerState], hideServicesOnDownHosts: Bool = true) {
-        hasServers = !servers.isEmpty
+        // Disabled servers are left out as if they weren't configured.
+        hasServers = servers.contains(where: \.enabled)
+        allDisabled = !servers.isEmpty && !hasServers
         var entries: [ProblemEntry] = []
         for server in servers where server.enabled {
+            guard !server.isPaused else {
+                paused += 1
+                continue
+            }
             watching += 1
             switch states[server.id] {
             case .ok(let status):
@@ -75,7 +85,7 @@ public struct MonitorSummary: Sendable {
         }
     }
 
-    /// Every configured server is switched off.
+    /// Every enabled server is paused.
     public var isPaused: Bool { hasServers && watching == 0 }
 
     /// All problems in display order.
@@ -97,11 +107,13 @@ public struct MonitorSummary: Sendable {
     public var mood: Mood {
         if hostsDown > 0 || count(.critical) > 0 { return .critical }
         if count(.warning) > 0 { return .warning }
-        if !hasServers { return .ok }
+        // Paused servers are not a reason to worry: the menu bar shows how many there are instead.
+        if !hasServers || isPaused { return .ok }
         return count(.unknown) > 0 || unreachable != nil || checked == 0 ? .unreachable : .ok
     }
 
     public var headline: String {
+        if allDisabled { return "Polly has nothing to watch: all sources are disabled" }
         if !hasServers { return "Polly has nothing to watch yet" }
         if hostsDown > 0 { return "Polly is squawking: \(hostsDown) \(hostsDown == 1 ? "host" : "hosts") down" }
         if count(.critical) > 0 { return "Polly is squawking: \(count(.critical)) critical" }

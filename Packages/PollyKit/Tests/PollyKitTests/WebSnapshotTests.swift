@@ -32,10 +32,17 @@ struct WebSnapshotTests {
     @Test func emptyPausedWaitingUnreachableAndPendingAreDistinct() {
         #expect(WebSnapshot(servers: [], states: [:], now: now).state == .empty)
         var paused = first
-        paused.enabled = false
+        paused.pausedSince = now - 60
         let snapshot = WebSnapshot(servers: [paused], states: [:], now: now)
         #expect(snapshot.state == .paused)
         #expect(snapshot.servers[0].state == .paused)
+        // A disabled source is left out, as if it wasn't configured.
+        var disabled = second
+        disabled.enabled = false
+        let withDisabled = WebSnapshot(servers: [paused, disabled], states: [:], now: now)
+        #expect(withDisabled.servers.map(\.id) == [paused.id])
+        #expect(withDisabled.state == .paused)
+        #expect(WebSnapshot(servers: [disabled], states: [:], now: now).state == .empty)
         #expect(WebSnapshot(servers: [first], states: [:], now: now).state == .waiting)
         #expect(WebSnapshot(servers: [first], states: [first.id: .failed("secret")], now: now).state == .unreachable)
         #expect(WebSnapshot(servers: [first], states: [first.id: status(pending: 1)], now: now).state == .waiting)

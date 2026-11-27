@@ -104,7 +104,8 @@ extension TransportTests {
         _ = try await client.fetchStatus()
 
         let text = try String(contentsOf: file, encoding: .utf8)
-        #expect(text.contains("X-API-Key"))
+        // Linux Foundation writes the header name as "X-Api-Key"; header names don't depend on case.
+        #expect(text.lowercased().contains("x-api-key"))
         #expect(text.contains("<redacted>"))
         #expect(text.contains("application/json"))
         #expect(!text.contains("k3y-value"))

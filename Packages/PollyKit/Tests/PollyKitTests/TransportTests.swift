@@ -150,11 +150,46 @@ struct TransportTests {
         #expect(failed.entries.isEmpty)
         #expect(failed.lastFetched == nil)
 
-        try model.setEnabled(false, for: server)
+        try model.setPaused(true, for: server)
         #expect(model.summary(for: server.id).isPaused)
         #expect(model.summary(for: server.id).screen == .waiting)
+        #expect(model.servers[0].pausedSince != nil)
+        try model.setEnabled(false, for: server)
+        #expect(model.summary(for: server.id).allDisabled)
+        #expect(model.summary(for: server.id).screen == .empty)
         try model.delete(server)
         #expect(model.summary(for: server.id).screen == .empty)
+    }
+
+    /// A paused source is not polled and keeps the time of its last answer; resuming checks it right away.
+    @MainActor @Test func pausingStopsPollingUntilResumed() async throws {
+        let requests = Box(0)
+        StubProtocol.handler = { request in
+            requests.value += 1
+            return statusJSON(for: request, problems: #"{"web1":{"Disk":{"status":4}}}"#, hostsUp: 3)
+        }
+        defer { StubProtocol.handler = nil }
+        let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
+        try store.add(server, password: "test-password")
+        let model = MonitorModel(store: store, session: StubProtocol.session())
+        await model.refreshAll()
+        let answered = try #require(model.lastSuccesses[server.id])
+
+        try model.setPaused(true, for: server)
+        #expect(model.states[server.id] == nil)
+        #expect(model.lastSuccesses[server.id] == answered)
+        let before = requests.value
+        await model.refreshAll()
+        await model.refresh(server)
+        #expect(requests.value == before)
+        #expect(model.summary.paused == 1)
+        #expect(model.summary.entries.isEmpty)
+
+        try model.setPaused(false, for: server)
+        #expect(model.servers[0].pausedSince == nil)
+        await model.refreshAll()
+        #expect(requests.value > before)
+        #expect(model.summary.entries.map(\.problem.host) == ["web1"])
     }
 
     @Test func preparingOnlyReadsAndSubmittingPostsOnce() async throws {

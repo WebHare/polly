@@ -16,16 +16,22 @@ public struct NagiosServer: Identifiable, Hashable, Sendable {
     /// When set, the password is sent as the value of this header instead of HTTP Basic authentication, and
     /// `username` is not used.
     public var authHeader: String?
-    /// When false the server is kept but not polled ("monitoring paused").
+    /// When false the server is kept in the settings but left out everywhere else: not polled, not shown in the
+    /// overview ("disabled", the switch in Settings).
     public var enabled: Bool
+    /// When set, the server is shown in the overview but not polled or counted, since that moment ("paused", the
+    /// switch in the source detail).
+    public var pausedSince: Date?
     public var kind: BackendKind
     /// Show local notifications when this server's problems change.
     public var notifications: Bool
 
     public init(id: UUID = UUID(), name: String, baseURL: URL, username: String, enabled: Bool = true,
-                kind: BackendKind = .nagios, notifications: Bool = false, authHeader: String? = nil) {
+                pausedSince: Date? = nil, kind: BackendKind = .nagios, notifications: Bool = false,
+                authHeader: String? = nil) {
         self.id = id
         self.enabled = enabled
+        self.pausedSince = pausedSince
         self.name = name
         self.baseURL = baseURL
         self.username = username
@@ -38,6 +44,11 @@ public struct NagiosServer: Identifiable, Hashable, Sendable {
     public func credentials(password: String?) -> SourceCredentials {
         SourceCredentials(username: authHeader == nil ? username : "", password: password, headerName: authHeader)
     }
+
+    public var isPaused: Bool { pausedSince != nil }
+
+    /// Polled and counted: enabled and not paused.
+    public var isActive: Bool { enabled && pausedSince == nil }
 
     /// The statusjson.cgi endpoint for this server.
     public var statusJSONURL: URL {

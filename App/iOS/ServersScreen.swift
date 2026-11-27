@@ -1,7 +1,7 @@
 import PollyKit
 import SwiftUI
 
-/// The configured servers with their state: add, edit, duplicate, pause, delete, and turn notifications on or off.
+/// The configured servers with their state: add, edit, duplicate, enable, pause, delete, and turn notifications on or off.
 struct ServersScreen: View {
     @Environment(MonitorModel.self) private var monitor
     @Environment(\.pollyTheme) private var theme
@@ -42,6 +42,10 @@ struct ServersScreen: View {
                             Button("Edit…", systemImage: "pencil") { edit(server) }
                             Button("Duplicate…", systemImage: "plus.square.on.square") { duplicate(server) }
                             Button("Refresh", systemImage: "arrow.clockwise") { Task { await monitor.refresh(server) } }
+                            if server.enabled {
+                                Button(server.isPaused ? "Resume" : "Pause",
+                                       systemImage: server.isPaused ? "play" : "pause") { setPaused(!server.isPaused, for: server) }
+                            }
                             Button("Delete", systemImage: "trash", role: .destructive) { delete(server) }
                         }
                         .swipeActions(edge: .leading) {
@@ -103,7 +107,7 @@ struct ServersScreen: View {
             .buttonStyle(.borderless)
             .tint(server.notifications ? theme.tileGlyph : theme.faint)
             .padding(.top, 4)
-            Toggle("Monitor \(server.name)", isOn: enabledBinding(for: server))
+            Toggle("Enable \(server.name)", isOn: enabledBinding(for: server))
                 .labelsHidden()
                 .tint(.pollyAccent)
         }
@@ -118,6 +122,10 @@ struct ServersScreen: View {
             }
             do { try monitor.setNotifications(enabled, for: server) } catch { errorMessage = error.localizedDescription }
         }
+    }
+
+    private func setPaused(_ paused: Bool, for server: NagiosServer) {
+        do { try monitor.setPaused(paused, for: server) } catch { errorMessage = error.localizedDescription }
     }
 
     private func enabledBinding(for server: NagiosServer) -> Binding<Bool> {
