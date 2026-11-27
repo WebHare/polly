@@ -18,6 +18,8 @@ settings:
     SWIFT_VERSION: "6.0"
     MARKETING_VERSION: "0.2.0"
     CURRENT_PROJECT_VERSION: "2"
+    # "local" shows a build line in the app; the TestFlight/App Store lane (fastlane) builds with "appstore".
+    POLLY_BUILD_CHANNEL: local
 
 targets:
   Polly:
@@ -41,6 +43,7 @@ targets:
       properties:
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        PollyBuildChannel: $(POLLY_BUILD_CHANNEL)
         NSHumanReadableCopyright: Copyright © 2026 WebHare b.v. GNU GPL version 2.
         # Required for Mac App Store uploads.
         LSApplicationCategoryType: public.app-category.developer-tools

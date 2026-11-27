@@ -61,6 +61,8 @@ def beta(options, platform:, sdk:, destination:)
   xcargs, export_options = signing(platform)
   number = build_number(options, platform)
   xcargs << "CURRENT_PROJECT_VERSION=#{number}" if number
+  # Hides the "Local build" line that local builds show.
+  xcargs << "POLLY_BUILD_CHANNEL=appstore"
 
   file = build_app(
     project: File.join(ROOT, "Polly.xcodeproj"),
