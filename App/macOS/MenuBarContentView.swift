@@ -264,8 +264,18 @@ private struct PopoverContent: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(theme.footer)
+            if let line = BuildInfo.current.localBuildLine() {
+                Text(line)
+                    .font(.system(size: 10).monospacedDigit())
+                    .foregroundStyle(theme.faint)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity)
+                    .padding(.horizontal, 10)
+                    .padding(.bottom, 6)
+            }
         }
+        .background(theme.footer)
     }
 
     private func footNote(_ summary: MonitorSummary, now: Date) -> String {

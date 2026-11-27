@@ -180,6 +180,12 @@ struct PhoneSettingsScreen: View {
             Section("About Polly") {
                 Text(AppRelease.versionLabel(info: Bundle.main.infoDictionary ?? [:]))
                     .listRowBackground(theme.surface)
+                if let line = BuildInfo.current.localBuildLine() {
+                    Text(line)
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(theme.muted)
+                        .listRowBackground(theme.surface)
+                }
                 NavigationLink("What's New") { WhatsNewView() }
                     .listRowBackground(theme.surface)
             }
