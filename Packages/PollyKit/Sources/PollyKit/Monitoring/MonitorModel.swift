@@ -34,6 +34,18 @@ public final class MonitorModel {
     /// The server list clears it once the form is open.
     public var editRequest: UUID?
 
+    /// What an opened "Add to Polly" link asks for; the settings (macOS) or the Sources tab (iOS) shows it and clears it.
+    public enum LinkRequest: Equatable, Sendable {
+        /// Open the add form, filled in from the link.
+        case add(AddSourceLink)
+        /// The link is for a source the user already has.
+        case existing(UUID)
+        /// The link can't be used; the message says why.
+        case invalid(String)
+    }
+
+    public var linkRequest: LinkRequest?
+
     @ObservationIgnored public let store: ServerStore
     /// `polly-debug.log` next to polly.yaml; nil for an in-memory store. Only passed to backends while
     /// `debugLog` is on.
@@ -72,6 +84,27 @@ public final class MonitorModel {
             if case .ok(let status) = state { return total + status.problems.count }
             if case .failed = state { return total + 1 }
             return total
+        }
+    }
+
+    // MARK: - Links
+
+    /// Handles an "Add to Polly" link. Never adds anything itself: it asks for the add form, or points at the
+    /// source the user already has (same type, URL and username).
+    public func open(_ url: URL) {
+        do {
+            let link = try AddSourceLink.parse(url)
+            let address = ServerURLParser.parse(link.url, keepPath: !link.kind.urlIsMonitoringSystem)?.baseURL
+            let username = link.headerName == nil ? (link.username ?? "") : ""
+            if let existing = servers.first(where: {
+                $0.kind == link.kind && $0.baseURL == address && $0.username == username
+            }) {
+                linkRequest = .existing(existing.id)
+            } else {
+                linkRequest = .add(link)
+            }
+        } catch {
+            linkRequest = .invalid(error.localizedDescription)
         }
     }
 

@@ -8,6 +8,8 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 - Feeds: a new source type that shows what a server lists as needing attention, such as SLA tickets, as
   problems next to Nagios and URLs. The JSON format is described in `doc/feed-format.md`.
+- "Add to Polly" links (`polly-monitor://add?…`) let web applications open Polly's add form, filled in. See
+  `doc/add-to-polly.md`.
 - Sources can authenticate with a custom header, such as `X-API-Key` or `Authorization: Bearer …`, instead of
   a username and password.
 - Click a source in macOS Settings to see its live status, problems and check details. Source rows now show status or connection errors, with a separate edit button.

@@ -99,6 +99,12 @@ URLs.
 - Redirects are not followed. A feed that breaks the format is refused as a whole, with the reason.
 - Building a feed? See [doc/feed-format.md](doc/feed-format.md).
 
+## "Add to Polly" links
+
+Web applications can offer an **Add to Polly** button that opens Polly's add form, filled in. Polly never adds a
+source from a link by itself, and a link never contains a password or token. To build such a button, see
+[doc/add-to-polly.md](doc/add-to-polly.md).
+
 ## Settings file
 
 Polly keeps its sources and settings in one file, `polly.yaml`. On macOS that is

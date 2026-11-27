@@ -24,6 +24,12 @@ struct MenuBarLabel: View {
                     openWindow(id: WindowID.servers)
                     NSApplication.shared.activate()
                 }
+                // The settings show what the link asks for: the add form, the existing source or the problem.
+                appDelegate.openLink = { [openWindow, monitor] url in
+                    monitor.open(url)
+                    openWindow(id: WindowID.servers)
+                    NSApplication.shared.activate()
+                }
             }
     }
 }

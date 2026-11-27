@@ -49,6 +49,10 @@ targets:
         LSApplicationCategoryType: public.app-category.developer-tools
         # Only the system's HTTPS/TLS, which is exempt from export compliance documentation.
         ITSAppUsesNonExemptEncryption: false
+        # "Add to Polly" links from web pages (see AddSourceLink).
+        CFBundleURLTypes:
+          - CFBundleURLName: nl.webhare.polly.add
+            CFBundleURLSchemes: [polly-monitor]
         # Nagios servers are often internal and plain http.
         NSAppTransportSecurity:
           NSAllowsArbitraryLoads: true

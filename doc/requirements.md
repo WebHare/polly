@@ -91,6 +91,23 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
   - Opens the add form prefilled with the source's type, URL, username, password and bell; the name gets
     " copy" appended (or stays empty when it was just the host). The copy is a new source, switched on.
+- A web page can offer an "Add to Polly" link (`polly-monitor://add?type=…&url=…`), described in
+  [add-to-polly.md](add-to-polly.md), on macOS, iPhone and iPad.
+  - It opens the add form filled in with the type, URL, name, username or sign-in header; macOS opens the
+    Settings window on the Sources pane, iOS the Sources tab.
+  - It never adds a source by itself: the user sees the form, enters the password or header value, tests and
+    adds.
+    - Why: any web page can open such a link.
+  - A link with a password, token or other secret, or a URL with `user:password@`, is refused with an
+    explanation.
+    - Why: links end up in browser history, server logs and screenshots.
+  - Only `http` and `https` URLs are accepted, so a web page can't point Polly at files on the computer.
+  - Unknown types, invalid header names and links longer than 2048 characters are refused with the reason;
+    unknown parameters are ignored.
+  - When the user already has a source with the same type, URL and username, Polly shows it instead (macOS:
+    its status; iOS: its edit form).
+  - The scheme is `polly-monitor`, not `polly`, which other apps may claim.
+  - Not handled yet: a page can't tell whether Polly is installed ([issue #90](https://github.com/WebHare/polly/issues/90)).
 - New sources are added at the end of the list. The list order is the order in `polly.yaml`; reordering is done
   by editing the file.
 - The user can delete a source (context menu; swipe left on iOS).
