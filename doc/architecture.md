@@ -221,7 +221,9 @@ doc/feed-format.md          The JSON format of a Polly feed, for whoever builds 
 
 ### Signing and sandbox
 
-- **App Sandbox with only `network.client`** on macOS.
+- **App Sandbox with `network.client`** on macOS, plus read access to files the user chooses and app-scoped
+  bookmarks, for feed files. A chosen file's security-scoped bookmark is stored with the source (`bookmark:` in
+  `polly.yaml`, base64) and resolved on every read, so the permission survives restarts.
 - **WebHare bv signing by default**, with an optional ignored `Local.xcconfig` for stable local macOS signing in both Debug and Release; see [Signing](../DEVELOPERS.md#signing). Ad-hoc signatures change on every build, which makes macOS treat each build as a new app and re-prompt for Keychain access.
 
 ### Tooling

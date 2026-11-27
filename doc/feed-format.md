@@ -82,3 +82,13 @@ of seconds are allowed.
   date) is refused as a whole, with a message naming the item, so mistakes are visible rather than quietly
   dropped.
 - Feeds are read-only: Polly can't acknowledge or snooze items.
+
+## Feed files
+
+On a Mac, Polly can also read a feed from a JSON file, for a script that writes the list instead of a server
+that serves it. Choose the file with **Browse…** in the add-source form.
+
+- Write the whole file at once (write a temporary file and rename it), so Polly never reads half a document.
+- Rewrite it regularly, also when nothing changed. Polly uses the file's modification time to tell whether the
+  writer is still running: a file that hasn't changed for longer than the source's limit (15 minutes unless
+  set otherwise) is reported as stale.

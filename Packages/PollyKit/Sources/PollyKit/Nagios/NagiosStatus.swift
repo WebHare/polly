@@ -186,6 +186,8 @@ public struct ServerStatus: Equatable, Sendable {
     /// Set for a source that counts items instead of hosts and services (a feed). Its items are then counted in
     /// `services`, and `hosts` stays empty.
     public var itemNoun: ItemNoun? = nil
+    /// When the source's data was last written, for a feed file: its modification time.
+    public var updatedAt: Date? = nil
 
     public var severity: Severity {
         if hosts.down + hosts.unreachable > 0 || services.critical > 0 { return .critical }
