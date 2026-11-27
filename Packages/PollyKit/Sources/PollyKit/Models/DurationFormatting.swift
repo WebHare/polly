@@ -21,6 +21,13 @@ public enum DurationFormatting {
         interval <= 0 ? "due now" : "in \(coarse(interval))"
     }
 
+    /// How far off a deadline is: "in 6d", "2h overdue", or "due now" in the minute it passes.
+    public static func due(_ date: Date, now: Date) -> String {
+        let interval = date.timeIntervalSince(now)
+        if abs(interval) < 60 { return "due now" }
+        return interval > 0 ? "in \(short(interval))" : "\(short(-interval)) overdue"
+    }
+
     private static func coarse(_ interval: TimeInterval) -> String {
         let seconds = Int(max(0, interval))
         if seconds < 60 { return "\(seconds) s" }

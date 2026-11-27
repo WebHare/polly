@@ -75,6 +75,37 @@ struct MockIntegrationTests {
         #expect(try await problem("HTTP")?.downtimeDepth == 1)
     }
 
+    private func feed(header: String? = nil, password: String = "nagios") -> any MonitorBackend {
+        let server = NagiosServer(name: "Feed", baseURL: base.appending(path: "polly/feed.json"),
+                                  username: header == nil ? "nagiosadmin" : "", kind: .feed, authHeader: header)
+        return try! server.makeBackend(password: password, session: URLSession(configuration: .ephemeral))
+    }
+
+    /// The mock's feed lists its problems as items, so the feed client is tested over real HTTP.
+    @Test func feedListsTheMocksProblems() async throws {
+        try await control("/mock/reset")
+        let quiet = try await feed().fetchStatus()
+        #expect(quiet.problems.isEmpty)
+        #expect(quiet.services.ok > 0)
+        #expect(quiet.summaryLine.hasSuffix("checks OK"))
+
+        try await control("/mock/set?host=\(host)&service=HTTP&status=critical")
+        try await control("/mock/sethost?host=db1.example.com&status=down")
+        let busy = try await feed(header: "X-API-Key", password: "polly-token").fetchStatus()
+        let http = try #require(busy.problems.first { $0.host == host && $0.service == "HTTP" })
+        #expect(http.severity == .critical)
+        #expect(http.id == "\(host)/HTTP")
+        #expect(http.due != nil)
+        #expect(http.link?.path() == "/nagios/cgi-bin/extinfo.cgi")
+        #expect(http.fields.first?.label == "Host")
+        #expect(busy.problems.contains { $0.host == "db1.example.com" && $0.service == "Host down" })
+
+        _ = try await feed(header: "Authorization", password: "Bearer polly-token").fetchStatus()
+        await #expect(throws: FeedError.http(401, "unauthorized")) {
+            try await feed(header: "X-API-Key", password: "wrong").fetchStatus()
+        }
+    }
+
     /// What monitor.webhare.net does: no CSRF token in the form at all, and ISO dates.
     @Test func serverWithoutCSRFTokenAndWithISODates() async throws {
         try await control("/mock/reset")

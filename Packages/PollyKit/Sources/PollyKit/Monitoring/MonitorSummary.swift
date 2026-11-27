@@ -30,6 +30,8 @@ public struct MonitorSummary: Sendable {
     public private(set) var hosts = 0
     public private(set) var hostsDown = 0
     public private(set) var services = 0
+    /// Items of sources that count items instead of hosts and services (feeds).
+    public private(set) var items = 0
     /// How many enabled servers answered their last refresh, and when the latest of those answers came.
     public private(set) var answeredServers = 0
     public private(set) var lastFetched: Date?
@@ -51,7 +53,11 @@ public struct MonitorSummary: Sendable {
                 checked += 1
                 hosts += status.hosts.total
                 hostsDown += status.hosts.down + status.hosts.unreachable
-                services += status.services.total
+                if status.itemNoun != nil {
+                    items += status.services.total
+                } else {
+                    services += status.services.total
+                }
                 answeredServers += 1
                 lastFetched = max(lastFetched ?? status.fetchedAt, status.fetchedAt)
                 let shown = hideServicesOnDownHosts ? status.problems.hidingServicesOnDownHosts : status.problems
@@ -118,9 +124,14 @@ public struct MonitorSummary: Sendable {
         headline.split(separator: ": ", maxSplits: 1).map(String.init)
     }
 
-    /// "218 hosts and 930 services OK on 2 sources. Last checked 9 s ago." for the all-quiet screen.
+    /// "218 hosts and 930 services OK on 2 sources. Last checked 9 s ago." for the all-quiet screen, with
+    /// ", 930 services and 16 items" when a feed answered too.
     public func quietDetail(now: Date) -> String {
-        var text = "\(hosts) hosts and \(services) services OK on \(answeredServers) \(answeredServers == 1 ? "source" : "sources")."
+        var counted: [String] = []
+        if hosts > 0 || services > 0 || items == 0 { counted += ["\(hosts) hosts", "\(services) services"] }
+        if items > 0 { counted.append("\(items) \(ItemNoun.items(items))") }
+        let what = counted.count > 1 ? counted.dropLast().joined(separator: ", ") + " and " + counted.last! : counted[0]
+        var text = "\(what) OK on \(answeredServers) \(answeredServers == 1 ? "source" : "sources")."
         if let lastFetched {
             text += " Last checked \(DurationFormatting.ago(now.timeIntervalSince(lastFetched)))."
         }

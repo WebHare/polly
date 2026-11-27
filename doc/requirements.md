@@ -4,14 +4,15 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
 
 ## General
 
-- Polly monitors Nagios servers and websites from macOS (menu bar), iPhone and iPad.
+- Polly monitors Nagios servers, websites and feeds from macOS (menu bar), iPhone and iPad.
   - Requires macOS 14 / iOS 17 or later.
   - Polly polls straight from the device; nothing goes through a Polly server.
-- A user can monitor two types of source:
+- A user can monitor three types of source:
   - Why "source" and not "server": the hosts Polly reports on are servers too, so "server" was ambiguous.
   - **Nagios server**: status is read from the server's Nagios installation (Nagios 4.4 or newer).
   - **URL**: Polly checks a website itself, with no monitoring system behind it.
-  - Everywhere a source is shown, its type ("Nagios" or "URL") is shown next to its name.
+  - **Feed**: a server lists what needs attention (such as SLA tickets) in Polly's JSON feed format.
+  - Everywhere a source is shown, its type ("Nagios", "URL" or "Feed") is shown next to its name.
 - Polly never changes anything on a monitored server, except when the user explicitly confirms an
   acknowledgement or downtime.
 - The screens follow the Polly design, in light and dark.
@@ -25,12 +26,13 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - macOS: **Add** above the source list opens the "Add a source" modal, with a Type control.
     - Cancel closes the modal without saving; adding successfully closes it and updates the list.
     - The form cannot be edited or dismissed while the connection test is running.
-  - iOS: **Add** (a menu: Nagios Server… / URL…) on the Sources tab, or **Add source…** in the empty states; the
-    form opens as a sheet titled "Add Nagios Server" or "Add URL".
+  - iOS: **Add** (a menu: Nagios Server… / URL… / Feed…) on the Sources tab, or **Add source…** in the empty
+    states; the form opens as a sheet titled "Add Nagios Server", "Add URL" or "Add Feed".
   - The URL placeholder and the explanation adapt to the type:
     - Nagios: the `statusjson.cgi` URL that will be read.
     - URL: that the host resolves, that the URL answers and (https only) that the certificate is valid for at
       least two more weeks.
+    - Feed: that it is a JSON feed in Polly's format, read from the URL as entered.
   - The URL comes first in the form, before **Name**.
     - Why: the name, username and password are derived from the URL, so filling it in first fills the rest.
   - Example URLs in the URL field are shown as plain placeholder text, not as links.
@@ -38,6 +40,16 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - **Name** is optional; it defaults to the URL's host name.
   - Username and password are never required. For a URL they are only needed for a page behind HTTP Basic
     authentication.
+  - "Sign in with" chooses **Username & password** (HTTP Basic) or **Custom header**, for every type of source.
+    - With a custom header the user enters the header's name (such as `X-API-Key` or `Authorization`) and its
+      value (such as the key, or `Bearer <token>`); the value is sent with every request instead of Basic
+      authentication.
+      - Why: feeds and proxies in front of a server often take an API key or bearer token, not a login.
+    - The value is a secret: it is stored like a password (keychain or `polly.yaml`), never shown in the debug log,
+      and the name is kept as `authHeader` in `polly.yaml`.
+    - A name that isn't a valid header, or one the connection sets itself (such as `Host` or
+      `Content-Length`), is refused with an explanation.
+    - Pasting a URL with `user:pass@` switches back to username and password.
   - On macOS the form says where the password will be stored (keychain or `polly.yaml`).
 - The URL field is paste-friendly:
   - Pasting `https://user:pass@host/...` moves the (percent-decoded) username and password into their own
@@ -46,7 +58,7 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - The fragment is always removed.
   - Nagios: query and anything from `/nagios` onwards are removed, so a pasted link to the Nagios web UI just
     works. The user enters the base URL; Polly appends `/nagios/cgi-bin/statusjson.cgi`.
-  - URL: the path and query are kept as entered.
+  - URL and feed: the path and query are kept as entered.
 - Adding a source tests the connection first.
   - **Test connection** can also be run on its own before adding; changing the URL or type resets the result.
   - A failed test shows the error with **Add anyway** (and **Retry** on iOS).
@@ -197,9 +209,11 @@ sources.
 - Shows the check output and long output (selectable).
 - Shows the duration with its start time, how long ago the last check was, and when the next check is.
   - A value the server didn't send is shown as "Unknown".
-- Shows the actions the source type supports (Nagios: all of them; URL: none).
+- Shows the deadline ("in 6d" / "2h overdue", with the date) and the extra facts a feed sends for an item.
+- Shows the actions the source type supports (Nagios: all of them; URL: none; feed: only opening it).
   - **Acknowledge…** (disabled when already acknowledged) and **Schedule downtime…**.
   - **Open in Nagios**: the check's page in the Nagios web UI; the host's page for a host problem.
+  - **Open in browser** (feed): the item's own page, or the feed's page when the item has none.
   - **Related link**: the action or notes link configured for the check.
   - If the password can't be read, the detail says why instead of showing no actions.
 - The password is only read when a problem is opened.
@@ -284,6 +298,30 @@ sources.
 - An untrusted certificate doesn't hide whether the server answers: the HTTP check continues anyway.
   - Except when a username or password is configured: credentials are never sent to a server with an untrusted
     certificate, and HTTP reports that as the reason it didn't connect.
+
+## Feeds
+
+- A feed is a JSON document at a URL, in the format described in [feed-format.md](feed-format.md), that lists the
+  items that need attention.
+  - Why: things that aren't checks, such as SLA tickets in the WebHare portal, need attention too; the server
+    that knows them publishes the list, and Polly needs no knowledge of tickets.
+- The server decides what is wrong and how bad it is: every listed item is a problem with its own severity
+  (critical, warning or unknown). Items that are fine are only counted.
+  - Why: the deadlines and priorities are business rules of the server; when it raises an item's severity as a
+    deadline nears, Polly notifies about it like any severity change.
+- An item is shown like a service: its group where the host goes, its title where the service goes, its summary
+  and details as the check output, its age since it got its current severity, and ACK when acknowledged.
+- The source line counts with the feed's own word: "16 tickets OK", or "16 tickets, 1 crit, 1 warn". The
+  all-quiet screen counts feed items separately from hosts and services ("10 hosts, 20 services and 16 items OK").
+- Items are told apart by their id, so a renamed item is the same problem and doesn't notify again.
+- Feeds are read-only: no acknowledgements, downtimes or monitoring notification switch.
+- Only http and https links of a feed are opened; other links are ignored.
+  - Why: a feed must not make Polly open files or other apps.
+- A feed Polly can't use makes the source unreachable with the reason: not JSON, an unknown format version
+  (asking the user to update Polly), a missing or invalid field (naming the item), a duplicate id, or the feed's
+  own `error` message. An item with a mistake is not quietly left out.
+- Redirects are not followed, so the credentials stay with the server that was entered.
+- The web service does not support feeds yet; it stays Nagios-only.
 
 ## Notifications
 
@@ -401,7 +439,8 @@ sources.
 - The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
   - The file is read once at startup and never rewritten. Restart to apply changes.
   - The list uses `sources:`. Legacy `servers:` is accepted without rewriting; combining both is an error.
-  - Only `passwordStorage: file` and Nagios sources are accepted, including paused entries.
+  - Only `passwordStorage: file` and Nagios sources are accepted, including paused entries. A source with
+    `authHeader` sends its password in that header.
   - HTTP(S) addresses must have a host and contain no embedded credentials or fragment. Pasted Nagios UI
     paths are normalized using the same endpoint rules as the native form.
   - Missing or invalid files, duplicate server IDs and unsupported settings prevent startup with a message

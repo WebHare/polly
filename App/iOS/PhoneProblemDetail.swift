@@ -131,6 +131,14 @@ private struct ProblemDetailContent: View {
                 fact("Last check", problem.lastCheck.map { DurationFormatting.ago(context.date.timeIntervalSince($0)) })
                 theme.surfaceDivider.frame(height: 1)
                 fact("Next check", problem.nextCheck.map { DurationFormatting.until($0.timeIntervalSince(context.date)) })
+                if let due = problem.due {
+                    theme.surfaceDivider.frame(height: 1)
+                    fact("Due", "\(DurationFormatting.due(due, now: context.date)) · \(due.pollyClock)")
+                }
+                ForEach(Array(problem.fields.enumerated()), id: \.offset) { _, field in
+                    theme.surfaceDivider.frame(height: 1)
+                    fact(field.label, field.value)
+                }
                 theme.surfaceDivider.frame(height: 1)
                 fact("Source", server.kind.displayName)
             }
@@ -163,12 +171,12 @@ private struct ProblemDetailContent: View {
                 }
                 tile("arrow.clockwise", "Recheck", placeholder: true) {}
                 if capabilities.contains(.links) {
-                    tile("arrow.up.right", "Open in \(server.kind.displayName)") {
+                    tile("arrow.up.right", server.kind.openLabel) {
                         run { openURL(try monitor.backend(for: server).checkURL(for: problem)) }
                     }
                 }
             }
-            if capabilities.contains(.links) {
+            if capabilities.contains(.relatedLinks) {
                 Button("Related link ↗") {
                     run { openURL(try await monitor.backend(for: server).relatedURL(for: problem)) }
                 }

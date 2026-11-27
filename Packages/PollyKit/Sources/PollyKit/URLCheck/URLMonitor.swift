@@ -19,6 +19,8 @@ public struct URLMonitor: MonitorBackend {
     public var url: URL
     public var username: String
     public var password: String?
+    /// When set, `password` is sent as this header instead of Basic authentication.
+    public var authHeader: String?
     /// Its configuration is used for a fresh session per check: only a new connection shows the certificate.
     public var session: URLSession
     public var wireLog: WireLog?
@@ -36,6 +38,7 @@ public struct URLMonitor: MonitorBackend {
 
     public init(server: NagiosServer, password: String?, session: URLSession = .shared) {
         self.init(url: server.baseURL, username: server.username, password: password, session: session)
+        authHeader = server.authHeader
     }
 
     /// Succeeds unless a check is critical; a certificate that expires soon doesn't stop adding the URL.
@@ -86,7 +89,8 @@ public struct URLMonitor: MonitorBackend {
 
     /// One GET over a new connection, so the TLS handshake (and with it the certificate) is always seen.
     private func checkHTTP() async -> (http: CheckResult, certificate: CheckResult) {
-        let sendsCredentials = !username.isEmpty || password != nil
+        let credentials = SourceCredentials(username: authHeader == nil ? username : "", password: password, headerName: authHeader)
+        let sendsCredentials = !credentials.isEmpty
         let recorder = TLSRecorder(warningPeriod: certificateWarningPeriod, acceptUntrusted: !sendsCredentials)
         let configuration = session.configuration
         configuration.urlCache = nil
@@ -96,10 +100,7 @@ public struct URLMonitor: MonitorBackend {
         defer { checkSession.finishTasksAndInvalidate() }
 
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        if sendsCredentials {
-            let token = Data("\(username):\(password ?? "")".utf8).base64EncodedString()
-            request.setValue("Basic \(token)", forHTTPHeaderField: "Authorization")
-        }
+        credentials.apply(to: &request)
 
         let started = Date()
         let http: CheckResult

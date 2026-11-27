@@ -5,12 +5,16 @@ import FoundationNetworking
 
 /// Debug log of everything sent to and received from the servers, one JSON object per line.
 ///
-/// Credentials are never written: the `Authorization` value is replaced by `Basic <redacted>`. The file is
+/// Credentials are never written: the `Authorization` value is replaced by `Basic <redacted>`, and the value of
+/// every other header that isn't known to be harmless (such as a custom `X-API-Key`) by `<redacted>`. The file is
 /// owner-only and is rotated to `<name>.1` once it grows beyond `maxBytes`. Thread-safe.
 public final class WireLog: Sendable {
     public let fileURL: URL
     private let maxBytes: Int
     private let lock = NSLock()
+
+    /// Headers whose values are written as they are.
+    private static let plainHeaders: Set<String> = ["accept", "content-type", "content-length", "user-agent"]
 
     public init(fileURL: URL, maxBytes: Int = 5_000_000) {
         self.fileURL = fileURL
@@ -21,7 +25,7 @@ public final class WireLog: Sendable {
     /// are ignored: a debug log must never break monitoring.
     public func record(request: URLRequest, status: Int?, body: Data?, error: String?) {
         var headers = request.allHTTPHeaderFields ?? [:]
-        for (name, value) in headers where name.caseInsensitiveCompare("Authorization") == .orderedSame {
+        for (name, value) in headers where !Self.plainHeaders.contains(name.lowercased()) {
             headers[name] = value.hasPrefix("Basic ") ? "Basic <redacted>" : "<redacted>"
         }
         let entry: [String: Any] = [

@@ -1,7 +1,8 @@
 # Polly
 
 A Nagios monitoring app for macOS (menu bar), iPhone and iPad, written in Swift/SwiftUI. It can also check
-websites itself, without a monitoring system behind them.
+websites itself, without a monitoring system behind them, and show any list of things that need attention
+(tickets, merge requests) that a server publishes as a [Polly feed](doc/feed-format.md).
 
 For a TV, browser or tablet, the standalone read-only **Polly web dashboard** runs on macOS or Linux.
 Build it locally with Docker Compose or Swift; see [installation and upgrades](DEVELOPERS.md#linux-container-installation).
@@ -19,10 +20,12 @@ Packages/PollyKit/          Platform-independent logic + unit tests
   Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
   Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
   URLCheck/                 URLMonitor: checks a URL's DNS, HTTP answer and certificate from the device
+  Feed/                     FeedClient + FeedDocument: reads a Polly feed (doc/feed-format.md)
   Monitoring/               MonitorBackend (what a monitoring system has to offer), MonitorModel (polling),
                             NotificationPolicy, ServerFormModel (add/edit-server form logic)
 .mcp.json                   Enables XcodeBuildMCP for Claude Code in this project
-mock/nagios-mock.mjs        Mock Nagios server for testing (see DEVELOPERS.md)
+mock/nagios-mock.mjs        Mock Nagios server for testing, which also serves a Polly feed (see DEVELOPERS.md)
+doc/feed-format.md          The JSON format of a Polly feed, for whoever builds one
 ```
 
 - Sources (Nagios servers and URLs) and settings are stored in one YAML file, `Application Support/Polly/polly.yaml`. On macOS

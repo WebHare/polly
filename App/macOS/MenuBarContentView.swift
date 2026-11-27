@@ -197,7 +197,7 @@ private struct PopoverContent: View {
     @ViewBuilder private func heroDetail(_ summary: MonitorSummary) -> some View {
         switch summary.screen {
         case .empty:
-            Text("Add a Nagios server or a URL and Polly starts polling right away.")
+            Text("Add a Nagios server, a URL or a feed and Polly starts polling right away.")
         case .unreachable:
             Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
         case .waiting:

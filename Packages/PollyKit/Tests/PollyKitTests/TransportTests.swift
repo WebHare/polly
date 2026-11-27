@@ -93,7 +93,7 @@ final class Box<Value>: @unchecked Sendable {
     }
 }
 
-private func statusJSON(for request: URLRequest, problems: String = "{}", hostsUp: Int = 1,
+func statusJSON(for request: URLRequest, problems: String = "{}", hostsUp: Int = 1,
                         notifications: Bool? = nil) -> StubProtocol.Response {
     let query = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "query" }?.value
     let data = switch query {
@@ -109,7 +109,7 @@ private func statusJSON(for request: URLRequest, problems: String = "{}", hostsU
 /// The stub handler is shared state, so everything that uses it runs one test at a time.
 @Suite(.serialized)
 struct TransportTests {
-    private let server = NagiosServer(name: "Prod", baseURL: URL(string: "https://nagios.test")!, username: "alice",
+    let server = NagiosServer(name: "Prod", baseURL: URL(string: "https://nagios.test")!, username: "alice",
                                       notifications: true)
     private let target = ServiceProblem(host: "web1", service: "HTTP", severity: .critical)
     private var client: NagiosClient { NagiosClient(server: server, password: "s3cret", session: StubProtocol.session()) }
