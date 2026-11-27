@@ -1,7 +1,8 @@
 # Developing Polly
 
-How to build and run Polly and the mock Nagios server it is tested against. For what Polly does and why it
-is built the way it is, see [README.md](README.md).
+How to build and run Polly and the mock Nagios server it is tested against. For what Polly does, see
+[README.md](README.md) and [doc/requirements.md](doc/requirements.md); for how it is built and why, see
+[doc/architecture.md](doc/architecture.md).
 
 ## Requirements
 
@@ -182,7 +183,7 @@ POLLY_NETWORK_TESTS=1 swift test --package-path Packages/PollyKit --filter URLMo
 ```
 
 CI runs the unit tests and builds the macOS app ([.github/workflows/build.yml](.github/workflows/build.yml),
-see "Continuous integration" in the README), and checks that the iOS app compiles
+see [Continuous integration](#continuous-integration)), and checks that the iOS app compiles
 ([.github/workflows/build-ios.yml](.github/workflows/build-ios.yml)). Linux amd64 CI runs the full portable
 suite and real HTTP mock integration with `scripts/test-linux.py`. Run the native mock integration and
 external network tests locally when you change the client; those are not enabled in macOS CI.
@@ -191,7 +192,7 @@ external network tests locally when you change the client; those are not enabled
 
 The mock is developed together with the client. When a real Nagios turns out to behave differently, first
 change the mock to match, watch the integration tests fail, and then fix the client. To find out what a real
-server sends, turn on `debugLog` (see "Debugging" in the README) and compare its requests and responses with
+server sends, turn on `debugLog` (see "Debugging" in [doc/architecture.md](doc/architecture.md#debugging)) and compare its requests and responses with
 the mock's. [doc/nagios-protocol.md](doc/nagios-protocol.md) describes what Polly sends and expects; update it
 too.
 
@@ -487,6 +488,56 @@ For a manually running demo, use the same start instructions with a private copy
 port and is absent from normal Compose. Stop your demo with `docker compose` using the same two files and
 `down`. On macOS without Docker, use the Swift start and hashing commands in [Web service](#web-service).
 
+## Continuous integration
+
+`.github/workflows/build.yml` tests PollyKit and PollyWeb on Linux amd64 and arm64 runners, including
+real Nagios HTTP integration and a build/start/restart test of the production container. A pinned
+Playwright/Chromium installation checks the dashboard, keyboard access, layouts and recovery. The macOS job
+runs in parallel and tests both Swift packages, real HTTP/source recovery, the iOS Simulator build and a
+universal macOS Release build. The required `build` job fails unless the Linux, browser and macOS jobs all
+passed. The Linux jobs cache their Swift debug builds per architecture, Swift version and `Package.resolved`.
+The container build compiles the Swift dependencies in a separate layer, which CI keeps in the GitHub Actions
+cache (`--cache-from`/`--cache-to type=gha`), so only the Polly targets compile when the manifests are unchanged.
+The separate iOS workflow still builds for devices without signing.
+The macOS, iOS and TestFlight jobs run on GitHub's `xcode-27` runner image (Xcode 27, still a preview image),
+because App Store Connect requires the iOS 27 SDK or later for uploads from April 2027.
+
+The macOS `Polly-<version>-<run>.dmg` artifact is for testing, not distribution. Apple apps are distributed
+through TestFlight and the App Store. CI does not publish web images or deploy the dashboard.
+
+Without signing secrets the app is **ad-hoc signed**. It runs, but macOS refuses to open it after downloading:
+open it once via System Settings → Privacy & Security → **Open Anyway**, or run
+`xattr -dr com.apple.quarantine /Applications/Polly.app`. Each build also counts as a new app for the keychain,
+so expect keychain prompts after updating (or set `passwordStorage: file`).
+
+With these repository secrets and variables the app and DMG are signed with a **Developer ID** and notarized,
+so they open without warnings. WebHare's portal (`webhare_portal`, `data/github-projects.yaml`) maintains them
+for `WebHare/polly`, the same way as for `WebHare/agent-radar`; set them by hand only on a fork.
+
+| Name                         | Kind     | Contents                                                                   |
+| ---------------------------- | -------- | -------------------------------------------------------------------------- |
+| `MACOS_CERTIFICATE_P12`      | secret   | base64 of the exported "Developer ID Application" certificate + key (.p12) |
+| `MACOS_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                      |
+| `NOTARY_API_KEY`             | secret   | base64 of an App Store Connect API key (.p8) with the Developer role       |
+| `NOTARY_API_KEY_ID`          | variable | that key's Key ID                                                          |
+| `NOTARY_API_ISSUER_ID`       | variable | the Issuer ID shown above the App Store Connect API keys list              |
+
+Only the team's Account Holder can create a Developer ID Application certificate.
+
+The **TestFlight** workflow (started by hand, see [TestFlight](#testflight)) uploads the iOS and macOS builds and uses:
+
+| Name                            | Kind     | Value                                                                                             |
+| ------------------------------- | -------- | ------------------------------------------------------------------------------------------------- |
+| `APPSTORE_CERTIFICATE_P12`      | secret   | base64 of one .p12 with the Apple Distribution and Mac Installer Distribution certificates + keys |
+| `APPSTORE_CERTIFICATE_PASSWORD` | secret   | password of that .p12                                                                             |
+| `APPSTORE_PROFILE_IOS`          | secret   | base64 of the "App Store Connect" profile for `nl.webhare.polly` (.mobileprovision)               |
+| `APPSTORE_PROFILE_MACOS`        | secret   | base64 of the "Mac App Store Connect" profile for `nl.webhare.polly` (.provisionprofile)          |
+| `APPSTORE_API_KEY`              | secret   | base64 of an App Store Connect API key (.p8) with the App Manager role                            |
+| `APPSTORE_API_KEY_ID`           | variable | that key's Key ID                                                                                 |
+| `APPSTORE_API_ISSUER_ID`        | variable | the Issuer ID (the same as `NOTARY_API_ISSUER_ID`)                                                |
+
+The certificates and profiles expire after a year and have to be renewed by hand.
+
 ## Versions, changelog and distribution
 
 `project.yml` owns `MARKETING_VERSION` (currently 0.2.0) and `CURRENT_PROJECT_VERSION` (2).
@@ -525,7 +576,7 @@ for the options. They install fastlane into `vendor/bundle` on first use and nee
 - **From GitHub**: Actions → **TestFlight** → Run workflow (or `gh workflow run testflight.yml -f platform=both`)
   builds the chosen branch and uploads it with `--build-number auto`. It signs manually with a fixed Apple
   Distribution and Mac Installer Distribution certificate and the App Store profiles from the repository secrets
-  (see "Continuous integration" in the README), because automatic signing on a clean runner would create a new
+  (see [Continuous integration](#continuous-integration)), because automatic signing on a clean runner would create a new
   development certificate in the team account on every run. Setting `POLLY_PROFILE_NAME` to the name of an
   installed App Store profile does the same locally.
   - The inputs are `platform` (`both`, `ios` or `macos`), `groups` (comma-separated TestFlight groups; the
@@ -536,7 +587,7 @@ for the options. They install fastlane into `vendor/bundle` on first use and nee
 
 #### Renewing the TestFlight signing secrets
 
-WebHare's portal fills the secrets in the README table from its registry; after changing a registry value,
+WebHare's portal fills the secrets in the tables under [Continuous integration](#continuous-integration) from its registry; after changing a registry value,
 run the portal's GitHub sync before rerunning the workflow.
 
 - **Certificate .p12**: one file with two identities, each a certificate *with its private key*:
