@@ -21,6 +21,9 @@ public final class MonitorModel {
     public private(set) var showDockIcon = false
     public private(set) var debugLog = false
     public private(set) var hideServicesOnDownHosts = true
+    public private(set) var syncWithICloud = true
+    /// Why the last sync with iCloud failed; nil when it worked or isn't on.
+    public private(set) var syncError: String?
     public var pollInterval: Duration = .seconds(60)
     /// When the poll loop refreshes all servers again; nil while it isn't running.
     public private(set) var nextPollAt: Date?
@@ -60,6 +63,12 @@ public final class MonitorModel {
     /// Number of the refresh started last per server. The poll and a manual refresh can overlap, and the
     /// answer that arrives last is not necessarily the newest.
     @ObservationIgnored private var lastRefresh: [UUID: Int] = [:]
+    /// Where the source list is shared with the user's other devices; nil until the app connects it.
+    @ObservationIgnored private var cloud: CloudKeyValueStore?
+    @ObservationIgnored private var cloudKey = SourceSync.defaultKey
+    /// Applying a merge reloads, which must not start another sync.
+    @ObservationIgnored private var syncing = false
+    @ObservationIgnored private var cloudObserver: NSObjectProtocol?
 
     public init(store: ServerStore, session: URLSession = .shared) {
         self.store = store
@@ -116,6 +125,7 @@ public final class MonitorModel {
         showDockIcon = store.showDockIcon
         debugLog = store.debugLog
         hideServicesOnDownHosts = store.hideServicesOnDownHosts
+        syncWithICloud = store.syncWithICloud
         // Drop status of removed, disabled and paused servers so they don't count towards the overall state.
         // A paused server keeps the time of its last answer, which its detail still shows.
         let active = Set(servers.filter(\.isActive).map(\.id))
@@ -125,7 +135,87 @@ public final class MonitorModel {
         lastAttempts = lastAttempts.filter { shown.contains($0.key) }
         lastSuccesses = lastSuccesses.filter { shown.contains($0.key) }
         notificationRequests = notificationRequests.filter { active.contains($0.key) }
+        // Every change to the sources goes through here; share it.
+        syncWithCloud()
     }
+
+    // MARK: - iCloud
+
+    /// Shares the source list through `cloud` under `key`, and merges what is there now.
+    public func connectCloud(_ cloud: CloudKeyValueStore, key: String = SourceSync.defaultKey) {
+        self.cloud = cloud
+        cloudKey = key
+        syncWithCloud()
+    }
+
+    /// Another device changed the list in iCloud.
+    public func cloudDidChange() {
+        syncWithCloud()
+    }
+
+    public func setSyncWithICloud(_ sync: Bool) throws {
+        defer { reload() }
+        try store.setSyncWithICloud(sync)
+        // Turning it on again later joins like a new device, matching sources by type, URL and username.
+        if !sync { try store.setSyncBase(nil) }
+        syncError = nil
+    }
+
+    private func syncWithCloud() {
+        guard let cloud, store.syncWithICloud, !syncing else { return }
+        syncing = true
+        defer { syncing = false }
+        do {
+            let remote = try cloud.string(forKey: cloudKey).map(SyncedSource.parse)
+            let before = servers
+            let merge = SourceSync.merge(local: before, base: store.syncBase(), remote: remote)
+            if merge.servers != before {
+                try store.applySync(merge)
+                reload()
+                checkChangedSources(before: before, merge: merge)
+            }
+            if let upload = merge.upload {
+                cloud.set(SyncedSource.render(upload), forKey: cloudKey)
+            }
+            try store.setSyncBase(merge.base)
+            syncError = nil
+        } catch {
+            syncError = error.localizedDescription
+        }
+    }
+
+    /// Sources that arrived from iCloud, or that point at another system now, are checked from scratch.
+    private func checkChangedSources(before: [NagiosServer], merge: SourceSync.Merge) {
+        let oldByID = Dictionary(before.map { (merge.renamed[$0.id] ?? $0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        for server in servers {
+            let old = oldByID[server.id]
+            guard old?.baseURL != server.baseURL || old?.kind != server.kind || merge.renamed.values.contains(server.id)
+            else { continue }
+            states[server.id] = nil
+            baselines[server.id] = nil
+            lastAttempts[server.id] = nil
+            lastSuccesses[server.id] = nil
+            notificationRequests[server.id] = nil
+            lastRefresh[server.id, default: 0] += 1
+            if server.isActive {
+                Task { await refresh(server) }
+            }
+        }
+    }
+
+    #if canImport(Darwin)
+    /// Shares the source list through iCloud key-value storage and follows changes from other devices.
+    public func connectICloud(key: String = SourceSync.defaultKey) {
+        let store = NSUbiquitousKeyValueStore.default
+        cloudObserver = NotificationCenter.default.addObserver(
+            forName: NSUbiquitousKeyValueStore.didChangeExternallyNotification, object: store, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.cloudDidChange() }
+        }
+        store.synchronize()
+        connectCloud(store, key: key)
+    }
+    #endif
 
     public func setShowDockIcon(_ show: Bool) throws {
         defer { reload() }

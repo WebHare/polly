@@ -68,7 +68,10 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
         # macOS: menu bar only, no Dock icon.
         "INFOPLIST_KEY_LSUIElement[sdk=macosx*]": YES
-        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": App/macOS/Polly.entitlements
+        # With iCloud unless Config/Signing.xcconfig or Local.xcconfig says otherwise (see DEVELOPERS.md, Signing).
+        "CODE_SIGN_ENTITLEMENTS[sdk=macosx*]": $(POLLY_MACOS_ENTITLEMENTS)
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]": App/iOS/Polly.entitlements
+        "CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]": App/iOS/Polly.entitlements
         "ENABLE_APP_SANDBOX[sdk=macosx*]": YES
         # The multiplatform default points inside MacOS/Frameworks, not Contents/Frameworks.
         "LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]": "$(inherited) @executable_path/../Frameworks"

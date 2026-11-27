@@ -143,6 +143,7 @@ jobs:
           xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release \
             -destination 'generic/platform=macOS' -derivedDataPath "$RUNNER_TEMP/DerivedData" \
             ENABLE_HARDENED_RUNTIME=YES \
+            POLLY_MACOS_ENTITLEMENTS=App/macOS/Polly.entitlements \
             CODE_SIGN_INJECT_BASE_ENTITLEMENTS=NO \
             "${SIGNING[@]}" build
           mkdir -p dist

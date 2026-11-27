@@ -29,11 +29,34 @@ For local macOS builds without WebHare team access, create `Local.xcconfig` next
 CODE_SIGN_STYLE[sdk=macosx*] = Manual
 DEVELOPMENT_TEAM[sdk=macosx*] = YOUR_CERTIFICATE_TEAM_ID
 CODE_SIGN_IDENTITY[sdk=macosx*] = Apple Development: Your Name (CERTIFICATE_ID)
+// Without a provisioning profile with iCloud, leave out the iCloud entitlements; such a build doesn't sync.
+POLLY_MACOS_ENTITLEMENTS = App/macOS/Polly.entitlements
 ```
 
 Find the exact certificate name with `security find-identity -v -p codesigning`; use the team that issued that certificate. `Local.xcconfig` is ignored by Git and optionally included for both Debug and Release. Xcode, SweetPad and `xcodebuild` read it without regenerating the project. The macOS conditions leave iOS signing unchanged. Keep this file on the development machine only; official builds use a clean checkout with the WebHare defaults.
 
 Build both local configurations without command-line signing overrides. In particular, `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM=` takes precedence over the local file and returns to ad-hoc signing. Using the same stable certificate and bundle identifier allows Keychain permission to survive rebuilds and switching between Polly DEV and the local Release. Changing to a different signing identity or distribution channel may require authorization again. A local Release is not an official TestFlight or App Store release. See [issue #77](https://github.com/WebHare/polly/issues/77).
+
+### iCloud
+
+Polly shares the source list through iCloud key-value storage and keeps passwords in iCloud Keychain (see
+`SourceSync` in PollyKit). That needs, for the App ID `nl.webhare.polly` in the WebHare bv team:
+
+- The **iCloud** capability with key-value storage enabled. Key-value storage needs no CloudKit container.
+- Provisioning profiles generated after that, for development and App Store, on both platforms. The App Store
+  profiles in the `APPSTORE_PROFILE_IOS` and `APPSTORE_PROFILE_MACOS` secrets (maintained by WebHare's
+  portal) must be regenerated, or TestFlight builds fail on the new entitlements.
+
+The entitlements are in `App/macOS/Polly-iCloud.entitlements` and `App/iOS/Polly.entitlements`: the key-value
+store `$(TeamIdentifierPrefix)nl.webhare.polly` and the keychain group `$(AppIdentifierPrefix)nl.webhare.polly`,
+the same on both platforms so they share both. A macOS build signed without such a profile (your own
+certificate, ad-hoc, the Developer ID DMG from CI) is killed at launch with these entitlements, so it uses
+`App/macOS/Polly.entitlements` through `POLLY_MACOS_ENTITLEMENTS` and doesn't sync. Its keychain passwords stay
+on the Mac.
+
+Debug builds use their own list in iCloud (`sources-debug`), so test sources never reach your real devices.
+To test syncing, run a Debug build signed with the team on the Mac and one in the iOS Simulator signed in to the
+same Apple Account; **Features → Trigger iCloud Sync** in the Simulator pulls changes right away.
 
 ## The Xcode project
 
@@ -627,7 +650,7 @@ xcodebuild -project Polly.xcodeproj -scheme Polly -configuration Release -destin
   -derivedDataPath .build/DerivedData-iOS CODE_SIGNING_ALLOWED=NO build
 ```
 
-Without a usable signing certificate, append `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual` to the macOS build command for compile-only verification. Do not use that fallback for an installed app that should retain Keychain permission between builds.
+Without a usable signing certificate, append `CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= CODE_SIGN_STYLE=Manual POLLY_MACOS_ENTITLEMENTS=App/macOS/Polly.entitlements` to the macOS build command for compile-only verification. Do not use that fallback for an installed app that should retain Keychain permission between builds.
 
 ### Dashboard development and tests
 

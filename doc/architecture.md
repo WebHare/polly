@@ -13,7 +13,7 @@ App/macOS/                  Menu bar UI + sandbox entitlements (macOS only)
 App/iOS/                    iPhone/iPad UI: Problems, Servers and Settings tabs (iOS only)
 Packages/PollyKit/          Platform-independent logic + unit tests
   Models/                   NagiosServer, ServerURLParser (splits user:pass@ out of pasted URLs)
-  Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, WireLog
+  Storage/                  polly.yaml reader/writer (Yams), ServerStore, keychain CredentialStore, iCloud SourceSync, WireLog
   Nagios/                   NagiosClient: statusjson.cgi (status), extinfo.cgi (links), cmd.cgi (commands)
   URLCheck/                 URLMonitor: checks a URL's DNS, HTTP answer and certificate from the device
   Feed/                     FeedClient + FeedDocument: reads a Polly feed (doc/feed-format.md)
@@ -191,6 +191,13 @@ doc/feed-format.md          The JSON format of a Polly feed, for whoever builds 
   text. A setting moves them into the YAML file instead: debug builds used to trigger keychain prompts on
   every rebuild, and turning the keychain off guarantees it is never touched again. Switching moves all
   existing passwords and reads everything first, so a keychain failure doesn't leave a half-migrated state.
+- **Sources sync through iCloud key-value storage as one YAML value** (`SourceSync`), on by default. The list
+  is a few KB, so one value is simplest; deletions and order need no bookkeeping. Each device keeps the list as
+  it last synced it, so a change made here while another device changed something else is merged by source
+  ID instead of being overwritten. Pause and the bell are per device and never leave it; passwords travel
+  through iCloud Keychain (synchronizable items; on macOS the data protection keychain), never through the
+  list. Polly reads both keychains, so turning sync off or on never loses a password, and falls back to the
+  local keychain in builds without a keychain group.
 - **Window state is not a setting.** The menu panel size stays in `UserDefaults`; the Dock icon preference
   moved into `polly.yaml`.
 

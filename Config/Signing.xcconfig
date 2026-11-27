@@ -3,4 +3,9 @@ CODE_SIGN_STYLE = Automatic
 DEVELOPMENT_TEAM = MF6WPNPK5H
 CODE_SIGN_IDENTITY = iPhone Developer
 
+// iCloud sync (key-value storage and iCloud Keychain) needs a provisioning profile with iCloud. A macOS build
+// signed without one is killed at launch with these entitlements: such builds (Local.xcconfig with your own
+// certificate, ad-hoc, Developer ID) set POLLY_MACOS_ENTITLEMENTS = App/macOS/Polly.entitlements.
+POLLY_MACOS_ENTITLEMENTS = App/macOS/Polly-iCloud.entitlements
+
 #include? "../Local.xcconfig"

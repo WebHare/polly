@@ -300,6 +300,11 @@ private struct ServersPane: View {
                           : "Passwords are stored unencrypted in polly.yaml; the keychain is not used.",
                       isOn: keychainBinding)
             RowDivider()
+            SwitchRow(title: "Sync sources with iCloud",
+                      subtitle: SourceSync.settingText(on: monitor.syncWithICloud, passwordStorage: monitor.passwordStorage,
+                                                       error: monitor.syncError),
+                      isOn: syncBinding)
+            RowDivider()
             SwitchRow(title: "Show Dock icon", subtitle: "Show Polly in the Dock and the app switcher.",
                       isOn: dockIconBinding)
             RowDivider()
@@ -372,6 +377,14 @@ private struct ServersPane: View {
             } catch {
                 errorMessage = "Could not save setting: \(error.localizedDescription)"
             }
+        }
+    }
+
+    private var syncBinding: Binding<Bool> {
+        Binding {
+            monitor.syncWithICloud
+        } set: { sync in
+            do { try monitor.setSyncWithICloud(sync) } catch { errorMessage = "Could not save setting: \(error.localizedDescription)" }
         }
     }
 

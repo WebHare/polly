@@ -28,6 +28,9 @@ public struct PollySettings: Equatable, Sendable {
     public var debugLog = false
     /// List a host that is down as one problem, without the problems of the services on it.
     public var hideServicesOnDownHosts = true
+    /// Share the sources (not pause or the bell) with this user's other devices through iCloud, and keep keychain
+    /// passwords in iCloud Keychain.
+    public var syncWithICloud = true
     public var servers: [Server] = []
 
     public init(passwordStorage: PasswordStorage = .keychain, showDockIcon: Bool = false, debugLog: Bool = false,
@@ -82,6 +85,7 @@ public enum SettingsFile {
         settings.showDockIcon = raw.showDockIcon ?? false
         settings.debugLog = raw.debugLog ?? false
         settings.hideServicesOnDownHosts = raw.hideServicesOnDownHosts ?? true
+        settings.syncWithICloud = raw.syncWithICloud ?? true
         if raw.sources != nil, raw.servers != nil {
             throw SettingsFileError(message: "polly.yaml: has both 'sources' and the old 'servers'; merge them into 'sources'")
         }
@@ -141,6 +145,7 @@ public enum SettingsFile {
         var showDockIcon: Bool?
         var debugLog: Bool?
         var hideServicesOnDownHosts: Bool?
+        var syncWithICloud: Bool?
         var sources: [RawServer]?
         /// The old name of `sources`; read once and rewritten as `sources`.
         var servers: [RawServer]?
@@ -178,6 +183,10 @@ public enum SettingsFile {
 
             # Show a host that is down as one problem and leave out the problems of the services on it.
             hideServicesOnDownHosts: \(settings.hideServicesOnDownHosts)
+
+            # Share the sources with your other devices through iCloud, and keep Keychain passwords in iCloud
+            # Keychain. Pausing a source and its notifications stay on this device.
+            syncWithICloud: \(settings.syncWithICloud)
 
 
             """

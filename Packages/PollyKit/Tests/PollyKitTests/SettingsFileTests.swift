@@ -145,3 +145,14 @@ struct PausedSettingsTests {
         }
     }
 }
+
+/// Syncing with iCloud is on unless this device's file turns it off.
+struct SyncSettingTests {
+    @Test func syncsWithICloudByDefault() throws {
+        #expect(try SettingsFile.parse("sources: []\n").syncWithICloud)
+        var settings = PollySettings()
+        settings.syncWithICloud = false
+        #expect(SettingsFile.render(settings).contains("syncWithICloud: false"))
+        #expect(try SettingsFile.parse(SettingsFile.render(settings)) == settings)
+    }
+}

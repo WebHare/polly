@@ -40,12 +40,14 @@
 		1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarContentView.swift; sourceTree = "<group>"; };
 		206F8CFFD8766B27EB430DBF /* ServersScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServersScreen.swift; sourceTree = "<group>"; };
 		276A57CF036E82890AFB589D /* PollyKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = PollyKit; path = Packages/PollyKit; sourceTree = SOURCE_ROOT; };
+		3360E0BCFA7399DBD52A4611 /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		4D179A8AB00DD1663451D08C /* Polly.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Polly.entitlements; sourceTree = "<group>"; };
 		4F9EC63E3847380F178FB586 /* PollyDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyDesign.swift; sourceTree = "<group>"; };
 		4FC2FAB90B0B60484B906A00 /* PollyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PollyApp.swift; sourceTree = "<group>"; };
 		5F30EFE40D0F1FACB5272BA4 /* ProblemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProblemDetailView.swift; sourceTree = "<group>"; };
 		81B90C0EAC47CF7AA6F82576 /* PhoneDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhoneDesign.swift; sourceTree = "<group>"; };
+		8B1FA4E848468CBF78530E65 /* Polly-iCloud.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "Polly-iCloud.entitlements"; sourceTree = "<group>"; };
 		922DC996571A754701F1C24C /* MenuBarIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarIcon.swift; sourceTree = "<group>"; };
 		99236F4F65BD9D0C4256A359 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormView.swift; sourceTree = "<group>"; };
@@ -88,6 +90,7 @@
 				81B90C0EAC47CF7AA6F82576 /* PhoneDesign.swift */,
 				1788649AD8663118B787D349 /* PhoneProblemDetail.swift */,
 				AE8AB70010188E67953BAD61 /* PhoneRootView.swift */,
+				3360E0BCFA7399DBD52A4611 /* Polly.entitlements */,
 				080314FCE6787B83F66412F2 /* ProblemsScreen.swift */,
 				A3994B22C3BB7A22D05A67B6 /* ServerFormView.swift */,
 				206F8CFFD8766B27EB430DBF /* ServersScreen.swift */,
@@ -115,6 +118,7 @@
 				1D1A3900AF7542B852886F12 /* DockIcon.swift */,
 				1D91E0CA2C4C2450C1FF6691 /* MenuBarContentView.swift */,
 				922DC996571A754701F1C24C /* MenuBarIcon.swift */,
+				8B1FA4E848468CBF78530E65 /* Polly-iCloud.entitlements */,
 				4D179A8AB00DD1663451D08C /* Polly.entitlements */,
 				5F30EFE40D0F1FACB5272BA4 /* ProblemDetailView.swift */,
 				D20C4E8D81E51B30896155BF /* SettingsView.swift */,
@@ -325,7 +329,9 @@
 			baseConfigurationReference = 3AD565C2FC2243CDC9A7391E /* Signing.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = App/iOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = App/iOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "$(POLLY_MACOS_ENTITLEMENTS)";
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
@@ -356,7 +362,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				"ASSETCATALOG_COMPILER_APPICON_NAME[sdk=macosx*]" = AppIconDev;
-				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = App/macOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphoneos*]" = App/iOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=iphonesimulator*]" = App/iOS/Polly.entitlements;
+				"CODE_SIGN_ENTITLEMENTS[sdk=macosx*]" = "$(POLLY_MACOS_ENTITLEMENTS)";
 				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = App/Info.plist;
