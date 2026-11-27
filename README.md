@@ -97,6 +97,10 @@ URLs.
 - The server decides what is wrong and how bad it is; Polly shows the items and notifies when they change.
   Feeds are read-only: Polly can't acknowledge or snooze items.
 - Redirects are not followed. A feed that breaks the format is refused as a whole, with the reason.
+- **On a Mac a feed can also be a JSON file**, written by a script: choose it with **Browse…** next to the URL.
+  The source line says when the file last changed ("updated 3 min ago"), and a file that hasn't changed for
+  15 minutes (adjustable) counts as stale, in case whatever writes it has stopped. Feed files stay on that
+  Mac.
 - Building a feed? See [doc/feed-format.md](doc/feed-format.md).
 
 ## "Add to Polly" links

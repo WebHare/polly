@@ -42,6 +42,9 @@ public struct ServerLine: Equatable, Sendable {
         case .ok(let status):
             icon = .reachable
             parts = status.summaryParts
+            if let updatedAt = status.updatedAt {
+                append(" · updated \(DurationFormatting.ago(now.timeIntervalSince(updatedAt)))", to: &parts)
+            }
             // Easy to forget once switched off, and then nobody hears about problems.
             if status.notificationsEnabled == false {
                 if parts.last?.severity == nil { parts[parts.count - 1].text += " · " } else { parts.append(Part(" · ")) }
@@ -55,6 +58,15 @@ public struct ServerLine: Equatable, Sendable {
             icon = .loading
             parts = [Part(server.baseURL.absoluteString)]
         }
+    }
+}
+
+/// Adds plain text to a line, merged with the plain text before it.
+private func append(_ text: String, to parts: inout [ServerLine.Part]) {
+    if let last = parts.last, last.severity == nil {
+        parts[parts.count - 1].text += text
+    } else {
+        parts.append(ServerLine.Part(text))
     }
 }
 

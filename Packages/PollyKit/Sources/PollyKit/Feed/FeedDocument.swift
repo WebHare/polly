@@ -14,6 +14,10 @@ public enum FeedError: LocalizedError, Equatable, Sendable {
     case redirect
     case invalidResponse
     case transport(String)
+    /// A feed file that hasn't changed for longer than its limit (seconds).
+    case stale(age: TimeInterval, limit: TimeInterval)
+    /// A feed file that can't be read; the message says why.
+    case file(String)
 
     public var errorDescription: String? {
         switch self {
@@ -31,6 +35,10 @@ public enum FeedError: LocalizedError, Equatable, Sendable {
         case .redirect:
             "The feed redirected the request, which Polly does not follow so your credentials stay with this server. Enter the final URL instead."
         case .invalidResponse: "The server returned an invalid response."
+        case .stale(let age, let limit):
+            "The file hasn't changed for \(DurationFormatting.coarseDuration(age)) (the limit is "
+                + "\(DurationFormatting.coarseDuration(limit))). Is whatever writes it still running?"
+        case .file(let message): message
         case .transport(let message): message
         }
     }

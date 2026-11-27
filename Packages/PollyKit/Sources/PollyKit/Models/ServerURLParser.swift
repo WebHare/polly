@@ -13,10 +13,16 @@ public struct ParsedServerURL: Equatable, Sendable {
 }
 
 public enum ServerURLParser {
-    /// `keepPath` keeps the path and query, for a URL that is itself the thing to check.
-    public static func parse(_ input: String, keepPath: Bool = false) -> ParsedServerURL? {
+    /// `keepPath` keeps the path and query, for a URL that is itself the thing to check. `allowFile` also takes a
+    /// `file://` URL, for a feed file.
+    public static func parse(_ input: String, keepPath: Bool = false, allowFile: Bool = false) -> ParsedServerURL? {
         var text = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return nil }
+        if allowFile, text.lowercased().hasPrefix("file://") {
+            guard let url = URL(string: text), url.isFileURL, !url.path(percentEncoded: false).isEmpty,
+                  url.path(percentEncoded: false) != "/" else { return nil }
+            return ParsedServerURL(baseURL: url, username: nil, password: nil)
+        }
         if !text.contains("://") {
             text = "https://" + text
         }

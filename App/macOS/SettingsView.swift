@@ -1,5 +1,6 @@
 import PollyKit
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// The settings window: a sidebar with panes, following "04 Settings" of the design export.
 /// Servers is real; Alerts is a clickable prototype; Team and Account are placeholders.
@@ -456,17 +457,26 @@ private struct ServerFormSheet: View {
                 }
                 GridRow {
                     label("URL")
-                    TextField("URL", text: $model.urlFieldText, prompt: Text(verbatim: model.kind.urlPlaceholder))
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        .pollyField()
+                    HStack(spacing: 8) {
+                        TextField("URL", text: $model.urlFieldText, prompt: Text(verbatim: model.kind.urlPlaceholder))
+                            .textContentType(.URL)
+                            .autocorrectionDisabled()
+                            .pollyField()
+                        if model.kind == .feed {
+                            Button("Browse…", action: chooseFeedFile)
+                                .buttonStyle(PollyButtonStyle(radius: 6))
+                                .help("Read the feed from a JSON file on this Mac")
+                        }
+                    }
                 }
                 GridRow {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
                     Group {
                         switch model.kind {
                         case .url: Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
-                        case .feed: Text("A JSON feed in Polly's format, listing what needs attention. The URL is used as entered.")
+                        case .feed where model.isFile:
+                            Text("A JSON file in Polly's feed format on this Mac, read every \(pollSeconds) s. Only on this Mac: it isn't shared with your other devices.")
+                        case .feed: Text("A JSON feed in Polly's format, listing what needs attention. The URL is used as entered, or choose a file.")
                         case .nagios:
                             Text("Polly reads ")
                                 + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
@@ -479,57 +489,71 @@ private struct ServerFormSheet: View {
                 }
                 GridRow {
                     label("Name")
-                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL?.host() ?? "Optional"))
+                    TextField("Name", text: $model.name, prompt: Text(model.parsedURL.map { $0.isFileURL ? $0.lastPathComponent : ($0.host() ?? "Optional") } ?? "Optional"))
                         .pollyField()
                 }
-                GridRow {
-                    label("Sign in with")
-                    Picker("Sign in with", selection: $model.authentication) {
-                        ForEach(ServerFormModel.Authentication.allCases) { Text($0.label).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .fixedSize()
-                }
-                if model.authentication == .header {
+                if model.isFile {
                     GridRow {
-                        label("Header")
-                        TextField("Header", text: $model.headerName, prompt: Text(verbatim: "X-API-Key or Authorization"))
-                            .autocorrectionDisabled()
-                            .pollyField()
-                    }
-                    if let problem = model.headerNameProblem, !model.headerName.isEmpty {
-                        GridRow {
-                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                            Text(problem)
-                                .font(.system(size: 12))
-                                .foregroundStyle(theme.severityText(.critical))
-                                .padding(.top, -4)
-                        }
-                    }
-                    GridRow {
-                        label("Value")
-                        HStack(spacing: 10) {
-                            SecureField("Value", text: $model.password, prompt: Text(verbatim: "Bearer … or the API key"))
+                        label("Stale after")
+                        HStack(spacing: 8) {
+                            TextField("Minutes", value: $model.staleAfterMinutes, format: .number)
+                                .frame(width: 60)
                                 .pollyField()
-                            storageNote
+                            Text("minutes without a change, as whatever writes the file may have stopped")
+                                .font(.system(size: 12))
+                                .foregroundStyle(theme.faint)
                         }
                     }
                 } else {
                     GridRow {
-                        label("Username")
-                        TextField("Username", text: $model.username)
-                            .textContentType(.username)
-                            .autocorrectionDisabled()
-                            .pollyField()
+                        label("Sign in with")
+                        Picker("Sign in with", selection: $model.authentication) {
+                            ForEach(ServerFormModel.Authentication.allCases) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
                     }
-                    GridRow {
-                        label("Password")
-                        HStack(spacing: 10) {
-                            SecureField("Password", text: $model.password)
-                                .textContentType(.password)
+                    if model.authentication == .header {
+                        GridRow {
+                            label("Header")
+                            TextField("Header", text: $model.headerName, prompt: Text(verbatim: "X-API-Key or Authorization"))
+                                .autocorrectionDisabled()
                                 .pollyField()
-                            storageNote
+                        }
+                        if let problem = model.headerNameProblem, !model.headerName.isEmpty {
+                            GridRow {
+                                Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                                Text(problem)
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(theme.severityText(.critical))
+                                    .padding(.top, -4)
+                            }
+                        }
+                        GridRow {
+                            label("Value")
+                            HStack(spacing: 10) {
+                                SecureField("Value", text: $model.password, prompt: Text(verbatim: "Bearer … or the API key"))
+                                    .pollyField()
+                                storageNote
+                            }
+                        }
+                    } else {
+                        GridRow {
+                            label("Username")
+                            TextField("Username", text: $model.username)
+                                .textContentType(.username)
+                                .autocorrectionDisabled()
+                                .pollyField()
+                        }
+                        GridRow {
+                            label("Password")
+                            HStack(spacing: 10) {
+                                SecureField("Password", text: $model.password)
+                                    .textContentType(.password)
+                                    .pollyField()
+                                storageNote
+                            }
                         }
                     }
                 }
@@ -577,6 +601,18 @@ private struct ServerFormSheet: View {
 
     private func label(_ text: String) -> some View {
         Text(text).foregroundStyle(theme.muted).frame(width: 110, alignment: .trailing)
+    }
+
+    /// Lets the user pick a feed file, which also gives the sandboxed app the permission to keep reading it.
+    private func chooseFeedFile() {
+        let panel = NSOpenPanel()
+        panel.allowedContentTypes = [.json]
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose a JSON file in Polly's feed format."
+        panel.prompt = "Choose"
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.chooseFile(url, bookmark: try? FeedFile.bookmark(for: url))
     }
 
     private var storageNote: some View {

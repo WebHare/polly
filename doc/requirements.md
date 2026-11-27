@@ -371,6 +371,21 @@ sources that are not paused.
   own `error` message. An item with a mistake is not quietly left out.
 - Redirects are not followed, so the credentials stay with the server that was entered.
 - The web service does not support feeds yet; it stays Nagios-only.
+- On macOS a feed can also be a JSON file on the Mac, written by a script or another program.
+  - **Browse…** next to the URL field (type Feed) chooses the file; the URL becomes its `file:///…` address.
+    - Choosing it gives Polly a lasting permission to read that file, kept with the source in `polly.yaml`.
+      Typing or changing the path by hand drops that permission: Polly then asks to choose the file with
+      Browse… again.
+    - Why: the app is sandboxed and may only read files the user picked.
+  - A file has no sign-in, so the form hides it; the name defaults to the file name.
+  - The file is read every 60 seconds, with the same format and checks as a feed from a server.
+  - The source line says when the file last changed: "16 tickets, 1 warn · updated 3 min ago".
+  - A file that hasn't changed for longer than its limit (15 minutes by default, adjustable per source in the
+    form) is stale: the source counts as unreachable with "The file hasn't changed for 4 h (the limit is 30
+    min). Is whatever writes it still running?".
+    - Why: when the script writing the file dies, the file stays as it was and would keep saying all is well.
+  - A missing or unreadable file makes the source unreachable with the reason.
+  - Mac only: iPhone and iPad don't offer it and can't read it, and the web service only takes Nagios sources.
 
 ## Notifications
 

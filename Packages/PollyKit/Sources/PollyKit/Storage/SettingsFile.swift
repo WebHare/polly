@@ -110,9 +110,19 @@ public enum SettingsFile {
                 }
                 pausedSince = date
             }
-            let server = NagiosServer(
+            var bookmark: Data?
+            if let text = entry.bookmark {
+                guard let data = Data(base64Encoded: text) else {
+                    throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has an unreadable bookmark")
+                }
+                bookmark = data
+            }
+            if let minutes = entry.staleAfterMinutes, minutes <= 0 {
+                throw SettingsFileError(message: "polly.yaml: source #\(index + 1) needs a staleAfterMinutes above 0")
+            }
+            var server = NagiosServer(
                 id: entry.id.flatMap(UUID.init(uuidString:)) ?? UUID(),
-                name: entry.name ?? url.host() ?? urlText,
+                name: entry.name ?? url.host() ?? url.lastPathComponent,
                 baseURL: url,
                 username: entry.username ?? "",
                 enabled: entry.enabled ?? true,
@@ -121,6 +131,8 @@ public enum SettingsFile {
                 notifications: entry.notifications ?? false,
                 authHeader: entry.authHeader
             )
+            server.fileBookmark = bookmark
+            server.staleAfter = entry.staleAfterMinutes.map { TimeInterval($0 * 60) }
             return PollySettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
         }
         return (settings, raw.servers != nil)
@@ -134,6 +146,8 @@ public enum SettingsFile {
             var url: String?
             var username: String?
             var authHeader: String?
+            var bookmark: String?
+            var staleAfterMinutes: Int?
             var password: String?
             var enabled: Bool?
             var pausedSince: String?
@@ -209,6 +223,13 @@ public enum SettingsFile {
             }
             if let password = entry.password {
                 out += "    password: \(scalar(password))\n"
+            }
+            if let bookmark = server.fileBookmark {
+                // Base64 is letters, digits, + / and =, which YAML reads as a plain string.
+                out += "    bookmark: \(bookmark.base64EncodedString())\n"
+            }
+            if let staleAfter = server.staleAfter, staleAfter != NagiosServer.defaultStaleAfter {
+                out += "    staleAfterMinutes: \(Int((staleAfter / 60).rounded()))\n"
             }
             out += "    enabled: \(server.enabled)\n"
             if let pausedSince = server.pausedSince {

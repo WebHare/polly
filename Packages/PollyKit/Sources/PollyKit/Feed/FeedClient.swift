@@ -18,8 +18,17 @@ public struct FeedClient: MonitorBackend {
         self.session = session
     }
 
+    /// The permission to read a feed file, and how long it may stay unchanged.
+    public var fileBookmark: Data?
+    public var staleAfter: TimeInterval = NagiosServer.defaultStaleAfter
+    /// Reads a feed file: its contents and modification time. Replaced in tests.
+    public var readFile: @Sendable (URL, Data?) throws -> (Data, Date) = { try FeedFile.read($0, bookmark: $1) }
+    public var now: @Sendable () -> Date = { .now }
+
     public init(server: NagiosServer, password: String?, session: URLSession = .shared) {
         self.init(url: server.baseURL, credentials: server.credentials(password: password), session: session)
+        fileBookmark = server.fileBookmark
+        staleAfter = server.staleAfter ?? NagiosServer.defaultStaleAfter
     }
 
     public var capabilities: BackendCapabilities { [.links] }
@@ -29,6 +38,10 @@ public struct FeedClient: MonitorBackend {
     }
 
     public func fetchStatus() async throws -> ServerStatus {
+        if url.isFileURL {
+            let (data, modified) = try readFile(url, fileBookmark)
+            return try FeedFile.status(from: data, modifiedAt: modified, now: now(), staleAfter: staleAfter)
+        }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         credentials.apply(to: &request)

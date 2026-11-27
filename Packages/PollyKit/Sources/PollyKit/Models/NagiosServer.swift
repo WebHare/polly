@@ -23,6 +23,16 @@ public struct NagiosServer: Identifiable, Hashable, Sendable {
     /// switch in the source detail).
     public var pausedSince: Date?
     public var kind: BackendKind
+    /// A feed file on this Mac: the permission to read it, from choosing it with Browse… (a security-scoped
+    /// bookmark). Never shared with other devices.
+    public var fileBookmark: Data?
+    /// A feed file is stale when it hasn't changed for this long; nil is `defaultStaleAfter`.
+    public var staleAfter: TimeInterval?
+
+    public static let defaultStaleAfter: TimeInterval = 15 * 60
+
+    /// A feed read from a file on this Mac instead of a server.
+    public var isFileFeed: Bool { kind == .feed && baseURL.isFileURL }
     /// Show local notifications when this server's problems change.
     public var notifications: Bool
 

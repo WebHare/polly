@@ -63,6 +63,11 @@ public final class ServerFormModel {
         didSet { if headerName != oldValue { checkState = .idle } }
     }
     public private(set) var checkState: CheckState = .idle
+    /// For a feed file: minutes it may stay unchanged before it counts as stale.
+    public var staleAfterMinutes = Int(NagiosServer.defaultStaleAfter / 60)
+    /// The permission to read the file chosen with Browse…, for `bookmarkURL` only.
+    @ObservationIgnored private var fileBookmark: Data?
+    @ObservationIgnored private var bookmarkURL: URL?
 
     /// The URL field. Setting a URL containing `user:pass@` moves those into the
     /// username/password fields and strips them from the URL.
@@ -142,11 +147,31 @@ public final class ServerFormModel {
             authentication = .header
             headerName = header
         }
+        if server.isFileFeed {
+            fileBookmark = server.fileBookmark
+            bookmarkURL = server.baseURL
+            staleAfterMinutes = Int(((server.staleAfter ?? NagiosServer.defaultStaleAfter) / 60).rounded())
+        }
     }
+
+    /// A feed file chosen with Browse…, with the permission to read it.
+    public func chooseFile(_ url: URL, bookmark: Data?) {
+        urlText = url.absoluteString
+        fileBookmark = bookmark
+        bookmarkURL = url
+    }
+
+    /// The URL is a file on this Mac (feeds only): no sign-in, a stale limit instead.
+    public var isFile: Bool { parsedURL?.isFileURL ?? false }
 
     /// A name that is just the URL's host is the default, so it is left empty to keep following the URL.
     private static func formName(for server: NagiosServer) -> String {
-        server.name == server.baseURL.host() ? "" : server.name
+        server.name == defaultName(for: server.baseURL) ? "" : server.name
+    }
+
+    /// The host, or the file name of a feed file.
+    private static func defaultName(for url: URL) -> String {
+        url.isFileURL ? url.lastPathComponent : (url.host() ?? url.absoluteString)
     }
 
     public var isEditing: Bool {
@@ -155,13 +180,15 @@ public final class ServerFormModel {
     }
 
     public var parsedURL: URL? { parse(urlText)?.baseURL }
-    public var canSubmit: Bool { parsedURL != nil && headerNameProblem == nil && checkState != .checking }
+    public var canSubmit: Bool {
+        parsedURL != nil && headerNameProblem == nil && checkState != .checking && (!isFile || staleAfterMinutes > 0)
+    }
 
     private var trimmedHeaderName: String { headerName.trimmingCharacters(in: .whitespaces) }
 
     /// Why the header name can't be used; nil when it can or isn't used.
     public var headerNameProblem: String? {
-        authentication == .header ? SourceCredentials.problem(withHeaderName: trimmedHeaderName) : nil
+        authentication == .header && !isFile ? SourceCredentials.problem(withHeaderName: trimmedHeaderName) : nil
     }
 
     /// False when an edit only changed the name, so saving doesn't wait for (or fail on) the server.
@@ -170,23 +197,32 @@ public final class ServerFormModel {
         guard let server = makeServer() else { return true }
         return server.baseURL != original.baseURL || kind != original.kind || server.username != original.username
             || server.authHeader != original.authHeader || password != originalPassword
+            || server.fileBookmark != original.fileBookmark || server.staleAfter != original.staleAfter
     }
 
     public func makeServer() -> NagiosServer? {
         guard let url = parsedURL, headerNameProblem == nil else { return nil }
-        let header = authentication == .header ? trimmedHeaderName : nil
+        let file = url.isFileURL
+        let header = authentication == .header && !file ? trimmedHeaderName : nil
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
-        var server = NagiosServer(name: trimmedName.isEmpty ? (url.host() ?? url.absoluteString) : trimmedName,
+        var server = NagiosServer(name: trimmedName.isEmpty ? Self.defaultName(for: url) : trimmedName,
                                   baseURL: url,
-                                  username: header == nil ? username : "",
+                                  username: header == nil && !file ? username : "",
                                   kind: kind,
                                   authHeader: header)
+        if file {
+            // The permission only covers the file that was chosen.
+            server.fileBookmark = url == bookmarkURL ? fileBookmark : nil
+            let staleAfter = TimeInterval(max(1, staleAfterMinutes) * 60)
+            server.staleAfter = staleAfter == NagiosServer.defaultStaleAfter ? nil : staleAfter
+        }
         switch purpose {
         case .add:
             break
         case .edit(let original):
             server.id = original.id
             server.enabled = original.enabled
+            server.pausedSince = original.pausedSince
             server.notifications = original.notifications
         case .duplicate(let original):
             server.notifications = original.notifications
@@ -198,7 +234,8 @@ public final class ServerFormModel {
     @discardableResult
     public func testConnection() async -> Bool {
         guard let server = makeServer() else {
-            checkState = .failed(headerNameProblem ?? "Please enter a valid http(s) URL.")
+            checkState = .failed(headerNameProblem ?? (kind == .feed ? "Please enter a valid http(s) URL, or choose a file."
+                                                                       : "Please enter a valid http(s) URL."))
             return false
         }
         checkState = .checking
@@ -225,7 +262,7 @@ public final class ServerFormModel {
     }
 
     private func parse(_ text: String) -> ParsedServerURL? {
-        ServerURLParser.parse(text, keepPath: !kind.urlIsMonitoringSystem)
+        ServerURLParser.parse(text, keepPath: !kind.urlIsMonitoringSystem, allowFile: kind == .feed)
     }
 }
 

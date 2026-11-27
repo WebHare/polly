@@ -39,6 +39,11 @@ public enum DurationFormatting {
         return date.formatted(style)
     }
 
+    /// A duration in its largest unit: "14 s", "16 min", "2 h".
+    public static func coarseDuration(_ interval: TimeInterval) -> String {
+        coarse(interval)
+    }
+
     private static func coarse(_ interval: TimeInterval) -> String {
         let seconds = Int(max(0, interval))
         if seconds < 60 { return "\(seconds) s" }
