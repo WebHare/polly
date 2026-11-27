@@ -75,6 +75,7 @@ struct ServersScreen: View {
         .refreshable { await monitor.refreshAll() }
         .sheet(item: $form) { ServerFormView(model: $0) }
         .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
+        .onChange(of: monitor.linkRequest, initial: true) { openRequestedLink() }
         .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
@@ -149,6 +150,17 @@ struct ServersScreen: View {
         monitor.editRequest = nil
         guard form == nil, let server = monitor.servers.first(where: { $0.id == id }) else { return }
         edit(server)
+    }
+
+    /// An "Add to Polly" link: the filled-in add form, the source the user already has, or why it can't be used.
+    private func openRequestedLink() {
+        guard let request = monitor.linkRequest, form == nil else { return }
+        monitor.linkRequest = nil
+        switch request {
+        case .add(let link): form = ServerFormModel(link: link)
+        case .existing(let id): if let server = monitor.servers.first(where: { $0.id == id }) { edit(server) }
+        case .invalid(let message): errorMessage = message
+        }
     }
 
     private func delete(_ server: NagiosServer) {

@@ -54,6 +54,7 @@ struct PollyApp: App {
         WindowGroup {
             PhoneRootView()
                 .environment(monitor)
+                .onOpenURL { monitor.open($0) }
         }
         .onChange(of: scenePhase, initial: true) {
             monitor.setPollingActive(scenePhase == .active)

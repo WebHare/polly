@@ -5,6 +5,7 @@ import SwiftUI
 struct PhoneRootView: View {
     enum Tab: Hashable { case problems, servers, settings }
 
+    @Environment(MonitorModel.self) private var monitor
     @State private var tab = Tab.problems
 
     init() {
@@ -29,5 +30,9 @@ struct PhoneRootView: View {
         }
         .tint(.pollyBlue)
         .phoneThemed()
+        // "Add to Polly" links are shown on the Sources tab.
+        .onChange(of: monitor.linkRequest, initial: true) {
+            if monitor.linkRequest != nil { tab = .servers }
+        }
     }
 }

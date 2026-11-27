@@ -53,6 +53,9 @@ struct SettingsView: View {
         .onChange(of: monitor.editRequest, initial: true) {
             if monitor.editRequest != nil { pane = .servers }
         }
+        .onChange(of: monitor.linkRequest, initial: true) {
+            if monitor.linkRequest != nil { pane = .servers }
+        }
     }
 }
 
@@ -201,6 +204,7 @@ private struct ServersPane: View {
             SourceStatusView(server: server)
         }
         .onChange(of: monitor.editRequest, initial: true) { openRequestedEdit() }
+        .onChange(of: monitor.linkRequest, initial: true) { openRequestedLink() }
         .alert("Error", isPresented: .constant(errorMessage != nil), presenting: errorMessage) { _ in
             Button("OK") { errorMessage = nil }
         } message: { Text($0) }
@@ -333,6 +337,17 @@ private struct ServersPane: View {
         monitor.editRequest = nil
         guard form == nil, let server = monitor.servers.first(where: { $0.id == id }) else { return }
         edit(server)
+    }
+
+    /// An "Add to Polly" link: the filled-in add form, the source the user already has, or why it can't be used.
+    private func openRequestedLink() {
+        guard let request = monitor.linkRequest, form == nil else { return }
+        monitor.linkRequest = nil
+        switch request {
+        case .add(let link): openForm(ServerFormModel(link: link))
+        case .existing(let id): selectedSource = monitor.servers.first { $0.id == id }
+        case .invalid(let message): errorMessage = message
+        }
     }
 
     private var keychainBinding: Binding<Bool> {

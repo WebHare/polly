@@ -105,6 +105,19 @@ public final class ServerFormModel {
         originalPassword = ""
     }
 
+    /// The add form filled in from an "Add to Polly" link. The password or header value is left to the user.
+    public convenience init(link: AddSourceLink, session: URLSession = .shared) {
+        self.init(kind: link.kind, session: session)
+        urlText = link.url
+        name = link.name ?? ""
+        if let header = link.headerName {
+            authentication = .header
+            headerName = header
+        } else {
+            username = link.username ?? ""
+        }
+    }
+
     public convenience init(editing server: NagiosServer, password: String?, session: URLSession = .shared) {
         self.init(purpose: .edit(server), from: server, name: Self.formName(for: server), password: password,
                   session: session)

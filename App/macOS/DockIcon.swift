@@ -15,6 +15,12 @@ enum DockIcon {
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Opens the Servers window; installed by a SwiftUI view that has access to `openWindow`.
     var openServersWindow: (() -> Void)?
+    /// Handles an "Add to Polly" link; installed with `openServersWindow`.
+    var openLink: ((URL) -> Void)?
+
+    func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls { openLink?(url) }
+    }
 
     /// Clicking the Dock icon with no windows open shows the Servers window.
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
