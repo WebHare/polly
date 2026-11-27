@@ -68,7 +68,9 @@ public struct WebSnapshot: Codable, Sendable {
         staleAfterSeconds = freshnessLimit
         self.nextPollAt = nextPollAt
         let summary = MonitorSummary(servers: servers, states: states, hideServicesOnDownHosts: hideServicesOnDownHosts)
-        let active = servers.filter(\.enabled)
+        // Disabled sources are left out as if they weren't configured; paused ones are listed but not counted.
+        let servers = servers.filter(\.enabled)
+        let active = servers.filter(\.isActive)
         let results = active.compactMap { server -> ServerStatus? in
             if case .ok(let result) = states[server.id] { return result }
             return nil
@@ -76,7 +78,7 @@ public struct WebSnapshot: Codable, Sendable {
         self.servers = servers.map { server in
             let state: Server.State
             var success = lastSuccesses[server.id]
-            if !server.enabled { state = .paused }
+            if server.isPaused { state = .paused }
             else {
                 switch states[server.id] {
                 case .ok(let result): state = .ok; success = result.fetchedAt

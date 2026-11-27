@@ -83,12 +83,14 @@ public final class MonitorModel {
         showDockIcon = store.showDockIcon
         debugLog = store.debugLog
         hideServicesOnDownHosts = store.hideServicesOnDownHosts
-        // Drop status of removed and disabled servers so they don't count towards the overall state.
-        let active = Set(servers.filter(\.enabled).map(\.id))
+        // Drop status of removed, disabled and paused servers so they don't count towards the overall state.
+        // A paused server keeps the time of its last answer, which its detail still shows.
+        let active = Set(servers.filter(\.isActive).map(\.id))
+        let shown = Set(servers.filter(\.enabled).map(\.id))
         states = states.filter { active.contains($0.key) }
         baselines = baselines.filter { active.contains($0.key) }
-        lastAttempts = lastAttempts.filter { active.contains($0.key) }
-        lastSuccesses = lastSuccesses.filter { active.contains($0.key) }
+        lastAttempts = lastAttempts.filter { shown.contains($0.key) }
+        lastSuccesses = lastSuccesses.filter { shown.contains($0.key) }
         notificationRequests = notificationRequests.filter { active.contains($0.key) }
     }
 
@@ -163,7 +165,7 @@ public final class MonitorModel {
             notificationRequests[server.id] = nil
         }
         reload()
-        if let updated = enabledServer(server.id) {
+        if let updated = activeServer(server.id) {
             Task { await refresh(updated) }
         }
     }
@@ -182,11 +184,23 @@ public final class MonitorModel {
         return form
     }
 
-    /// Temporarily turns monitoring of a server on or off.
+    /// The servers the overview lists: all but the disabled ones.
+    public var enabledServers: [NagiosServer] { servers.filter(\.enabled) }
+
+    /// Pauses a server from now, or resumes it and checks it right away. Saved, so it survives a restart.
+    public func setPaused(_ paused: Bool, for server: NagiosServer) throws {
+        try store.setPaused(since: paused ? .now : nil, for: server.id)
+        reload()
+        if !paused, let updated = activeServer(server.id) {
+            Task { await refresh(updated) }
+        }
+    }
+
+    /// Turns a server on or off in the settings; off leaves it out everywhere else.
     public func setEnabled(_ enabled: Bool, for server: NagiosServer) throws {
         try store.setEnabled(enabled, for: server.id)
         reload()
-        if enabled, let updated = servers.first(where: { $0.id == server.id }) {
+        if enabled, let updated = activeServer(server.id) {
             Task { await refresh(updated) }
         }
     }
@@ -234,7 +248,7 @@ public final class MonitorModel {
 
     public func refreshAll() async {
         await withTaskGroup(of: Void.self) { group in
-            for server in servers where server.enabled {
+            for server in servers where server.isActive {
                 group.addTask { await self.refresh(server) }
             }
         }
@@ -254,7 +268,7 @@ public final class MonitorModel {
     }
 
     public func refresh(_ server: NagiosServer) async {
-        guard isEnabled(server.id) else { return }
+        guard activeServer(server.id) != nil else { return }
         if states[server.id] == nil { states[server.id] = .loading }
         let number = (lastRefresh[server.id] ?? 0) + 1
         lastRefresh[server.id] = number
@@ -264,9 +278,9 @@ public final class MonitorModel {
         } catch {
             result = .failed(error.localizedDescription)
         }
-        // The server may have been disabled or deleted while the request was in flight, or a refresh
+        // The server may have been paused, disabled or deleted while the request was in flight, or a refresh
         // that started later has taken over: its answer is the newer one, whichever arrives first.
-        guard !Task.isCancelled, let current = enabledServer(server.id), lastRefresh[server.id] == number else { return }
+        guard !Task.isCancelled, let current = activeServer(server.id), lastRefresh[server.id] == number else { return }
         states[server.id] = result
         lastAttempts[server.id] = .now
         guard case .ok(let status) = result else { return }
@@ -280,11 +294,7 @@ public final class MonitorModel {
         if current.notifications, !changes.isEmpty { onProblemChanges?(current, changes) }
     }
 
-    private func isEnabled(_ id: UUID) -> Bool {
-        enabledServer(id) != nil
-    }
-
-    private func enabledServer(_ id: UUID) -> NagiosServer? {
-        servers.first { $0.id == id && $0.enabled }
+    private func activeServer(_ id: UUID) -> NagiosServer? {
+        servers.first { $0.id == id && $0.isActive }
     }
 }

@@ -7,11 +7,15 @@ struct MenuBarLabel: View {
     let monitor: MonitorModel
     let appDelegate: AppDelegate
     @Environment(\.openWindow) private var openWindow
+    /// The menu bar's own appearance, which follows the wallpaper rather than the app.
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         let summary = monitor.summary
-        Image(nsImage: MenuBarIcon.image(mood: summary.mood, badge: summary.badge))
-            .accessibilityLabel(summary.headline)
+        Image(nsImage: MenuBarIcon.image(mood: summary.mood, badge: summary.badge, paused: summary.paused,
+                                         darkMenuBar: colorScheme == .dark))
+            .accessibilityLabel(summary.paused == 0 ? summary.headline
+                                : "\(summary.headline), \(summary.paused) paused")
             .onAppear {
                 // Apply the saved Dock icon setting at launch (the label appears once, when the app starts).
                 DockIcon.apply(monitor.showDockIcon, activate: false)
@@ -120,7 +124,7 @@ private struct PopoverContent: View {
                     .frame(maxWidth: .infinity)
                     .frame(maxHeight: userSized ? .infinity : nil, alignment: .top)
             }
-            if !monitor.servers.isEmpty {
+            if !monitor.enabledServers.isEmpty {
                 theme.divider.frame(height: 1)
                 servers
             }
@@ -172,9 +176,13 @@ private struct PopoverContent: View {
                 .lineSpacing(3)
                 .foregroundStyle(theme.muted)
                 .fixedSize(horizontal: false, vertical: true)
-            if summary.screen != .ok {
+            // Nothing to retry while every source is paused; resuming is in each source's detail.
+            if summary.screen != .ok && !summary.isPaused {
                 HStack(spacing: 8) {
-                    if summary.screen == .empty {
+                    if summary.allDisabled {
+                        Button("Settings…") { showSettings() }
+                            .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
+                    } else if summary.screen == .empty {
                         Button("Add source…") { showSettings() }
                             .buttonStyle(PollyButtonStyle(kind: .primary, radius: 6))
                     } else {
@@ -197,11 +205,12 @@ private struct PopoverContent: View {
     @ViewBuilder private func heroDetail(_ summary: MonitorSummary) -> some View {
         switch summary.screen {
         case .empty:
-            Text("Add a Nagios server or a URL and Polly starts polling right away.")
+            Text(summary.allDisabled ? "Turn a source on in Settings and Polly starts checking it."
+                                     : "Add a Nagios server or a URL and Polly starts polling right away.")
         case .unreachable:
             Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
         case .waiting:
-            Text(summary.isPaused ? "Turn a source back on in Settings and Polly starts checking again."
+            Text(summary.isPaused ? "Open a source below and switch on Check in Polly to start checking again."
                                   : "Waiting for the first answer.")
         case .ok, .problems:
             TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -221,7 +230,8 @@ private struct PopoverContent: View {
                 .textCase(.uppercase)
                 .foregroundStyle(theme.faint)
                 .padding(EdgeInsets(top: 6, leading: 8, bottom: 4, trailing: 8))
-            ForEach(monitor.servers) { server in
+            // Disabled sources are left out; paused ones say so in their line.
+            ForEach(monitor.enabledServers) { server in
                 SourceRow(server: server, state: monitor.states[server.id]) { selectSource(server) }
             }
         }
@@ -271,7 +281,7 @@ private struct PopoverContent: View {
     private func footNote(_ summary: MonitorSummary, now: Date) -> String {
         switch summary.screen {
         case .empty:
-            return "No sources"
+            return summary.allDisabled ? "All sources disabled" : "No sources"
         case .waiting:
             return summary.isPaused ? "Paused" : "Checking…"
         case .unreachable:

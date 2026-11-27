@@ -99,3 +99,26 @@ struct SettingsFileTests {
         }
     }
 }
+
+/// A source paused from the menu bar panel stays paused after a restart, with the moment it was paused.
+struct PausedSettingsTests {
+    @Test func roundTripsPausedSince() throws {
+        var server = NagiosServer(name: "Staging", baseURL: URL(string: "https://staging.example.com")!, username: "")
+        server.pausedSince = Date(timeIntervalSince1970: 1_700_000_000)
+        let settings = PollySettings(servers: [.init(server: server)])
+        let yaml = SettingsFile.render(settings)
+        #expect(yaml.contains("    pausedSince: 2023-11-14T22:13:20Z\n"))
+        #expect(try SettingsFile.parse(yaml) == settings)
+    }
+
+    @Test func leavesOutPausedSinceWhenNotPaused() {
+        let server = NagiosServer(name: "Prod", baseURL: URL(string: "https://mon.example.com")!, username: "")
+        #expect(!SettingsFile.render(PollySettings(servers: [.init(server: server)])).contains("paused"))
+    }
+
+    @Test func rejectsAnUnreadablePausedSince() {
+        #expect(throws: SettingsFileError.self) {
+            try SettingsFile.parse("sources:\n  - url: https://x.example\n    pausedSince: yesterday\n")
+        }
+    }
+}

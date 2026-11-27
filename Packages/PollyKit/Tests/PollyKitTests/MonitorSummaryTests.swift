@@ -66,11 +66,13 @@ import Testing
         #expect(failed.unreachable?.message == "Timed out.")
     }
 
-    /// A paused server has no state and must not count, whatever is left in `states`.
-    @Test func disabledServersAreIgnored() {
-        var paused = nagios
-        paused.enabled = false
-        let summary = MonitorSummary(servers: [paused], states: [paused.id: .failed("x")])
+    /// A disabled or paused server has no state and must not count, whatever is left in `states`.
+    @Test func disabledAndPausedServersAreIgnored() {
+        var disabled = nagios
+        disabled.enabled = false
+        var paused = other
+        paused.pausedSince = Date(timeIntervalSince1970: 0)
+        let summary = MonitorSummary(servers: [disabled, paused], states: [disabled.id: .failed("x"), paused.id: .failed("x")])
         #expect(summary.unreachable == nil)
         #expect(summary.screen == .waiting)
         #expect(summary.headline == "Polly is not watching: all sources are paused")
@@ -177,12 +179,12 @@ import Testing
         #expect(ServerLine(server: nagios, state: .loading).icon == .loading)
         #expect(ServerLine(server: nagios, state: nil).text == "https://monitor.example.com")
 
-        var paused = nagios
-        paused.enabled = false
-        let pausedLine = ServerLine(server: paused, state: .failed("x"))
-        #expect(pausedLine.icon == .paused)
-        #expect(pausedLine.text == "Monitoring paused")
-        #expect(pausedLine.tint == nil)
+        var disabled = nagios
+        disabled.enabled = false
+        let disabledLine = ServerLine(server: disabled, state: .failed("x"))
+        #expect(disabledLine.icon == .disabled)
+        #expect(disabledLine.text == "Disabled")
+        #expect(disabledLine.tint == nil)
     }
 }
 
@@ -195,5 +197,87 @@ struct RelativeTimeTests {
         #expect(DurationFormatting.until(46) == "in 46 s")
         #expect(DurationFormatting.until(125) == "in 2 min")
         #expect(DurationFormatting.until(-5) == "due now")
+    }
+}
+
+/// Disabled sources (the switch in Settings) are left out completely; paused sources (the switch in the source
+/// detail) are listed, but not checked or counted.
+@MainActor
+@Suite struct PausedAndDisabledSummaryTests {
+    let prod = NagiosServer(name: "prod", baseURL: URL(string: "https://prod.example.com")!, username: "")
+    let staging = NagiosServer(name: "staging", baseURL: URL(string: "https://staging.example.com")!, username: "")
+
+    private func warnings(_ count: Int) -> MonitorModel.ServerState {
+        .ok(ServerStatus(hosts: HostCounts(up: 1), services: ServiceCounts(ok: 1, warning: count),
+                         problems: (0..<count).map { ServiceProblem(host: "h", service: "s\($0)", severity: .warning) },
+                         fetchedAt: Date(timeIntervalSince1970: 1000)))
+    }
+
+    private var pausedStaging: NagiosServer {
+        var server = staging
+        server.pausedSince = Date(timeIntervalSince1970: 55_800) // 15:30 UTC
+        return server
+    }
+
+    @Test func aPausedSourceIsNotCounted() {
+        let summary = MonitorSummary(servers: [prod, pausedStaging], states: [prod.id: warnings(1), staging.id: warnings(2)])
+        #expect(summary.count(.warning) == 1)
+        #expect(summary.paused == 1)
+        #expect(summary.mood == .warning)
+        #expect(summary.badge == "1")
+    }
+
+    @Test func everySourcePausedIsQuietWithThePausedCount() {
+        let summary = MonitorSummary(servers: [pausedStaging], states: [:])
+        #expect(summary.screen == .waiting)
+        #expect(summary.isPaused)
+        #expect(summary.headline == "Polly is not watching: all sources are paused")
+        #expect(summary.mood == .ok)
+        #expect(summary.badge == nil)
+        #expect(summary.paused == 1)
+    }
+
+    @Test func aDisabledSourceIsLeftOut() {
+        var disabled = staging
+        disabled.enabled = false
+        let summary = MonitorSummary(servers: [prod, disabled], states: [prod.id: warnings(1), staging.id: warnings(2)])
+        #expect(summary.count(.warning) == 1)
+        #expect(summary.paused == 0)
+    }
+
+    @Test func everySourceDisabledHasNothingToWatch() {
+        var disabled = staging
+        disabled.enabled = false
+        let summary = MonitorSummary(servers: [disabled], states: [:])
+        #expect(summary.screen == .empty)
+        #expect(summary.allDisabled)
+        #expect(summary.headline == "Polly has nothing to watch: all sources are disabled")
+        #expect(summary.mood == .ok)
+        #expect(summary.badge == nil)
+        #expect(!MonitorSummary(servers: [], states: [:]).allDisabled)
+    }
+
+    /// A disabled source that is also paused is just disabled.
+    @Test func aDisabledPausedSourceIsNotCountedAsPaused() {
+        var both = pausedStaging
+        both.enabled = false
+        #expect(MonitorSummary(servers: [prod, both], states: [:]).paused == 0)
+    }
+
+    @Test func sourceLines() {
+        let utc = TimeZone(identifier: "UTC")!
+        let locale = Locale(identifier: "en_GB")
+        let now = Date(timeIntervalSince1970: 57_600)
+        let today = ServerLine(server: pausedStaging, state: warnings(2), now: now, timeZone: utc, locale: locale)
+        #expect(today.icon == .paused)
+        #expect(today.text == "Paused since 15:30 · not checked")
+        let earlier = ServerLine(server: pausedStaging, state: nil, now: now + 3 * 86400, timeZone: utc, locale: locale)
+        // Another day also names the date; its exact form is up to the locale.
+        #expect(earlier.text.hasPrefix("Paused since ") && earlier.text.contains("1970") && earlier.text.contains("15:30"))
+        var disabled = pausedStaging
+        disabled.enabled = false
+        let line = ServerLine(server: disabled, state: nil)
+        #expect(line.icon == .disabled)
+        #expect(line.text == "Disabled")
     }
 }

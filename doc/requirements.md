@@ -74,7 +74,7 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   - The source list also shows the latest status or connection error.
   - The detail shows only this source, with host and service totals, problems grouped by severity, and the time of its last successful check.
   - Clicking a problem opens its check output and existing actions; **Refresh** checks this source again.
-  - Loading, paused and unreachable sources are distinguished from a source with no problems.
+  - Loading, paused, disabled and unreachable sources are distinguished from a source with no problems.
 - The user can duplicate a source to add a similar one without typing everything again.
   - macOS: **Duplicate…** in the context menu. iOS: **Duplicate…** in the context menu, or swipe right.
   - Opens the add form prefilled with the source's type, URL, username, password and bell; the name gets
@@ -83,8 +83,25 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
   by editing the file.
 - The user can delete a source (context menu; swipe left on iOS).
 - The user can refresh one source (context menu) or all sources (menu bar panel, pull to refresh on iOS).
-- Each source has an on/off switch to pause monitoring without deleting it.
-  - A paused source shows "Monitoring paused", is not polled and doesn't count towards the overall status.
+- Each source has an on/off switch in Settings to disable it without deleting it (`enabled: false` in
+  `polly.yaml`).
+  - A disabled source shows "Disabled" in Settings, is not polled and is left out of the overview completely, as
+    if it wasn't configured.
+- The user can pause a source: on macOS with **Check in Polly** in its detail in the menu bar panel (see
+  [macOS menu bar](#macos-menu-bar)), or with **Pause** / **Resume** in its context menu in Settings and on
+  iPhone and iPad.
+  - Why both: disabling is a setting ("I don't want this source here"); pausing is for now ("stop bothering me
+    about this one for a while") and stays visible, so it isn't forgotten.
+  - A paused source is not polled, its problems are not listed or counted and it sends no notifications.
+  - It stays in the overview's source list with a pause icon and "Paused since 15:30 · not checked" (with the
+    date when it was paused on another day).
+  - The pause is saved (`pausedSince` in `polly.yaml`) and survives a restart.
+    - Why: quitting Polly must not quietly resume a source that was paused because it was noisy; the menu bar
+      icon keeps it from being forgotten.
+  - Resuming checks the source right away; that first answer doesn't notify, like a source that is turned on
+    again.
+  - Pausing only affects Polly on this device, not the monitoring system or other users.
+  - A disabled source can't be paused; a source that is both is just disabled.
 - Each source has a bell to turn notifications on or off (see [Notifications](#notifications)).
 - Each source shows a one-line state:
   - "170 hosts, 1 down · 714 services, 1 crit, 3 warn", or "48 hosts up · 216 services OK" when all is well.
@@ -92,14 +109,15 @@ What Polly does and the rules it follows. See [AGENTS.md](../AGENTS.md) for how 
       and is written in its status color.
   - "Unreachable · <error>" in red when it can't be read; its URL while it is loading for the first time.
 - The icon in front of a source only says whether Polly can reach it: a green check when it answers,
-  a red error icon when it can't be reached, a pause icon when it is paused, a spinner while loading.
+  a red error icon when it can't be reached, a pause icon when it is paused, a minus icon when it is disabled,
+  a spinner while loading.
   - Problems on the hosts and services it monitors never change that icon; they show in the state line.
     *Why:* a red icon for one critical service made healthy monitors look unreachable.
 
 ## Overview
 
 The overview is the macOS menu bar panel and the iOS Problems tab. Both show the same summary of all enabled
-sources.
+sources that are not paused.
 
 - Problems (warning, critical and unknown services, and hosts that are down or unreachable) of all sources are
   grouped by severity: critical, then warning, then unknown; newest first within a group.
@@ -125,7 +143,8 @@ sources.
   - "Polly is checking your sources" before the first answer, or "Polly is not watching: all sources are
     paused".
   - "Polly is quiet. Go back to sleep." when everything answered and is fine.
-  - "Polly has nothing to watch yet" without sources.
+  - "Polly has nothing to watch yet" without sources, or "Polly has nothing to watch: all sources are
+    disabled".
 - Which screen is shown:
   - **Problems** when there is a problem or a host is down.
     - A host can be down while none of its services is listed as a problem; that still counts.
@@ -135,7 +154,8 @@ sources.
     sources are paused.
     - Why: nothing checked is not the same as nothing wrong; it must never look like "all is well".
   - **All quiet** with the number of hosts and services that are fine and when Polly checks again.
-  - **Empty** without sources, with **Add source…**.
+  - **Empty** without sources, with **Add source…**; when every source is disabled, how to turn one on, with
+    **Settings…** on macOS.
 - A source that can't be reached counts as unreachable in the mood, even when other sources are fine.
 
 ## macOS menu bar
@@ -153,9 +173,15 @@ sources.
   - Warning: a warning triangle and the number of warnings.
   - Unreachable: a faded Polly with the number of unknowns, or "?".
   - Otherwise just Polly. The non-critical icons adapt to a light or dark menu bar.
+  - When sources are paused, a pause sign and the number of paused sources follow, in every state; with a
+    critical problem it sits outside the red pill.
+    - When every source is paused there is nothing special: just Polly with the pause sign and number.
+    - Why: a paused source is easy to forget; the icon is always in sight.
 - The panel shows the overview, the list of sources with their state, and **Refresh**, **Settings…** and
   **Quit**.
-  - The footer says "Retrying in 46 s" when a source is unreachable, "Checking…", "Paused" or "No sources"; it
+  - It lists the enabled sources; disabled ones are left out, paused ones show their pause icon and line.
+  - The footer says "Retrying in 46 s" when a source is unreachable, "Checking…", "Paused", "No sources" or
+    "All sources disabled"; it
     doesn't say when the sources were last checked.
     - Why: with several sources one time for all of them says little, and an indicator that only matters when
       something is wrong doesn't belong in the footer. Each source's detail shows its own last refresh.
@@ -168,6 +194,12 @@ sources.
 - Clicking a source slides the panel to the source detail; "‹ Back" (or Escape) goes back.
   - It shows the source's name, type, URL, state line, when Polly last refreshed it ("14 s ago", or "Failed
     1 min ago · last answer 10 min ago") and when it refreshes next.
+  - **Check in Polly** pauses or resumes the source (see [Sources](#sources)).
+    - Its text says that it only affects Polly on this device, so it can't be mistaken for the monitoring
+      system's notification switch below it.
+    - While paused: "Last refresh" keeps counting from the last answer before the pause, there is no next
+      refresh, and the notification switch is greyed out with "Unknown while paused", as Polly doesn't read
+      the status that holds it.
   - For a source whose monitoring system reports it (Nagios), a switch turns that system's own notifications
     on or off (see [Notifications on the monitoring system](#notifications-on-the-monitoring-system)).
 - The Settings window has a sidebar with Sources, Alerts, Team, Account and About Polly.
@@ -251,7 +283,7 @@ sources.
 ## Nagios monitoring
 
 - Every enabled source is polled every 60 seconds, all sources in parallel.
-  - A result that arrives after the source was paused or deleted is discarded.
+  - A result that arrives after the source was paused, disabled or deleted is discarded.
   - When a poll and a manual refresh overlap, the answer of the refresh started last wins, whichever arrives
     first.
   - A server that refuses the connection must not crash the app.
@@ -316,6 +348,8 @@ sources.
   program-wide "notifications enabled" setting).
   - This is not Polly's bell: it turns off the notifications the monitoring system sends to all its contacts,
     for every host and service, not just the user's.
+  - Its label ("Nagios notifications for everyone") and its text say that it affects every user of that
+    monitoring system, whether it is on or off.
   - Turning it off asks for confirmation first, inside the panel, explaining that it affects everyone. Turning it
     on doesn't ask.
   - The command is sent once and never retried; a failure is shown under the switch.
@@ -401,7 +435,8 @@ sources.
 - The operator supplies a separate, absolute configuration path through `POLLY_CONFIG`.
   - The file is read once at startup and never rewritten. Restart to apply changes.
   - The list uses `sources:`. Legacy `servers:` is accepted without rewriting; combining both is an error.
-  - Only `passwordStorage: file` and Nagios sources are accepted, including paused entries.
+  - Only `passwordStorage: file` and Nagios sources are accepted. Disabled entries are left out; paused
+    entries are listed as paused.
   - HTTP(S) addresses must have a host and contain no embedded credentials or fragment. Pasted Nagios UI
     paths are normalized using the same endpoint rules as the native form.
   - Missing or invalid files, duplicate server IDs and unsupported settings prevent startup with a message

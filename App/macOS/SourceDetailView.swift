@@ -1,8 +1,8 @@
 import PollyKit
 import SwiftUI
 
-/// One source in the popover: its state, when Polly last heard from it, and the monitoring system's own
-/// notification switch.
+/// One source in the popover: its state, when Polly last heard from it, the switch that pauses it in Polly and the
+/// monitoring system's own notification switch.
 struct SourceDetailView: View {
     let server: NagiosServer
     let back: () -> Void
@@ -43,9 +43,14 @@ struct SourceDetailView: View {
                 let detail = monitor.sourceDetail(for: server, now: context.date)
                 VStack(alignment: .leading, spacing: 12) {
                     summary(detail, now: context.date)
+                    theme.divider.frame(height: 1)
+                    pauseSwitch
                     if let notifications = detail.notifications {
                         theme.divider.frame(height: 1)
                         notificationSwitch(notifications)
+                    } else if detail.paused, capabilities.contains(.monitorNotifications) {
+                        theme.divider.frame(height: 1)
+                        pausedNotificationSwitch
                     }
                     if let message {
                         Text(message).foregroundStyle(theme.severityText(.critical)).fixedSize(horizontal: false, vertical: true)
@@ -76,7 +81,7 @@ struct SourceDetailView: View {
             Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 10) {
                 GridRow {
                     fact("Last refresh", detail.lastRefresh)
-                    if server.enabled {
+                    if server.isActive {
                         // The next poll is only planned once the running one has finished.
                         fact("Next refresh", monitor.nextPollAt.map { DurationFormatting.until($0.timeIntervalSince(now)) }
                             ?? "Checking now")
@@ -94,16 +99,64 @@ struct SourceDetailView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Pausing only affects Polly on this device, unlike the monitoring system's notifications below it.
+    private var pauseSwitch: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Check in Polly").fontWeight(.semibold)
+                Group {
+                    if server.isPaused {
+                        Text("Paused: Polly doesn't check \(server.name), its problems aren't counted and you get no "
+                             + "notifications for it. Only Polly on this Mac is affected.")
+                    } else {
+                        Text("Polly checks \(server.name) every \(Int(monitor.pollInterval.components.seconds)) s. Pause it "
+                             + "to stop checking without changing anything in \(server.kind.displayName).")
+                    }
+                }
+                .font(.system(size: 12))
+                .foregroundStyle(server.isPaused ? theme.severityText(.warning) : theme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle("Check \(server.name) in Polly", isOn: Binding(
+                get: { !server.isPaused },
+                set: { checking in
+                    message = nil
+                    do { try monitor.setPaused(!checking, for: server) } catch { message = error.localizedDescription }
+                }))
+                .toggleStyle(PollyToggleStyle())
+                .labelsHidden()
+                .help(server.isPaused ? "Resume checking \(server.name)" : "Pause checking \(server.name)")
+        }
+    }
+
+    /// While paused Polly doesn't read the monitoring system's status, so the switch's position is unknown.
+    private var pausedNotificationSwitch: some View {
+        HStack(alignment: .top, spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(server.kind.displayName) notifications for everyone").fontWeight(.semibold)
+                Text("Unknown while paused.").font(.system(size: 12)).foregroundStyle(theme.muted)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Toggle("\(server.kind.displayName) notifications for everyone", isOn: .constant(false))
+                .toggleStyle(PollyToggleStyle())
+                .labelsHidden()
+                .disabled(true)
+        }
+        .opacity(0.55)
+    }
+
     private func notificationSwitch(_ notifications: SourceDetail.Notifications) -> some View {
         let kind = server.kind.displayName
         let switching = if case .switching = notifications { true } else { false }
         return VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("\(kind) notifications").fontWeight(.semibold)
+                    Text("\(kind) notifications for everyone").fontWeight(.semibold)
                     Group {
                         switch notifications {
-                        case .on: Text("\(kind) notifies its contacts about problems.")
+                        case .on: Text("\(kind) notifies all its contacts about problems. Switching this off silences "
+                                       + "\(kind) for every user, not just you.")
                         case .off: Text("Off for everyone: \(kind) notifies no one about any problem.")
                         case .switching(let enabled):
                             Text("Turning \(enabled ? "on" : "off")… waiting for \(kind) to report the change.")
@@ -115,7 +168,7 @@ struct SourceDetailView: View {
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 if working || switching { ProgressView().controlSize(.small) }
-                Toggle("\(kind) notifications", isOn: Binding(
+                Toggle("\(kind) notifications for everyone", isOn: Binding(
                     get: { confirmingOff ? false : notifications.isOn },
                     set: { enabled in
                         message = nil

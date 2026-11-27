@@ -27,9 +27,21 @@ struct SourceDetailTests {
         #expect(detail(.failed("timeout"), lastAttempt: now - 60).lastRefresh == "Failed 1 min ago")
         #expect(detail(.failed("timeout"), lastSuccess: now - 600, lastAttempt: now - 60).lastRefresh
             == "Failed 1 min ago · last answer 10 min ago")
+        var disabled = server
+        disabled.enabled = false
+        #expect(detail(nil, server: disabled).lastRefresh == "Disabled")
+    }
+
+    /// A paused source keeps saying when Polly last heard from it, and has no notification switch to show.
+    @Test func aPausedSourceShowsItsLastAnswer() {
         var paused = server
-        paused.enabled = false
-        #expect(detail(nil, server: paused).lastRefresh == "Paused")
+        paused.pausedSince = now - 60
+        let last = detail(ok(fetchedAt: now - 1080), server: paused, lastSuccess: now - 1080, lastAttempt: now - 1080)
+        #expect(last.lastRefresh == "18 min ago")
+        #expect(last.paused)
+        #expect(last.notifications == nil)
+        #expect(detail(nil, server: paused).lastRefresh == "Not yet")
+        #expect(!detail(nil).paused)
     }
 
     @Test func notificationSwitchFollowsTheMonitor() {
