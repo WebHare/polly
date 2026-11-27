@@ -147,7 +147,15 @@ public final class ServerStore: @unchecked Sendable {
         }
     }
 
-    /// Pauses or resumes monitoring of a server without touching its password.
+    /// Pauses a server from that moment, or resumes it with nil.
+    public func setPaused(since date: Date?, for id: UUID) throws {
+        try withSettings { settings in
+            guard let index = settings.servers.firstIndex(where: { $0.server.id == id }) else { return }
+            settings.servers[index].server.pausedSince = date
+        }
+    }
+
+    /// Disables or enables a server without touching its password.
     public func setEnabled(_ enabled: Bool, for id: UUID) throws {
         try withSettings { settings in
             guard let index = settings.servers.firstIndex(where: { $0.server.id == id }) else { return }

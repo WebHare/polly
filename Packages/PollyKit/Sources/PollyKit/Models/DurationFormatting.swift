@@ -21,6 +21,17 @@ public enum DurationFormatting {
         interval <= 0 ? "due now" : "in \(coarse(interval))"
     }
 
+    /// A moment in the recent past: "15:30" today, with the date on another day ("26 Nov 2026, 15:30").
+    public static func moment(_ date: Date, now: Date = .now, timeZone: TimeZone = .current,
+                              locale: Locale = .current) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        var style = Date.FormatStyle(date: calendar.isDate(date, inSameDayAs: now) ? .omitted : .abbreviated,
+                                     time: .shortened, locale: locale, calendar: calendar, timeZone: timeZone)
+        style.timeZone = timeZone
+        return date.formatted(style)
+    }
+
     private static func coarse(_ interval: TimeInterval) -> String {
         let seconds = Int(max(0, interval))
         if seconds < 60 { return "\(seconds) s" }
