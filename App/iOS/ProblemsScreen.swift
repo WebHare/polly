@@ -169,7 +169,7 @@ struct ProblemsScreen: View {
             case .empty:
                 Text(summary.headline).font(.system(size: 26, weight: .bold)).padding(.top, 14)
                 Text(summary.allDisabled ? "Turn a source on in Sources, or add one, and Polly starts polling right away."
-                                         : "Add a Nagios server or a URL and Polly starts polling right away.")
+                                         : "Add a Nagios server, a URL or a feed and Polly starts polling right away.")
                     .font(.system(size: 14)).foregroundStyle(theme.faint).lineSpacing(6).padding(.top, 8)
                 Menu("Add source…") {
                     Button("Nagios Server…", systemImage: "server.rack") { adding = .nagios }

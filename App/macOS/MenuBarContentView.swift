@@ -206,7 +206,7 @@ private struct PopoverContent: View {
         switch summary.screen {
         case .empty:
             Text(summary.allDisabled ? "Turn a source on in Settings and Polly starts checking it."
-                                     : "Add a Nagios server or a URL and Polly starts polling right away.")
+                                     : "Add a Nagios server, a URL or a feed and Polly starts polling right away.")
         case .unreachable:
             Text("\(summary.unreachable?.message ?? "") Polly keeps trying every \(Int(monitor.pollInterval.components.seconds)) s.")
         case .waiting:

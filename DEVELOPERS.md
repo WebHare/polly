@@ -65,6 +65,7 @@ Options:
 | `--user`, `--password` | `nagiosadmin`, `nagios` | Basic auth login |
 | `--no-auth` | | Accept requests without a login |
 | `--no-rotate` | | Start with automatic status changes paused |
+| `--token` | `polly-token` | Secret accepted by the Polly feed as `X-API-Key` or `Authorization: Bearer` |
 
 While it runs, press keys in its terminal to change what Polly sees:
 
@@ -174,6 +175,11 @@ The tests put the mock into a known state through endpoints that need no login:
 | `GET /mock/config?csrf=on\|off&dateFormat=us\|euro\|iso8601\|strict-iso8601` | `csrf=off` behaves like Nagios 4.5.11 and older (no CSRF token, as on monitor.webhare.net); `dateFormat` is Nagios' `date_format` (monitor.webhare.net uses `iso8601`) |
 | `GET /mock/config?notifications=on\|off&notificationComment=0\|1\|2&systemCommands=on\|off` | `notifications` is the program-wide `enable_notifications`; `notificationComment` is `CMT_DISABLE_NOTIFICATIONS`/`CMT_ENABLE_NOTIFICATIONS` in `cgi.cfg` (0 no comment field, 1 optional, 2 required); `systemCommands=off` takes the user out of `authorized_for_system_commands` |
 | `/redirect/<path>` | Answers with a 302 redirect to `/<path>` |
+
+The mock also serves its problems as a [Polly feed](doc/feed-format.md) at `/polly/feed.json`: one item per
+service that is not OK and per host that is down, with a deadline on critical items. Add it to Polly as a
+**Feed** with the custom header `X-API-Key` and the value `polly-token` (or `Authorization` with
+`Bearer polly-token`, or the Basic login).
 
 `URLMonitorNetworkTests` checks real websites, including badssl.com's broken certificates. It is skipped
 unless `POLLY_NETWORK_TESTS` is set:

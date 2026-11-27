@@ -1,7 +1,7 @@
 import Foundation
 
-// Everything the app needs from a monitoring system. Implemented by Nagios and by a plain "check this URL"
-// backend, so nothing in here may mention CGI names, HTML or Nagios status bits.
+// Everything the app needs from a monitoring system. Implemented by Nagios, by a plain "check this URL"
+// backend and by Polly feeds, so nothing in here may mention CGI names, HTML or Nagios status bits.
 
 /// The type of monitoring system a server runs. Stored as `type` in polly.yaml.
 public enum BackendKind: String, Sendable, CaseIterable, Identifiable {
@@ -9,6 +9,8 @@ public enum BackendKind: String, Sendable, CaseIterable, Identifiable {
     case nagios
     /// A website checked by Polly itself: DNS, HTTP and certificate (`URLMonitor`).
     case url
+    /// A JSON document listing what needs attention, in Polly's own format (`FeedClient`, doc/feed-format.md).
+    case feed
 
     public var id: String { rawValue }
 
@@ -17,6 +19,24 @@ public enum BackendKind: String, Sendable, CaseIterable, Identifiable {
         switch self {
         case .nagios: "Nagios"
         case .url: "URL"
+        case .feed: "Feed"
+        }
+    }
+
+    /// Example URL for the form's URL field.
+    public var urlPlaceholder: String {
+        switch self {
+        case .nagios: "https://nagios.example.com"
+        case .url: "https://www.example.com/"
+        case .feed: "https://portal.example.com/polly/feed.json"
+        }
+    }
+
+    /// The label of the button that opens a problem in the browser.
+    public var openLabel: String {
+        switch self {
+        case .nagios: "Open in Nagios"
+        case .url, .feed: "Open in browser"
         }
     }
 
@@ -29,8 +49,10 @@ public struct BackendCapabilities: OptionSet, Sendable {
     public let rawValue: Int
     public init(rawValue: Int) { self.rawValue = rawValue }
 
-    /// `checkURL(for:)` and `relatedURL(for:)` work.
+    /// `checkURL(for:)` works.
     public static let links = BackendCapabilities(rawValue: 1 << 0)
+    /// `relatedURL(for:)` works.
+    public static let relatedLinks = BackendCapabilities(rawValue: 1 << 3)
     /// `prepareCommand(_:for:)` works.
     public static let commands = BackendCapabilities(rawValue: 1 << 1)
     /// `setNotificationsEnabled(_:)` works.

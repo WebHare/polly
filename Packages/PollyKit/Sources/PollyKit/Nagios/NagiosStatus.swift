@@ -73,7 +73,16 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
     public var downtimeDepth: Int
     public var checkAttempt: CheckAttempt?
     public var nextCheck: Date?
-    public var id: String { "\(host)/\(service)" }
+    /// The source's own key for an item that isn't a host or service, such as a feed item. Identifies the problem
+    /// instead of host and service, so a renamed item is still the same problem.
+    public var itemID: String?
+    /// When the item has to be dealt with, if the source says so.
+    public var due: Date?
+    /// The item's own page, for a source that has one per item.
+    public var link: URL?
+    /// Extra facts about the item to show in its detail, in the source's order.
+    public var fields: [ProblemField]
+    public var id: String { itemID ?? "\(host)/\(service)" }
 
     public var isHost: Bool { hostState != nil }
 
@@ -97,7 +106,8 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
 
     public init(host: String, service: String, severity: Severity, since: Date? = nil, output: String = "",
                 longOutput: String = "", lastCheck: Date? = nil, acknowledged: Bool = false, downtimeDepth: Int = 0,
-                checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil, hostState: HostState? = nil) {
+                checkAttempt: CheckAttempt? = nil, nextCheck: Date? = nil, hostState: HostState? = nil,
+                itemID: String? = nil, due: Date? = nil, link: URL? = nil, fields: [ProblemField] = []) {
         self.host = host
         self.service = hostState == nil ? service : ""
         self.hostState = hostState
@@ -110,7 +120,37 @@ public struct ServiceProblem: Identifiable, Hashable, Sendable {
         self.downtimeDepth = downtimeDepth
         self.checkAttempt = checkAttempt
         self.nextCheck = nextCheck
+        self.itemID = itemID
+        self.due = due
+        self.link = link
+        self.fields = fields
     }
+}
+
+/// A label and value the source reports about a problem, shown as they are.
+public struct ProblemField: Hashable, Sendable {
+    public var label: String
+    public var value: String
+
+    public init(label: String, value: String) {
+        self.label = label
+        self.value = value
+    }
+}
+
+/// What a source that isn't about hosts and services calls the things it counts ("ticket", "tickets").
+public struct ItemNoun: Equatable, Sendable {
+    public var one: String
+    public var other: String
+
+    public init(one: String, other: String) {
+        self.one = one
+        self.other = other
+    }
+
+    public static let items = ItemNoun(one: "item", other: "items")
+
+    public func callAsFunction(_ count: Int) -> String { count == 1 ? one : other }
 }
 
 public extension ServiceProblem {
@@ -143,6 +183,9 @@ public struct ServerStatus: Equatable, Sendable {
     /// Whether the monitoring system itself sends notifications to its contacts (Nagios' program-wide
     /// `enable_notifications`); nil when it doesn't report this.
     public var notificationsEnabled: Bool? = nil
+    /// Set for a source that counts items instead of hosts and services (a feed). Its items are then counted in
+    /// `services`, and `hosts` stays empty.
+    public var itemNoun: ItemNoun? = nil
 
     public var severity: Severity {
         if hosts.down + hosts.unreachable > 0 || services.critical > 0 { return .critical }

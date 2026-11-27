@@ -1,7 +1,8 @@
 # Polly
 
 Polly keeps an eye on your monitoring from the macOS menu bar, your iPhone and your iPad. It reads the status of
-your Nagios servers and can check websites itself, without a monitoring system behind them. Problems of all
+your Nagios servers, can check websites itself, and shows any list of things that need attention (tickets, merge
+requests) that a server publishes as a [Polly feed](doc/feed-format.md). Problems of all
 sources are listed together, worst first, and Polly's mood in the menu bar tells you at a glance whether
 something needs attention.
 
@@ -33,8 +34,9 @@ and pick its type. Polly tests the connection before adding it; when that fails 
 For every source:
 
 - **Name** is optional; it defaults to the host name of the URL.
-- **Username and password** are optional, and sent as HTTP Basic authentication. Pasting a URL with
-  `https://user:password@host/` fills them in for you.
+- **Sign in with** a username and password (HTTP Basic), or a **custom header** with a secret value, such as
+  `X-API-Key` or `Authorization: Bearer <token>`. Both are optional. Pasting a URL with
+  `https://user:password@host/` fills in the username and password for you.
 - The **switch** in the settings disables a source without deleting it: Polly leaves it out completely.
 - **Pausing** keeps a source in the list but stops checking it, for example during maintenance. The menu bar
   icon shows how many sources are paused, so you don't forget them.
@@ -79,6 +81,23 @@ Polly checks a website itself, from your device. Use it for sites that no monito
   to a server whose certificate isn't trusted.
 - URL problems show no age: Polly keeps no history of them.
 - URL checks are available in the macOS, iPhone and iPad apps, not in the web dashboard.
+
+### Feed
+
+A feed is a JSON document in Polly's own format that a server publishes: SLA tickets, open merge requests or
+anything else that needs attention. Polly shows each item as a problem, next to those of your Nagios servers and
+URLs.
+
+- **URL:** the address of the feed, kept exactly as you enter it, including the path and query. Use a separate
+  URL for each list (such as `?list=mine`), so each gets its own switch and bell in Polly.
+- **Sign in** usually with a custom header, such as `X-API-Key` or `Authorization: Bearer <token>`.
+- **What you see:** each item with its group (where Nagios shows the host), title, severity and age, and in the
+  detail its deadline ("in 6d", "2h overdue"), summary, details, extra fields and a link to its page. The
+  source line counts the items: "16 tickets, 1 crit, 1 warn".
+- The server decides what is wrong and how bad it is; Polly shows the items and notifies when they change.
+  Feeds are read-only: Polly can't acknowledge or snooze items.
+- Redirects are not followed. A feed that breaks the format is refused as a whole, with the reason.
+- Building a feed? See [doc/feed-format.md](doc/feed-format.md).
 
 ## Settings file
 

@@ -15,11 +15,13 @@ struct ServersScreen: View {
                 VStack(spacing: 10) {
                     PollyMascot(mood: .ok, size: 96)
                     Text("Polly has nothing to watch yet").font(.system(size: 17, weight: .bold)).padding(.top, 6)
-                    Text("Add a Nagios server or a URL and Polly starts polling right away.")
+                    Text("Add a Nagios server, a URL or a feed and Polly starts polling right away.")
                         .font(.system(size: 14)).foregroundStyle(theme.muted)
                     Menu("Add source…") {
                         Button("Nagios Server…", systemImage: "server.rack") { form = ServerFormModel(kind: .nagios) }
                         Button("URL…", systemImage: "globe") { form = ServerFormModel(kind: .url) }
+                    Button("Feed…", systemImage: "list.bullet.rectangle") { form = ServerFormModel(kind: .feed) }
+                        Button("Feed…", systemImage: "list.bullet.rectangle") { form = ServerFormModel(kind: .feed) }
                     }
                     .menuStyle(.button)
                     .font(.system(size: 14, weight: .semibold))
@@ -65,8 +67,9 @@ struct ServersScreen: View {
                 Menu("Add", systemImage: "plus") {
                     Button("Nagios Server…", systemImage: "server.rack") { form = ServerFormModel(kind: .nagios) }
                     Button("URL…", systemImage: "globe") { form = ServerFormModel(kind: .url) }
+                    Button("Feed…", systemImage: "list.bullet.rectangle") { form = ServerFormModel(kind: .feed) }
                 }
-                .help("Add a Nagios server or a URL to check")
+                .help("Add a Nagios server, a URL to check or a feed")
             }
         }
         .refreshable { await monitor.refreshAll() }

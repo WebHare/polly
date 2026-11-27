@@ -72,6 +72,18 @@ public extension ServerStatus {
                 parts.append(.init(text, severity))
             }
         }
+        let bad = [(services.critical, "crit", Severity.critical), (services.warning, "warn", .warning),
+                   (services.unknown, "unknown", .unknown)].filter { $0.0 > 0 }
+        if let itemNoun {
+            // "16 tickets OK" / "16 tickets, 1 crit, 1 warn"
+            add("\(services.total) \(itemNoun(services.total))")
+            if bad.isEmpty { add(" OK") }
+            for (count, label, severity) in bad {
+                add(", ")
+                add("\(count) \(label)", severity)
+            }
+            return parts
+        }
         let down = hosts.down + hosts.unreachable
         if down > 0 {
             add("\(hosts.total) hosts, ")
@@ -79,8 +91,6 @@ public extension ServerStatus {
         } else {
             add("\(hosts.total) hosts up")
         }
-        let bad = [(services.critical, "crit", Severity.critical), (services.warning, "warn", .warning),
-                   (services.unknown, "unknown", .unknown)].filter { $0.0 > 0 }
         if bad.isEmpty {
             add(" · \(services.total) services OK")
         } else {

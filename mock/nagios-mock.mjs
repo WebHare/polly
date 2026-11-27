@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Mock Nagios server for testing Polly. No dependencies; needs Node 18+.
 //
-//   node mock/nagios-mock.mjs [--port 8080] [--interval 15] [--user nagiosadmin] [--password nagios] [--no-auth] [--no-rotate]
+//   node mock/nagios-mock.mjs [--port 8080] [--interval 15] [--user nagiosadmin] [--password nagios] [--token polly-token]
+//                             [--no-auth] [--no-rotate]
 //
 // Serves /nagios/cgi-bin/statusjson.cgi (programstatus, hostcount, servicecount, servicelist, hostlist)
 // with made-up hosts/services that slowly rotate through OK/WARNING/CRITICAL/UNKNOWN and host DOWN/UNREACHABLE.
@@ -16,6 +17,10 @@
 // - program-wide notifications show as enable_notifications in programstatus; commands 11 and 12 need
 //   authorized_for_system_commands (systemCommands=off refuses them) and take a comment only when CMT_ asks for one
 // --no-rotate starts with automatic rotation paused.
+//
+// Also serves /polly/feed.json: the same problems as a Polly feed (doc/feed-format.md), one item per service that
+// is not OK and per host that is down. It accepts the Basic login, or --token as "Authorization: Bearer <token>"
+// or "X-API-Key: <token>".
 //
 // Mock-only, without auth:
 //   GET /mock/reset                                       all hosts up, all services OK, no acks or downtimes
@@ -37,6 +42,7 @@ const { values: opts } = parseArgs({
     interval: { type: "string", default: "15" },
     user: { type: "string", default: "nagiosadmin" },
     password: { type: "string", default: "nagios" },
+    token: { type: "string", default: "polly-token" },
     "no-auth": { type: "boolean", default: false },
     "no-rotate": { type: "boolean", default: false },
   },
@@ -318,6 +324,57 @@ function checkAuth(req) {
   if (!header.startsWith("Basic ")) return false;
   const [user, ...rest] = Buffer.from(header.slice(6), "base64").toString().split(":");
   return user === opts.user && rest.join(":") === opts.password;
+}
+
+function checkFeedAuth(req) {
+  if (!state.auth || checkAuth(req)) return true;
+  return req.headers.authorization === `Bearer ${opts.token}` || req.headers["x-api-key"] === opts.token;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Polly feed (doc/feed-format.md)
+
+function feed(req) {
+  const origin = `http://${req.headers.host ?? `localhost:${opts.port}`}`;
+  const link = (params) => `${origin}/nagios/cgi-bin/extinfo.cgi?${new URLSearchParams(params)}`;
+  const iso = (ms) => new Date(ms).toISOString();
+  const items = [];
+  for (const [name, h] of hosts) {
+    if (h.status === HOST.up) continue;
+    items.push({
+      id: name,
+      group: name,
+      title: h.status === HOST.down ? "Host down" : "Host unreachable",
+      severity: "critical",
+      since: iso(h.lastChange),
+      summary: `Host is ${HOST_NAME[h.status].toUpperCase()}`,
+      acknowledged: !!h.ack,
+      url: link({ type: 1, host: name }),
+    });
+  }
+  let okCount = 0;
+  for (const s of services) {
+    if (s.status === SERVICE.ok) {
+      okCount++;
+      continue;
+    }
+    if (s.status === SERVICE.pending) continue;
+    items.push({
+      id: `${s.host}/${s.name}`,
+      group: s.host,
+      title: s.name,
+      severity: SERVICE_NAME[s.status],
+      since: iso(s.lastChange),
+      // A deadline, to show how a feed can say when something has to be dealt with.
+      ...(s.status === SERVICE.critical ? { due: iso(s.lastChange + 4 * 3600_000) } : {}),
+      summary: OUTPUT[s.status],
+      details: "Served by the mock's Polly feed.",
+      acknowledged: !!s.ack,
+      url: link({ type: 2, host: s.host, service: s.name }),
+      fields: [{ label: "Host", value: s.host }, { label: "Downtime", value: downtimeDepth(s.host, s.name) ? "yes" : "no" }],
+    });
+  }
+  return { polly: 1, url: `${origin}/nagios/`, okCount, noun: { one: "check", other: "checks" }, items };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -767,6 +824,10 @@ const server = http.createServer(async (req, res) => {
   if (state.offline) return send(503, '{"error":"mock server is offline"}');
   if (url.pathname.startsWith("/redirect/")) return send(302, '{"redirect":true}', { Location: url.pathname.slice("/redirect".length) + url.search });
   if (url.pathname.startsWith("/mock/")) return send(...handleControl(url));
+  if (url.pathname === "/polly/feed.json") {
+    if (!checkFeedAuth(req)) return send(401, '{"error":"unauthorized"}');
+    return send(200, feed(req));
+  }
 
   const cgi = url.pathname.startsWith("/nagios/cgi-bin/") ? url.pathname.slice("/nagios/cgi-bin/".length) : null;
   if (!["statusjson.cgi", "extinfo.cgi", "cmd.cgi"].includes(cgi)) return send(404, '{"error":"not found"}');
@@ -832,6 +893,7 @@ Without auth: GET /mock/reset, GET /mock/set?host=H&service=S&status=ok|warning|
   GET /mock/sethost?host=H&status=up|down|unreachable,
   GET /mock/config?csrf=on|off&dateFormat=${DATE_FORMATS.join("|")}, /redirect/<path> (302)
   GET /mock/config?notifications=on|off&notificationComment=0|1|2&systemCommands=on|off
+Polly feed: GET /polly/feed.json (Basic login, "Authorization: Bearer ${opts.token}" or "X-API-Key: ${opts.token}")
 `);
 }
 
@@ -898,6 +960,7 @@ server.listen(Number(opts.port), () => {
   const auth = state.auth ? `${encodeURIComponent(opts.user)}:${encodeURIComponent(opts.password)}@` : "";
   console.log(`Mock Nagios listening on http://localhost:${opts.port}/nagios/cgi-bin/statusjson.cgi`);
   console.log(`Add it to Polly with:  http://${auth}localhost:${opts.port}/`);
+  console.log(`Polly feed:            http://localhost:${opts.port}/polly/feed.json  (header X-API-Key: ${opts.token})`);
   if (process.stdin.isTTY) {
     process.stdin.setRawMode(true);
     process.stdin.setEncoding("utf8");

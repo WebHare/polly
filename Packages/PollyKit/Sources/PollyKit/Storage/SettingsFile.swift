@@ -96,6 +96,9 @@ public enum SettingsFile {
                 }
                 kind = value
             }
+            if let header = entry.authHeader, let problem = SourceCredentials.problem(withHeaderName: header) {
+                throw SettingsFileError(message: "polly.yaml: source #\(index + 1) has an invalid authHeader: \(problem)")
+            }
             var pausedSince: Date?
             if let text = entry.pausedSince {
                 guard let date = ISO8601DateFormatter().date(from: text) else {
@@ -111,7 +114,8 @@ public enum SettingsFile {
                 enabled: entry.enabled ?? true,
                 pausedSince: pausedSince,
                 kind: kind,
-                notifications: entry.notifications ?? false
+                notifications: entry.notifications ?? false,
+                authHeader: entry.authHeader
             )
             return PollySettings.Server(server: server, password: entry.password.flatMap { $0.isEmpty ? nil : $0 })
         }
@@ -125,6 +129,7 @@ public enum SettingsFile {
             var type: String?
             var url: String?
             var username: String?
+            var authHeader: String?
             var password: String?
             var enabled: Bool?
             var pausedSince: String?
@@ -160,6 +165,8 @@ public enum SettingsFile {
             # Where source passwords are kept:
             #   keychain  in the system keychain (recommended)
             #   file      unencrypted, as "password:" entries in this file
+            # A source with "authHeader: <name>" sends its password as the value of that header (for example
+            # X-API-Key, or Authorization with "Bearer <token>" as the password) instead of username and password.
             passwordStorage: \(settings.passwordStorage.rawValue)
 
             # macOS only: show a Dock icon in addition to the menu bar icon.
@@ -188,6 +195,9 @@ public enum SettingsFile {
             out += "    type: \(server.kind.rawValue)\n"
             out += "    url: \(scalar(server.baseURL.absoluteString))\n"
             out += "    username: \(scalar(server.username))\n"
+            if let header = server.authHeader {
+                out += "    authHeader: \(scalar(header))\n"
+            }
             if let password = entry.password {
                 out += "    password: \(scalar(password))\n"
             }

@@ -25,6 +25,23 @@ public final class ServerFormModel {
         case duplicate(NagiosServer)
     }
 
+    /// How the source authenticates.
+    public enum Authentication: String, CaseIterable, Identifiable, Sendable {
+        /// HTTP Basic with the username and password (or none when both are empty).
+        case basic
+        /// The password is sent as the value of the header named `headerName`.
+        case header
+
+        public var id: String { rawValue }
+
+        public var label: String {
+            switch self {
+            case .basic: "Username & password"
+            case .header: "Custom header"
+            }
+        }
+    }
+
     public let purpose: Purpose
 
     /// What is being added. Decides how the URL is read and which backend tests it.
@@ -36,7 +53,15 @@ public final class ServerFormModel {
     }
     public var name = ""
     public var username = ""
+    /// The password, or the header value with `.header` authentication.
     public var password = ""
+    public var authentication: Authentication = .basic {
+        didSet { if authentication != oldValue { checkState = .idle } }
+    }
+    /// The header to send the password in, with `.header` authentication.
+    public var headerName = "" {
+        didSet { if headerName != oldValue { checkState = .idle } }
+    }
     public private(set) var checkState: CheckState = .idle
 
     /// The URL field. Setting a URL containing `user:pass@` moves those into the
@@ -100,6 +125,10 @@ public final class ServerFormModel {
         username = server.username
         self.password = password ?? ""
         originalPassword = password ?? ""
+        if let header = server.authHeader {
+            authentication = .header
+            headerName = header
+        }
     }
 
     /// A name that is just the URL's host is the default, so it is left empty to keep following the URL.
@@ -113,22 +142,32 @@ public final class ServerFormModel {
     }
 
     public var parsedURL: URL? { parse(urlText)?.baseURL }
-    public var canSubmit: Bool { parsedURL != nil && checkState != .checking }
+    public var canSubmit: Bool { parsedURL != nil && headerNameProblem == nil && checkState != .checking }
+
+    private var trimmedHeaderName: String { headerName.trimmingCharacters(in: .whitespaces) }
+
+    /// Why the header name can't be used; nil when it can or isn't used.
+    public var headerNameProblem: String? {
+        authentication == .header ? SourceCredentials.problem(withHeaderName: trimmedHeaderName) : nil
+    }
 
     /// False when an edit only changed the name, so saving doesn't wait for (or fail on) the server.
     public var needsConnectionTest: Bool {
         guard case .edit(let original) = purpose else { return true }
-        return parsedURL != original.baseURL || kind != original.kind || username != original.username
-            || password != originalPassword
+        guard let server = makeServer() else { return true }
+        return server.baseURL != original.baseURL || kind != original.kind || server.username != original.username
+            || server.authHeader != original.authHeader || password != originalPassword
     }
 
     public func makeServer() -> NagiosServer? {
-        guard let url = parsedURL else { return nil }
+        guard let url = parsedURL, headerNameProblem == nil else { return nil }
+        let header = authentication == .header ? trimmedHeaderName : nil
         let trimmedName = name.trimmingCharacters(in: .whitespaces)
         var server = NagiosServer(name: trimmedName.isEmpty ? (url.host() ?? url.absoluteString) : trimmedName,
                                   baseURL: url,
-                                  username: username,
-                                  kind: kind)
+                                  username: header == nil ? username : "",
+                                  kind: kind,
+                                  authHeader: header)
         switch purpose {
         case .add:
             break
@@ -146,7 +185,7 @@ public final class ServerFormModel {
     @discardableResult
     public func testConnection() async -> Bool {
         guard let server = makeServer() else {
-            checkState = .failed("Please enter a valid http(s) URL.")
+            checkState = .failed(headerNameProblem ?? "Please enter a valid http(s) URL.")
             return false
         }
         checkState = .checking
@@ -167,6 +206,7 @@ public final class ServerFormModel {
         else { return }
         if let user = parsed.username { username = user }
         if let pass = parsed.password { password = pass }
+        authentication = .basic
         // Rewrite the field without the credentials (this re-enters didSet, which is then a no-op).
         urlText = parsed.baseURL.absoluteString
     }

@@ -428,19 +428,23 @@ private struct ServerFormSheet: View {
                 }
                 GridRow {
                     label("URL")
-                    TextField("URL", text: $model.urlFieldText,
-                              prompt: Text(verbatim: model.kind == .url ? "https://www.example.com/" : "https://nagios.example.com"))
+                    TextField("URL", text: $model.urlFieldText, prompt: Text(verbatim: model.kind.urlPlaceholder))
                         .textContentType(.URL)
                         .autocorrectionDisabled()
                         .pollyField()
                 }
                 GridRow {
                     Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
-                    (model.kind == .url
-                        ? Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
-                        : Text("Polly reads ")
-                            + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
-                            + Text(" (Nagios 4.4 or newer)."))
+                    Group {
+                        switch model.kind {
+                        case .url: Text("Polly checks DNS, the HTTP answer and, for https, the certificate itself.")
+                        case .feed: Text("A JSON feed in Polly's format, listing what needs attention. The URL is used as entered.")
+                        case .nagios:
+                            Text("Polly reads ")
+                                + Text("cgi-bin/statusjson.cgi").font(.system(size: 12, design: .monospaced))
+                                + Text(" (Nagios 4.4 or newer).")
+                        }
+                    }
                         .font(.system(size: 12))
                         .foregroundStyle(theme.faint)
                         .padding(.top, -4)
@@ -451,21 +455,54 @@ private struct ServerFormSheet: View {
                         .pollyField()
                 }
                 GridRow {
-                    label("Username")
-                    TextField("Username", text: $model.username)
-                        .textContentType(.username)
-                        .autocorrectionDisabled()
-                        .pollyField()
+                    label("Sign in with")
+                    Picker("Sign in with", selection: $model.authentication) {
+                        ForEach(ServerFormModel.Authentication.allCases) { Text($0.label).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    .fixedSize()
                 }
-                GridRow {
-                    label("Password")
-                    HStack(spacing: 10) {
-                        SecureField("Password", text: $model.password)
-                            .textContentType(.password)
+                if model.authentication == .header {
+                    GridRow {
+                        label("Header")
+                        TextField("Header", text: $model.headerName, prompt: Text(verbatim: "X-API-Key or Authorization"))
+                            .autocorrectionDisabled()
                             .pollyField()
-                        Text(monitor.passwordStorage == .keychain ? "Stored in your Keychain" : "Stored in polly.yaml")
-                            .font(.system(size: 12))
-                            .foregroundStyle(theme.faint)
+                    }
+                    if let problem = model.headerNameProblem, !model.headerName.isEmpty {
+                        GridRow {
+                            Color.clear.gridCellUnsizedAxes([.horizontal, .vertical])
+                            Text(problem)
+                                .font(.system(size: 12))
+                                .foregroundStyle(theme.severityText(.critical))
+                                .padding(.top, -4)
+                        }
+                    }
+                    GridRow {
+                        label("Value")
+                        HStack(spacing: 10) {
+                            SecureField("Value", text: $model.password, prompt: Text(verbatim: "Bearer … or the API key"))
+                                .pollyField()
+                            storageNote
+                        }
+                    }
+                } else {
+                    GridRow {
+                        label("Username")
+                        TextField("Username", text: $model.username)
+                            .textContentType(.username)
+                            .autocorrectionDisabled()
+                            .pollyField()
+                    }
+                    GridRow {
+                        label("Password")
+                        HStack(spacing: 10) {
+                            SecureField("Password", text: $model.password)
+                                .textContentType(.password)
+                                .pollyField()
+                            storageNote
+                        }
                     }
                 }
                 GridRow {
@@ -512,6 +549,12 @@ private struct ServerFormSheet: View {
 
     private func label(_ text: String) -> some View {
         Text(text).foregroundStyle(theme.muted).frame(width: 110, alignment: .trailing)
+    }
+
+    private var storageNote: some View {
+        Text(monitor.passwordStorage == .keychain ? "Stored in your Keychain" : "Stored in polly.yaml")
+            .font(.system(size: 12))
+            .foregroundStyle(theme.faint)
     }
 
     @ViewBuilder private var banner: some View {
@@ -574,7 +617,7 @@ private struct ServerFormSheet: View {
 }
 
 
-/// The type segmented control: Nagios and URL work, the other systems are drawn from the design.
+/// The type segmented control: Nagios, URL and Feed work, the other systems are drawn from the design.
 private struct TypePicker: View {
     @Binding var selection: BackendKind
     @Environment(\.pollyTheme) private var theme

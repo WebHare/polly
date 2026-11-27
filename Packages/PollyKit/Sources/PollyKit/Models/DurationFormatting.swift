@@ -21,6 +21,13 @@ public enum DurationFormatting {
         interval <= 0 ? "due now" : "in \(coarse(interval))"
     }
 
+    /// How far off a deadline is: "in 6d", "2h overdue", or "due now" in the minute it passes.
+    public static func due(_ date: Date, now: Date) -> String {
+        let interval = date.timeIntervalSince(now)
+        if abs(interval) < 60 { return "due now" }
+        return interval > 0 ? "in \(short(interval))" : "\(short(-interval)) overdue"
+    }
+
     /// A moment in the recent past: "15:30" today, with the date on another day ("26 Nov 2026, 15:30").
     public static func moment(_ date: Date, now: Date = .now, timeZone: TimeZone = .current,
                               locale: Locale = .current) -> String {

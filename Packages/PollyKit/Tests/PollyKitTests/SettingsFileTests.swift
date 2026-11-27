@@ -86,6 +86,29 @@ struct SettingsFileTests {
         #expect(!old.servers[0].server.notifications)
     }
 
+    @Test func roundTripsFeedsAndCustomHeaders() throws {
+        var settings = PollySettings(passwordStorage: .file)
+        settings.servers.append(.init(server: NagiosServer(name: "Tickets", baseURL: URL(string: "https://portal.example.com/feed?list=mine")!,
+                                                           username: "", kind: .feed, authHeader: "X-API-Key"),
+                                      password: "k3y"))
+        settings.servers.append(.init(server: NagiosServer(name: "Plain", baseURL: URL(string: "https://mon.example.com")!, username: "")))
+        let yaml = SettingsFile.render(settings)
+        #expect(yaml.contains("    type: feed\n"))
+        #expect(yaml.contains("    authHeader: X-API-Key\n"))
+        #expect(yaml.components(separatedBy: "\n    authHeader:").count == 2)
+        let parsed = try SettingsFile.parse(yaml)
+        #expect(parsed == settings)
+        #expect(parsed.servers[1].server.authHeader == nil)
+    }
+
+    @Test func refusesHeaderNamesThatAreNotHeaders() {
+        for name in ["", "X API", "Host", "content-length", "X-Key:"] {
+            #expect(throws: SettingsFileError.self) {
+                try SettingsFile.parse("sources:\n  - url: https://x.example\n    authHeader: \"\(name)\"\n")
+            }
+        }
+    }
+
     // TODO: Remove with the `servers:` migration after 2026-11-23.
     @Test func readsLegacyServersKey() throws {
         let legacy = try SettingsFile.parseMigrating("servers:\n  - url: https://mon.example.com\n")

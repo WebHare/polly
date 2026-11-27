@@ -6,6 +6,10 @@ Changes in Polly, newest first. Add user-facing changes under `[Unreleased]`; mo
 
 ### Added
 
+- Feeds: a new source type that shows what a server lists as needing attention, such as SLA tickets, as
+  problems next to Nagios and URLs. The JSON format is described in `doc/feed-format.md`.
+- Sources can authenticate with a custom header, such as `X-API-Key` or `Authorization: Bearer …`, instead of
+  a username and password.
 - Click a source in macOS Settings to see its live status, problems and check details. Source rows now show status or connection errors, with a separate edit button.
 
 - A locally buildable Linux container and Docker Compose setup for the web dashboard, with private

@@ -67,6 +67,49 @@ struct ServerFormTests {
         #expect(ServerFormModel(duplicating: custom, password: "pw").needsConnectionTest)
     }
 
+    @Test func aCustomHeaderReplacesTheUsername() throws {
+        let model = ServerFormModel(kind: .feed)
+        model.urlText = "https://portal.example.com/polly/feed?list=mine"
+        #expect(model.parsedURL?.absoluteString == "https://portal.example.com/polly/feed?list=mine")
+        model.username = "alice"
+        model.authentication = .header
+        #expect(!model.canSubmit)
+        model.headerName = " X API "
+        #expect(model.headerNameProblem != nil)
+        #expect(!model.canSubmit)
+        model.headerName = " X-API-Key "
+        #expect(model.headerNameProblem == nil)
+        model.password = "k3y"
+        let server = try #require(model.makeServer())
+        #expect(server.authHeader == "X-API-Key")
+        #expect(server.username == "")
+        #expect(server.kind == .feed)
+
+        model.authentication = .basic
+        #expect(try #require(model.makeServer()).authHeader == nil)
+        #expect(try #require(model.makeServer()).username == "alice")
+    }
+
+    @Test func editingAHeaderSourceKeepsTheHeader() {
+        let source = NagiosServer(name: "Tickets", baseURL: URL(string: "https://portal.example.com/feed")!, username: "",
+                                  kind: .feed, authHeader: "Authorization")
+        let model = ServerFormModel(editing: source, password: "Bearer t")
+        #expect(model.authentication == .header)
+        #expect(model.headerName == "Authorization")
+        #expect(model.password == "Bearer t")
+        #expect(!model.needsConnectionTest)
+        model.headerName = "X-API-Key"
+        #expect(model.needsConnectionTest)
+    }
+
+    @Test func pastedCredentialsSwitchBackToUsernameAndPassword() {
+        let model = ServerFormModel(kind: .feed)
+        model.authentication = .header
+        model.urlText = "https://alice:pw@portal.example.com/feed"
+        #expect(model.authentication == .basic)
+        #expect(model.username == "alice")
+    }
+
     @Test func updateSavesInPlaceAndForgetsTheOldStatusWhenTheURLChanged() throws {
         let store = try ServerStore(fileURL: nil, credentials: InMemoryCredentialStore())
         let other = NagiosServer(name: "Other", baseURL: URL(string: "https://other.example.com")!, username: "")

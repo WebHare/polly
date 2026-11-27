@@ -34,6 +34,8 @@ public struct NagiosClient: MonitorBackend {
     public var endpoint: URL
     public var username: String
     public var password: String?
+    /// When set, `password` is sent as this header instead of Basic authentication.
+    public var authHeader: String?
     public var session: URLSession
     /// Records every request and response when set.
     public var wireLog: WireLog?
@@ -47,9 +49,10 @@ public struct NagiosClient: MonitorBackend {
 
     public init(server: NagiosServer, password: String?, session: URLSession = .shared) {
         self.init(endpoint: server.statusJSONURL, username: server.username, password: password, session: session)
+        authHeader = server.authHeader
     }
 
-    public var capabilities: BackendCapabilities { [.links, .commands, .monitorNotifications] }
+    public var capabilities: BackendCapabilities { [.links, .relatedLinks, .commands, .monitorNotifications] }
 
     /// Connectivity check: runs the cheap `programstatus` query and verifies the answer.
     public func testConnection() async throws {
@@ -200,10 +203,8 @@ public struct NagiosClient: MonitorBackend {
 
     private func request(url: URL) -> URLRequest {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 15)
-        if !username.isEmpty || password != nil {
-            let token = Data("\(username):\(password ?? "")".utf8).base64EncodedString()
-            request.setValue("Basic \(token)", forHTTPHeaderField: "Authorization")
-        }
+        SourceCredentials(username: authHeader == nil ? username : "", password: password, headerName: authHeader)
+            .apply(to: &request)
         return request
     }
 
@@ -272,8 +273,8 @@ public struct NagiosClient: MonitorBackend {
     }
 }
 
-/// Following a redirect would send the Basic credentials to wherever it points.
-private final class RedirectRefuser: NSObject, URLSessionTaskDelegate, Sendable {
+/// Following a redirect would send the credentials to wherever it points.
+final class RedirectRefuser: NSObject, URLSessionTaskDelegate, Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping @Sendable (URLRequest?) -> Void) {
         completionHandler(nil)

@@ -139,10 +139,25 @@ struct ProblemDetailView: View {
                         // Polly keeps no record of what it notified about.
                         fact("Notified", "You · 09:21 push", placeholder: true)
                     }
+                    let extras = extraFacts(now: context.date)
+                    ForEach(Array(stride(from: 0, to: extras.count, by: 2)), id: \.self) { index in
+                        GridRow {
+                            fact(extras[index].label, extras[index].value)
+                            if index + 1 < extras.count {
+                                fact(extras[index + 1].label, extras[index + 1].value)
+                            }
+                        }
+                    }
                 }
             }
         }
         .padding(EdgeInsets(top: 14, leading: 14, bottom: 12, trailing: 14))
+    }
+
+    /// The deadline and the source's own facts about the problem, if it reports any.
+    private func extraFacts(now: Date) -> [ProblemField] {
+        let due = problem.due.map { ProblemField(label: "Due", value: "\(DurationFormatting.due($0, now: now)) · \(Self.clock($0))") }
+        return (due.map { [$0] } ?? []) + problem.fields
     }
 
     private func fact(_ label: String, _ value: String?, placeholder: Bool = false) -> some View {
@@ -186,14 +201,16 @@ struct ProblemDetailView: View {
             }
             if capabilities.contains(.links) {
                 HStack(spacing: 14) {
-                    Button("Open in \(server.kind.displayName) ↗") {
+                    Button("\(server.kind.openLabel) ↗") {
                         run { openURL(try monitor.backend(for: server).checkURL(for: problem)) }
                     }
                     .help("Open this check on the server")
-                    Button("Related link ↗") {
-                        run { openURL(try await monitor.backend(for: server).relatedURL(for: problem)) }
+                    if capabilities.contains(.relatedLinks) {
+                        Button("Related link ↗") {
+                            run { openURL(try await monitor.backend(for: server).relatedURL(for: problem)) }
+                        }
+                        .help("Open the action or notes link of this check")
                     }
-                    .help("Open the action or notes link of this check")
                 }
                 .buttonStyle(PollyLinkStyle())
                 .padding(.top, 2)
