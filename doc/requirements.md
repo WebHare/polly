@@ -449,6 +449,13 @@ Drawn from the design and tagged as such, but without function:
 ## Versions and updates
 
 - The app shows its version and build number from the same values used to build it.
+- A local build (built on a developer's machine) shows its build number, build date and time (in the local time
+  zone) and version in a small line: at the bottom of the macOS panel, and under the version in Settings on
+  iPhone and iPad.
+  - *Why:* so a developer can see at a glance whether they are running an up-to-date local build or the App
+    Store version.
+  - TestFlight and App Store builds don't show this line.
+  - The build date is when the app's program file was last built.
 - **What's New** works offline and lists the changelog newest first.
   - Release builds show published version sections only; development builds also show unreleased entries.
 - Polly is distributed through TestFlight and the App Store on macOS, iPhone and iPad.
